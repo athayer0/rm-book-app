@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "rm-book-app",
-    "slug": "rm-book-app",
+    "name": "RM Book",
+    "slug": "rm-book",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
