@@ -11,6 +11,7 @@ export interface CalendarEvent {
   notes?: string;
   recurring: boolean;
   recurringRule?: 'daily' | 'weekly' | 'monthly';
+  completed?: boolean;
 }
 
 export function generateId(): string {
@@ -69,7 +70,7 @@ export function eventTopOffset(startTime: string, gridStartHour: number = 6): nu
 export function eventHeight(startTime: string, endTime: string): number {
   const startMinutes = timeToMinutes(startTime);
   const endMinutes = timeToMinutes(endTime);
-  const duration = Math.max(endMinutes - startMinutes, 30);
+  const duration = Math.max(endMinutes - startMinutes, 15);
   return (duration / 30) * 50;
 }
 

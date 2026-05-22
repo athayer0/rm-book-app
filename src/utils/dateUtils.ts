@@ -65,3 +65,17 @@ export function timeToMinutes(hour: number, minute: number): number {
 export function addWeeksToDate(date: Date, weeks: number): Date {
   return addWeeks(date, weeks);
 }
+
+export function addMinutesToTimeString(timeStr: string, minutes: number): string {
+  const [time, ampm] = timeStr.split(' ');
+  let [hour, minute] = time.split(':').map(Number);
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  const total = hour * 60 + minute + minutes;
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  const h12 = h % 12 || 12;
+  const mm = String(m).padStart(2, '0');
+  const suffix = h < 12 ? 'AM' : 'PM';
+  return `${h12}:${mm} ${suffix}`;
+}

@@ -23,8 +23,9 @@ export function AppNavigation() {
             backgroundColor: Colors.white,
             borderTopColor: Colors.border,
             borderTopWidth: 1,
-            paddingBottom: 4,
-            height: 60,
+            paddingTop: 0,
+            paddingBottom: 10,
+            height: 85,
           },
           tabBarLabelStyle: {
             fontSize: 11,

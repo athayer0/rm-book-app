@@ -4,15 +4,19 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, EventColors, EventTypeLabels } from '../constants/colors';
+import { Colors, EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
 import { CalendarEvent } from '../utils/eventUtils';
+import { addMinutesToTimeString } from '../utils/dateUtils';
+import { AppSettings } from '../hooks/useSettings';
 import { format } from 'date-fns';
 
 interface Props {
   visible: boolean;
   event?: CalendarEvent | null;
   defaultDate?: string;
-  onSave: (event: Omit<CalendarEvent, 'id'>) => void;
+  defaultStartTime?: string;
+  settings: AppSettings;
+  onSave: (event: Omit<CalendarEvent, 'id'>) => Promise<void>;
   onDelete?: (id: string) => void;
   onClose: () => void;
 }
@@ -29,18 +33,33 @@ for (let h = 6; h <= 22; h++) {
   }
 }
 
-export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelete, onClose }: Props) {
+function resolvedColor(type: string, settings: AppSettings): string {
+  return settings.eventTypeColors[type] ?? EventColors[type] ?? Colors.accent;
+}
+
+function resolvedDefaultMinutes(type: string, settings: AppSettings): number {
+  const config = EventTypeConfig[type];
+  if (config?.defaultMinutes === 0) return 15; // fixed block
+  return settings.eventTypeDefaultMinutes[type] ?? config?.defaultMinutes ?? 30;
+}
+
+function isFixedType(type: string): boolean {
+  return EventTypeConfig[type]?.defaultMinutes === 0;
+}
+
+export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, onSave, onDelete, onClose }: Props) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState('scripture');
   const [date, setDate] = useState(defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
   const [startTime, setStartTime] = useState('9:00 AM');
-  const [endTime, setEndTime] = useState('10:00 AM');
+  const [endTime, setEndTime] = useState('9:30 AM');
   const [notes, setNotes] = useState('');
   const [recurring, setRecurring] = useState(false);
   const [recurringRule, setRecurringRule] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (event) {
@@ -53,32 +72,57 @@ export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelet
       setRecurring(event.recurring);
       setRecurringRule(event.recurringRule ?? 'weekly');
     } else {
+      const initialStart = defaultStartTime ?? '9:00 AM';
       setTitle('');
       setType('scripture');
       setDate(defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
-      setStartTime('9:00 AM');
-      setEndTime('10:00 AM');
+      setStartTime(initialStart);
+      setEndTime(addMinutesToTimeString(initialStart, resolvedDefaultMinutes('scripture', settings)));
       setNotes('');
       setRecurring(false);
       setRecurringRule('weekly');
     }
-  }, [event, defaultDate, visible]);
+    setError('');
+  }, [event, defaultDate, defaultStartTime, visible]);
 
-  function handleSave() {
-    if (!title.trim()) return;
-    onSave({
-      title: title.trim(),
-      type,
-      color: EventColors[type] ?? Colors.accent,
-      date,
-      startTime,
-      endTime,
-      notes: notes.trim(),
-      recurring,
-      recurringRule: recurring ? recurringRule : undefined,
-    });
-    onClose();
+  function handleTypeChange(newType: string) {
+    setType(newType);
+    if (!title) setTitle(EventTypeLabels[newType] ?? '');
+    setEndTime(addMinutesToTimeString(startTime, resolvedDefaultMinutes(newType, settings)));
+    setShowTypePicker(false);
   }
+
+  function handleStartTimeChange(t: string) {
+    setStartTime(t);
+    setEndTime(addMinutesToTimeString(t, resolvedDefaultMinutes(type, settings)));
+    setShowStartPicker(false);
+  }
+
+  async function handleSave() {
+    setError('');
+    const computedEnd = isFixedType(type)
+      ? addMinutesToTimeString(startTime, 15)
+      : endTime;
+    try {
+      await onSave({
+        title: title.trim() || (EventTypeLabels[type] ?? type),
+        type,
+        color: resolvedColor(type, settings),
+        date,
+        startTime,
+        endTime: computedEnd,
+        notes: notes.trim(),
+        recurring,
+        recurringRule: recurring ? recurringRule : undefined,
+      });
+      onClose();
+    } catch (e) {
+      console.error('[AddEditEventModal] onSave failed:', e);
+      setError('Failed to save event. Please try again.');
+    }
+  }
+
+  const fixed = isFixedType(type);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -93,6 +137,7 @@ export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelet
           </TouchableOpacity>
         </View>
 
+        {!!error && <Text style={styles.errorBanner}>{error}</Text>}
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
           {/* Title */}
           <View style={styles.section}>
@@ -110,7 +155,7 @@ export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelet
           <View style={styles.section}>
             <Text style={styles.label}>Event Type</Text>
             <TouchableOpacity style={styles.picker} onPress={() => setShowTypePicker(!showTypePicker)}>
-              <View style={[styles.colorDot, { backgroundColor: EventColors[type] }]} />
+              <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
               <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
               <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
             </TouchableOpacity>
@@ -121,9 +166,9 @@ export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelet
                     <TouchableOpacity
                       key={t}
                       style={styles.dropdownItem}
-                      onPress={() => { setType(t); if (!title) setTitle(EventTypeLabels[t]); setShowTypePicker(false); }}
+                      onPress={() => handleTypeChange(t)}
                     >
-                      <View style={[styles.colorDot, { backgroundColor: EventColors[t] }]} />
+                      <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
                       <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
                       {type === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
                     </TouchableOpacity>
@@ -157,7 +202,7 @@ export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelet
                 <View style={styles.dropdown}>
                   <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
                     {TIME_OPTIONS.map(t => (
-                      <TouchableOpacity key={t} style={styles.dropdownItem} onPress={() => { setStartTime(t); setShowStartPicker(false); }}>
+                      <TouchableOpacity key={t} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
                         <Text style={styles.dropdownText}>{t}</Text>
                         {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
                       </TouchableOpacity>
@@ -166,25 +211,28 @@ export function AddEditEventModal({ visible, event, defaultDate, onSave, onDelet
                 </View>
               )}
             </View>
-            <View style={[styles.section, { flex: 1 }]}>
-              <Text style={styles.label}>End Time</Text>
-              <TouchableOpacity style={styles.picker} onPress={() => setShowEndPicker(!showEndPicker)}>
-                <Text style={styles.pickerText}>{endTime}</Text>
-                <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-              </TouchableOpacity>
-              {showEndPicker && (
-                <View style={styles.dropdown}>
-                  <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
-                    {TIME_OPTIONS.map(t => (
-                      <TouchableOpacity key={t} style={styles.dropdownItem} onPress={() => { setEndTime(t); setShowEndPicker(false); }}>
-                        <Text style={styles.dropdownText}>{t}</Text>
-                        {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
+
+            {!fixed && (
+              <View style={[styles.section, { flex: 1 }]}>
+                <Text style={styles.label}>End Time</Text>
+                <TouchableOpacity style={styles.picker} onPress={() => setShowEndPicker(!showEndPicker)}>
+                  <Text style={styles.pickerText}>{endTime}</Text>
+                  <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
+                </TouchableOpacity>
+                {showEndPicker && (
+                  <View style={styles.dropdown}>
+                    <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+                      {TIME_OPTIONS.map(t => (
+                        <TouchableOpacity key={t} style={styles.dropdownItem} onPress={() => { setEndTime(t); setShowEndPicker(false); }}>
+                          <Text style={styles.dropdownText}>{t}</Text>
+                          {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Notes */}
@@ -258,24 +306,10 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     backgroundColor: Colors.card,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  cancel: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-  },
-  save: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.accent,
-  },
-  form: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  headerTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
+  cancel: { fontSize: 16, color: Colors.textSecondary },
+  save: { fontSize: 16, fontWeight: '600', color: Colors.accent },
+  form: { flex: 1, backgroundColor: Colors.background },
   section: {
     backgroundColor: Colors.card,
     marginHorizontal: 16,
@@ -283,10 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
   },
-  row: {
-    flexDirection: 'row',
-    marginHorizontal: 0,
-  },
+  row: { flexDirection: 'row', marginHorizontal: 0 },
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -302,11 +333,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     paddingVertical: 4,
   },
-  notesInput: {
-    minHeight: 72,
-    textAlignVertical: 'top',
-    paddingTop: 4,
-  },
+  notesInput: { minHeight: 72, textAlignVertical: 'top', paddingTop: 4 },
   picker: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,17 +341,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
-  colorDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: 8,
-  },
-  pickerText: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.text,
-  },
+  colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 8 },
+  pickerText: { flex: 1, fontSize: 16, color: Colors.text },
   dropdown: {
     marginTop: 4,
     backgroundColor: Colors.background,
@@ -341,21 +359,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
-  dropdownText: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ruleRow: {
-    flexDirection: 'row',
-    marginTop: 10,
-    gap: 8,
-  },
+  dropdownText: { flex: 1, fontSize: 15, color: Colors.text },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  ruleRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
   ruleChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -363,18 +369,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  ruleChipActive: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + '20',
-  },
-  ruleText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  ruleTextActive: {
-    color: Colors.accent,
-    fontWeight: '600',
-  },
+  ruleChipActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + '20' },
+  ruleText: { fontSize: 13, color: Colors.textSecondary },
+  ruleTextActive: { color: Colors.accent, fontWeight: '600' },
   deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,9 +382,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: Colors.danger + '12',
   },
-  deleteText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.danger,
-  },
+  deleteText: { fontSize: 15, fontWeight: '600', color: Colors.danger },
+  errorBanner: { fontSize: 13, color: Colors.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: Colors.danger + '12' },
 });

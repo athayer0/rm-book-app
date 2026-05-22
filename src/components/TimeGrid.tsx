@@ -1,58 +1,148 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Colors } from '../constants/colors';
 import { CalendarEvent } from '../utils/eventUtils';
 import { EventBlock } from './EventBlock';
+import { formatTime } from '../utils/dateUtils';
 
-const GRID_START = 6;
-const GRID_END = 22;
 const SLOT_HEIGHT = 50;
-const HOURS = Array.from({ length: GRID_END - GRID_START + 1 }, (_, i) => GRID_START + i);
 const TIME_COL_WIDTH = 52;
 
 interface Props {
   events: CalendarEvent[];
   onEventPress: (event: CalendarEvent) => void;
+  onToggleComplete?: (id: string) => void;
+  onTapEmpty: (timeStr: string) => void;
+  onSwipeDay: (dir: 1 | -1) => void;
+  onDragStart?: (event: CalendarEvent, x: number, y: number) => void;
+  onDragMove?: (x: number, y: number) => void;
+  onDragEnd?: (absoluteY: number, gridTopY: number, scrollOffset: number) => void;
+  dragHoverY?: number | null;
+  gridStartHour?: number;
+  gridEndHour?: number;
 }
 
-export function TimeGrid({ events, onEventPress }: Props) {
-  const totalHeight = (GRID_END - GRID_START) * SLOT_HEIGHT * 2;
+function gridHourLabel(hour: number): string {
+  if (hour === 0 || hour === 24) return '12 AM';
+  if (hour === 12) return '12 PM';
+  return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+}
+
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onDragStart, onDragMove, onDragEnd, dragHoverY, gridStartHour = 6, gridEndHour = 22 }: Props) {
+  const HOURS = Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => gridStartHour + i);
+  const totalHeight = (gridEndHour - gridStartHour) * SLOT_HEIGHT * 2;
+  const scrollOffsetRef = useRef(0);
+  const gridRef = useRef<ViewType>(null);
+  const gridTopAbsoluteRef = useRef(0);
+
+  function measureGridTop() {
+    gridRef.current?.measure((_x, _y, _w, _h, _pageX, pageY) => {
+      gridTopAbsoluteRef.current = pageY;
+    });
+  }
+  const [pressedSlot, setPressedSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (dragHoverY != null) setPressedSlot(null);
+  }, [dragHoverY]);
+
+  const dragSlot = dragHoverY != null
+    ? Math.max(0, Math.floor((dragHoverY - gridTopAbsoluteRef.current + scrollOffsetRef.current) / SLOT_HEIGHT))
+    : null;
+
+  function tapYToSlot(tapY: number): number {
+    return Math.floor(tapY / SLOT_HEIGHT);
+  }
+
+  function slotToTimeStr(slot: number): string {
+    const hour = Math.floor(slot / 2) + gridStartHour;
+    const minute = (slot % 2) * 30;
+    return formatTime(Math.min(hour, 23), minute);
+  }
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-25, 25])
+    .failOffsetY([-15, 15])
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (Math.abs(e.translationX) > 60) {
+        onSwipeDay(e.translationX < 0 ? 1 : -1);
+      }
+    });
 
   return (
-    <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.grid}>
-        {/* Hour labels */}
-        <View style={styles.timeCol}>
-          {HOURS.map(hour => (
-            <View key={hour} style={styles.hourLabel}>
-              <Text style={styles.hourText}>
-                {hour === 12 ? '12 PM' : hour < 12 ? `${hour} AM` : `${hour - 12} PM`}
-              </Text>
-            </View>
-          ))}
-        </View>
+    <GestureDetector gesture={swipeGesture}>
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+      >
+        <View style={styles.grid}>
+          {/* Hour labels */}
+          <View style={styles.timeCol}>
+            {HOURS.map(hour => (
+              <View key={hour} style={styles.hourLabel}>
+                <Text style={styles.hourText}>
+                  {gridHourLabel(hour)}
+                </Text>
+              </View>
+            ))}
+          </View>
 
-        {/* Event column */}
-        <View style={[styles.eventCol, { height: totalHeight }]}>
-          {/* Grid lines */}
-          {HOURS.map((hour, i) => (
-            <React.Fragment key={hour}>
-              <View style={[styles.fullLine, { top: i * SLOT_HEIGHT * 2 }]} />
-              <View style={[styles.halfLine, { top: i * SLOT_HEIGHT * 2 + SLOT_HEIGHT }]} />
-            </React.Fragment>
-          ))}
+          {/* Event column */}
+          <Pressable
+            ref={gridRef}
+            style={[styles.eventCol, { height: totalHeight }]}
+            onLayout={measureGridTop}
+            onPressIn={(e) => setPressedSlot(tapYToSlot(e.nativeEvent.locationY))}
+            onPressOut={() => setPressedSlot(null)}
+            onPress={(e) => onTapEmpty(slotToTimeStr(tapYToSlot(e.nativeEvent.locationY)))}
+          >
+            {/* Grid lines */}
+            {HOURS.map((hour, i) => (
+              <React.Fragment key={hour}>
+                <View style={[styles.fullLine, { top: i * SLOT_HEIGHT * 2 }]} />
+                {i < HOURS.length - 1 && (
+                  <View style={[styles.halfLine, { top: i * SLOT_HEIGHT * 2 + SLOT_HEIGHT }]} />
+                )}
+              </React.Fragment>
+            ))}
 
-          {/* Events */}
-          {events.map(event => (
-            <EventBlock
-              key={event.id + event.date}
-              event={event}
-              onPress={() => onEventPress(event)}
-            />
-          ))}
+            {/* Tap highlight */}
+            {pressedSlot !== null && (
+              <View
+                pointerEvents="none"
+                style={[styles.tapHighlight, { top: pressedSlot * SLOT_HEIGHT, height: SLOT_HEIGHT }]}
+              />
+            )}
+
+            {/* Drag hover highlight */}
+            {dragSlot !== null && (
+              <View
+                pointerEvents="none"
+                style={[styles.dragHighlight, { top: dragSlot * SLOT_HEIGHT, height: SLOT_HEIGHT }]}
+              />
+            )}
+
+            {/* Events */}
+            {events.map(event => (
+              <EventBlock
+                key={event.id + event.date}
+                event={event}
+                gridStartHour={gridStartHour}
+                onPress={() => onEventPress(event)}
+                onToggleComplete={onToggleComplete ? () => onToggleComplete(event.id) : undefined}
+                onDragStart={onDragStart ? (ev, x, y) => onDragStart(ev, x, y) : undefined}
+                onDragMove={onDragMove}
+                onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
+              />
+            ))}
+          </Pressable>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </GestureDetector>
   );
 }
 
@@ -63,7 +153,8 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: 'row',
-    paddingBottom: 40,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   timeCol: {
     width: TIME_COL_WIDTH,
@@ -80,6 +171,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textLight,
     fontWeight: '500',
+    transform: [{ translateY: -12 }],
   },
   eventCol: {
     flex: 1,
@@ -89,15 +181,31 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
+    height: 1,
+    backgroundColor: Colors.textLight,
+    opacity: 0.2,
   },
   halfLine: {
     position: 'absolute',
     left: 0,
     right: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
-    opacity: 0.5,
+    height: 1,
+    backgroundColor: Colors.textLight,
+    opacity: 0.1,
+  },
+  tapHighlight: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.accent + '25',
+  },
+  dragHighlight: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.accent + '35',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.accent + '80',
   },
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { getItem, setItem } from '../utils/storage';
 
 export interface AppSettings {
@@ -6,6 +6,10 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   reminderEnabled: boolean;
   reminderTime: string;
+  eventTypeColors: Record<string, string>;
+  eventTypeDefaultMinutes: Record<string, number>;
+  gridStartHour: number;
+  gridEndHour: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -13,9 +17,25 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'light',
   reminderEnabled: false,
   reminderTime: '8:00 AM',
+  eventTypeColors: {},
+  eventTypeDefaultMinutes: {},
+  gridStartHour: 6,
+  gridEndHour: 24,
 };
 
-export function useSettings() {
+type SettingsContextValue = {
+  settings: AppSettings;
+  updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
+  loaded: boolean;
+};
+
+export const SettingsContext = createContext<SettingsContextValue>({
+  settings: DEFAULT_SETTINGS,
+  updateSettings: async () => {},
+  loaded: false,
+});
+
+export function useSettingsState(): SettingsContextValue {
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
 
@@ -33,4 +53,8 @@ export function useSettings() {
   }, [settings]);
 
   return { settings, updateSettings, loaded };
+}
+
+export function useSettings() {
+  return useContext(SettingsContext);
 }
