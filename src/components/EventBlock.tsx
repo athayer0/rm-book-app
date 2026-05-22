@@ -66,6 +66,7 @@ export function EventBlock({
             opacity: isBeingDragged ? 0.35 : 1,
           },
         ]}
+        onStartShouldSetResponder={() => true}
       >
         <View style={styles.row}>
           {isFixed && (
