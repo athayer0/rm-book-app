@@ -7,6 +7,17 @@ import { useAuth } from '../lib/AuthContext';
 
 export type WeeklyCounts = Record<string, number>;
 
+function mergeWithDefaults(storedDefs: IndicatorDefinition[]): IndicatorDefinition[] {
+  // Built-ins are always the current DEFAULT_INDICATORS, preserving user-customized goals
+  const builtIns = DEFAULT_INDICATORS.map(def => {
+    const stored = storedDefs.find(d => d.id === def.id);
+    return stored ? { ...def, goal: stored.goal } : def;
+  });
+  // Keep custom (non-builtIn) KIs from stored
+  const customs = storedDefs.filter(d => !d.builtIn);
+  return [...builtIns, ...customs];
+}
+
 export function useWeeklyIndicators() {
   const { user } = useAuth();
   const [definitions, setDefinitions] = useState<IndicatorDefinition[]>(DEFAULT_INDICATORS);
@@ -21,7 +32,9 @@ export function useWeeklyIndicators() {
         getItem<string>('last_reset_date'),
       ]);
 
-      if (storedDefs) setDefinitions(storedDefs);
+      if (storedDefs) {
+        setDefinitions(mergeWithDefaults(storedDefs));
+      }
 
       if (isNewWeek(lastReset)) {
         setCounts({});
@@ -44,15 +57,23 @@ export function useWeeklyIndicators() {
   }, [user, weekKey]);
 
   const increment = useCallback(async (id: string) => {
-    const def = definitions.find(d => d.id === id);
-    if (!def) return;
     const current = counts[id] ?? 0;
-    const next = Math.min(current + 1, def.goal);
+    const next = current + 1;
     const updated = { ...counts, [id]: next };
     setCounts(updated);
     await setItem(weekKey, updated);
     await syncEntry(id, next);
-  }, [counts, definitions, weekKey, syncEntry]);
+  }, [counts, weekKey, syncEntry]);
+
+  const decrement = useCallback(async (id: string) => {
+    const current = counts[id] ?? 0;
+    if (current <= 0) return;
+    const next = current - 1;
+    const updated = { ...counts, [id]: next };
+    setCounts(updated);
+    await setItem(weekKey, updated);
+    await syncEntry(id, next);
+  }, [counts, weekKey, syncEntry]);
 
   const reset = useCallback(async (id: string) => {
     const updated = { ...counts, [id]: 0 };
@@ -77,8 +98,26 @@ export function useWeeklyIndicators() {
     }
   }, [user]);
 
+  const adjustCount = useCallback(async (id: string, delta: number) => {
+    if (delta === 0) return;
+    const current = counts[id] ?? 0;
+    const next = Math.max(0, current + delta);
+    const updated = { ...counts, [id]: next };
+    setCounts(updated);
+    await setItem(weekKey, updated);
+    await syncEntry(id, next);
+  }, [counts, weekKey, syncEntry]);
+
+  const reload = useCallback(async () => {
+    const [storedDefs, storedCounts] = await Promise.all([
+      getItem<IndicatorDefinition[]>('indicator_definitions'),
+      getItem<WeeklyCounts>(weekKey),
+    ]);
+    if (storedDefs) setDefinitions(mergeWithDefaults(storedDefs));
+    setCounts(storedCounts ?? {});
+  }, [weekKey]);
+
   const getCount = useCallback((id: string) => counts[id] ?? 0, [counts]);
 
-  return { definitions, counts, increment, reset, resetAll, updateDefinitions, getCount };
+  return { definitions, counts, increment, decrement, reset, resetAll, updateDefinitions, adjustCount, reload, getCount };
 }
-

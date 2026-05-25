@@ -5,10 +5,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
-import { CalendarEvent } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES } from '../utils/eventUtils';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
 import { format } from 'date-fns';
+
+const STATUS_OPTIONS: { value: EventStatus; label: string; icon: string; color: string }[] = [
+  { value: 'pending',   label: 'Pending',   icon: 'alert',    color: '#F39C12' },
+  { value: 'completed', label: 'Completed', icon: 'checkmark', color: '#27AE60' },
+  { value: 'failed',    label: 'Failed',    icon: 'close',    color: '#E74C3C' },
+];
 
 interface Props {
   visible: boolean;
@@ -16,6 +22,8 @@ interface Props {
   defaultDate?: string;
   defaultStartTime?: string;
   settings: AppSettings;
+  currentStatus?: EventStatus;
+  onStatusChange?: (status: EventStatus | undefined) => void;
   onSave: (event: Omit<CalendarEvent, 'id'>) => Promise<void>;
   onDelete?: (id: string) => void;
   onClose: () => void;
@@ -47,15 +55,17 @@ function isFixedType(type: string): boolean {
   return EventTypeConfig[type]?.defaultMinutes === 0;
 }
 
-export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, onSave, onDelete, onClose }: Props) {
+export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState('scripture');
+  const [localStatus, setLocalStatus] = useState<EventStatus | undefined>(currentStatus);
   const [date, setDate] = useState(defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
   const [startTime, setStartTime] = useState('9:00 AM');
   const [endTime, setEndTime] = useState('9:30 AM');
   const [notes, setNotes] = useState('');
   const [recurring, setRecurring] = useState(false);
   const [recurringRule, setRecurringRule] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [isBackup, setIsBackup] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
@@ -71,6 +81,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setNotes(event.notes ?? '');
       setRecurring(event.recurring);
       setRecurringRule(event.recurringRule ?? 'weekly');
+      setIsBackup(event.backup ?? false);
     } else {
       const initialStart = defaultStartTime ?? '9:00 AM';
       setTitle('');
@@ -81,9 +92,17 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setNotes('');
       setRecurring(false);
       setRecurringRule('weekly');
+      setIsBackup(false);
     }
+    setLocalStatus(currentStatus);
     setError('');
-  }, [event, defaultDate, defaultStartTime, visible]);
+  }, [event, defaultDate, defaultStartTime, visible, currentStatus]);
+
+  function handleStatusTap(value: EventStatus) {
+    const next = localStatus === value ? undefined : value;
+    setLocalStatus(next);
+    onStatusChange?.(next);
+  }
 
   function handleTypeChange(newType: string) {
     setType(newType);
@@ -114,6 +133,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
         notes: notes.trim(),
         recurring,
         recurringRule: recurring ? recurringRule : undefined,
+        backup: isBackup,
       });
       onClose();
     } catch (e) {
@@ -139,6 +159,36 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
+          {/* Status (only when editing a non-backup trackable event type) */}
+          {event && !isBackup && TRACKABLE_TYPES.has(type) && (
+            <View style={styles.section}>
+              <Text style={styles.label}>Status</Text>
+              <View style={styles.statusRow}>
+                {STATUS_OPTIONS.map(opt => {
+                  const selected = localStatus === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => handleStatusTap(opt.value)}
+                      style={[
+                        styles.statusBtn,
+                        { borderColor: opt.color },
+                        selected && { backgroundColor: opt.color + '18' },
+                      ]}
+                    >
+                      <View style={[styles.statusCircle, { backgroundColor: opt.color }]}>
+                        <Ionicons name={opt.icon as any} size={13} color="#fff" />
+                      </View>
+                      <Text style={[styles.statusLabel, { color: selected ? opt.color : Colors.textSecondary }]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           {/* Title */}
           <View style={styles.section}>
             <Text style={styles.label}>Title</Text>
@@ -277,6 +327,22 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
           </View>
 
+          {/* Backup */}
+          <View style={styles.section}>
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.label}>Backup Event</Text>
+                <Text style={styles.switchHint}>No status tracking, shown rightmost when overlapping</Text>
+              </View>
+              <Switch
+                value={isBackup}
+                onValueChange={setIsBackup}
+                trackColor={{ true: Colors.accent }}
+                thumbColor={Colors.white}
+              />
+            </View>
+          </View>
+
           {/* Delete */}
           {event && onDelete && (
             <TouchableOpacity
@@ -361,6 +427,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: { flex: 1, fontSize: 15, color: Colors.text },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  switchHint: { fontSize: 11, color: Colors.textLight, marginTop: 2, maxWidth: 220 },
   ruleRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
   ruleChip: {
     paddingHorizontal: 14,
@@ -384,4 +451,30 @@ const styles = StyleSheet.create({
   },
   deleteText: { fontSize: 15, fontWeight: '600', color: Colors.danger },
   errorBanner: { fontSize: 13, color: Colors.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: Colors.danger + '12' },
+  statusRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  statusBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  statusCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

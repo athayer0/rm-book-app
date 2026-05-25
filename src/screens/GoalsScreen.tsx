@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
@@ -14,7 +15,9 @@ import { getItem } from '../utils/storage';
 import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
 
 export function GoalsScreen() {
-  const { definitions, counts, increment, reset, updateDefinitions } = useWeeklyIndicators();
+  const { definitions, counts, increment, decrement, updateDefinitions, reload } = useWeeklyIndicators();
+
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const [editMode, setEditMode] = useState(false);
   const [pastData, setPastData] = useState<Record<string, WeeklyCounts>>({});
   const [pastLoaded, setPastLoaded] = useState(false);
@@ -125,7 +128,7 @@ export function GoalsScreen() {
               definitions={definitions}
               counts={counts}
               onIncrement={increment}
-              onReset={reset}
+              onDecrement={decrement}
             />
           )}
         </View>

@@ -66,6 +66,12 @@ export function addWeeksToDate(date: Date, weeks: number): Date {
   return addWeeks(date, weeks);
 }
 
+export function isInCurrentWeek(dateStr: string): boolean {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return getWeekKey(date) === getWeekKey(new Date());
+}
+
 export function addMinutesToTimeString(timeStr: string, minutes: number): string {
   const [time, ampm] = timeStr.split(' ');
   let [hour, minute] = time.split(':').map(Number);

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
@@ -14,7 +15,9 @@ import { format } from 'date-fns';
 import { getWeekKey } from '../utils/dateUtils';
 
 export function HomeScreen({ navigation }: any) {
-  const { definitions, counts, increment, reset } = useWeeklyIndicators();
+  const { definitions, counts, increment, decrement, updateDefinitions, reload } = useWeeklyIndicators();
+
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const { people, toggleStar } = usePeople();
   const [planningVisible, setPlanningVisible] = useState(false);
 
@@ -47,7 +50,7 @@ export function HomeScreen({ navigation }: any) {
             definitions={definitions}
             counts={counts}
             onIncrement={increment}
-            onReset={reset}
+            onDecrement={decrement}
           />
           <TouchableOpacity
             style={styles.planBtn}
@@ -90,7 +93,12 @@ export function HomeScreen({ navigation }: any) {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <WeeklyPlanningModal visible={planningVisible} onClose={() => setPlanningVisible(false)} />
+      <WeeklyPlanningModal
+        visible={planningVisible}
+        onClose={() => setPlanningVisible(false)}
+        definitions={definitions}
+        onUpdateDefinitions={updateDefinitions}
+      />
     </SafeAreaView>
   );
 }

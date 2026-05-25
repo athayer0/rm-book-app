@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays } from 'date-fns';
@@ -11,14 +11,17 @@ import { TimeGrid } from '../components/TimeGrid';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
-import { CalendarEvent } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, getKIContribution } from '../utils/eventUtils';
 import { DragProvider, useDrag } from '../components/DragContext';
+import { useEventStatuses } from '../hooks/useEventStatuses';
+import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
+import { isInCurrentWeek } from '../utils/dateUtils';
 import { addMinutesToTimeString, formatTime } from '../utils/dateUtils';
 import { EventTypeConfig } from '../constants/colors';
 
 const SLOT_HEIGHT = 50;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const EDGE_ZONE = 70;
+const EDGE_ZONE = 120;
 
 function CalendarContent() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -27,18 +30,63 @@ function CalendarContent() {
   const [defaultStartTime, setDefaultStartTime] = useState<string | undefined>();
   const { getForDate, addEvent, updateEvent, deleteEvent, toggleComplete } = useCalendarEvents();
   const { settings } = useSettings();
+  const { getStatus, setStatus } = useEventStatuses();
+  const { adjustCount } = useWeeklyIndicators();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, endDrag, startDrag, moveDrag } = useDrag();
+  const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
-  const events = getForDate(dateStr);
+  const prevDateStr = format(addDays(selectedDate, -1), 'yyyy-MM-dd');
+  const nextDateStr = format(addDays(selectedDate,  1), 'yyyy-MM-dd');
+  const events     = getForDate(dateStr);
+  const prevEvents = getForDate(prevDateStr);
+  const nextEvents = getForDate(nextDateStr);
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
+
+  // Animated value lives at -SCREEN_WIDTH at rest (center pane visible).
+  // Swiping left → goes more negative (next pane slides in).
+  // Swiping right → goes toward 0 (prev pane slides in).
+  const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  const [currentScrollY, setCurrentScrollY] = useState(0);
+  const [committedDate, setCommittedDate] = useState(new Date());
+  const pendingResetRef = useRef(false);
+
+  // Keep committedDate in sync when date changes via nav buttons, week strip, today, etc.
+  useEffect(() => {
+    setCommittedDate(selectedDate);
+  }, [selectedDate]);
+
+  // Reset translateX AFTER React commits new pane content — eliminates the flash frame.
+  useLayoutEffect(() => {
+    if (pendingResetRef.current) {
+      pendingResetRef.current = false;
+      translateX.setValue(-SCREEN_WIDTH);
+    }
+  }, [selectedDate]);
+
+  // Snap row back to center if the swipe gesture partially moved it before drag activated.
+  useEffect(() => {
+    if (dragActive) {
+      Animated.spring(translateX, {
+        toValue: -SCREEN_WIDTH,
+        useNativeDriver: true,
+        tension: 40,
+        friction: 8,
+      }).start();
+    }
+  }, [dragActive]);
 
   const goToToday = useCallback(() => setSelectedDate(new Date()), []);
   const edgeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Edge-scroll while dragging
+  const edgeZone: 'left' | 'right' | null = !dragActive ? null
+    : ghostX < EDGE_ZONE ? 'left'
+    : ghostX > SCREEN_WIDTH - EDGE_ZONE ? 'right'
+    : null;
+
+  // Edge-scroll while dragging — interval only resets when entering/leaving the zone.
   useEffect(() => {
-    if (!dragActive) {
+    if (edgeZone === null) {
       if (edgeIntervalRef.current) {
         clearInterval(edgeIntervalRef.current);
         edgeIntervalRef.current = null;
@@ -46,17 +94,9 @@ function CalendarContent() {
       return;
     }
 
-    const isLeftEdge = ghostX < EDGE_ZONE;
-    const isRightEdge = ghostX > SCREEN_WIDTH - EDGE_ZONE;
-
-    if ((isLeftEdge || isRightEdge) && !edgeIntervalRef.current) {
-      edgeIntervalRef.current = setInterval(() => {
-        setSelectedDate(d => isLeftEdge ? addDays(d, -1) : addDays(d, 1));
-      }, 1000);
-    } else if (!isLeftEdge && !isRightEdge && edgeIntervalRef.current) {
-      clearInterval(edgeIntervalRef.current);
-      edgeIntervalRef.current = null;
-    }
+    edgeIntervalRef.current = setInterval(() => {
+      setSelectedDate(d => edgeZone === 'left' ? addDays(d, -1) : addDays(d, 1));
+    }, 500);
 
     return () => {
       if (edgeIntervalRef.current) {
@@ -64,7 +104,7 @@ function CalendarContent() {
         edgeIntervalRef.current = null;
       }
     };
-  }, [dragActive, ghostX]);
+  }, [edgeZone]);
 
   function handleEventPress(event: CalendarEvent) {
     setEditingEvent(event);
@@ -84,6 +124,18 @@ function CalendarContent() {
     setShowEventModal(true);
   }
 
+  async function handleStatusChange(event: CalendarEvent, newStatus: EventStatus | undefined) {
+    const prevStatus = getStatus(event.id, event.date);
+    if (isInCurrentWeek(event.date)) {
+      const contrib = getKIContribution(event);
+      if (contrib) {
+        if (prevStatus === 'completed') await adjustCount(contrib.kiId, -contrib.delta);
+        if (newStatus === 'completed')  await adjustCount(contrib.kiId, +contrib.delta);
+      }
+    }
+    await setStatus(event.id, event.date, newStatus);
+  }
+
   async function handleSaveEvent(eventData: Omit<CalendarEvent, 'id'>) {
     if (editingEvent) {
       await updateEvent(editingEvent.id, eventData);
@@ -97,6 +149,7 @@ function CalendarContent() {
   }
 
   function handleDragStart(event: CalendarEvent, x: number, y: number) {
+    frozenEventsRef.current = events;
     startDrag(event, x, y);
   }
 
@@ -104,7 +157,13 @@ function CalendarContent() {
     moveDrag(x, y);
   }
 
+  function handleDragCancel() {
+    frozenEventsRef.current = null;
+    endDrag();
+  }
+
   function handleDragDrop(absoluteY: number, gridTopY: number, scrollOffset: number) {
+    frozenEventsRef.current = null;
     if (!dragEvent) { endDrag(); return; }
     const relativeY = absoluteY - gridTopY + scrollOffset;
     const thirtyMinSlot = Math.max(0, Math.floor(relativeY / SLOT_HEIGHT));
@@ -120,13 +179,37 @@ function CalendarContent() {
   }
 
   function handleDayDrop(date: Date) {
+    frozenEventsRef.current = null;
     if (!dragEvent) { endDrag(); return; }
     updateEvent(dragEvent.id, { date: format(date, 'yyyy-MM-dd') });
     endDrag();
   }
 
+  function handleSwipeProgress(x: number) {
+    translateX.setValue(-SCREEN_WIDTH + x);
+  }
+
+  function handleSwipeCancel() {
+    Animated.spring(translateX, {
+      toValue: -SCREEN_WIDTH,
+      useNativeDriver: true,
+      tension: 40,
+      friction: 8,
+    }).start();
+  }
+
   function handleSwipeDay(dir: 1 | -1) {
-    setSelectedDate(d => addDays(d, dir));
+    setCommittedDate(d => addDays(d, dir));
+    const target = dir === 1 ? -SCREEN_WIDTH * 2 : 0;
+    Animated.spring(translateX, {
+      toValue: target,
+      useNativeDriver: true,
+      tension: 40,
+      friction: 8,
+    }).start(() => {
+      pendingResetRef.current = true;
+      setSelectedDate(d => addDays(d, dir));
+    });
   }
 
   function handleSwipeWeek(dir: 1 | -1) {
@@ -138,8 +221,8 @@ function CalendarContent() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerDate}>{format(selectedDate, 'MMM d')}</Text>
-          <Text style={styles.headerYear}>{format(selectedDate, 'yyyy')}</Text>
+          <Text style={styles.headerDate}>{format(committedDate, 'MMM d')}</Text>
+          <Text style={styles.headerYear}>{format(committedDate, 'yyyy')}</Text>
           <TouchableOpacity onPress={goToToday} style={styles.calendarIconBtn}>
             <Ionicons name="calendar-outline" size={20} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
@@ -166,24 +249,64 @@ function CalendarContent() {
 
       {/* Day label */}
       <View style={styles.dayLabelRow}>
-        <Text style={styles.dayLabel}>{format(selectedDate, 'EEEE, MMMM d')}</Text>
+        <Text style={styles.dayLabel}>{format(committedDate, 'EEEE, MMMM d')}</Text>
         <Text style={styles.eventCount}>{events.length} event{events.length !== 1 ? 's' : ''}</Text>
       </View>
 
-      {/* Time grid */}
-      <TimeGrid
-        events={events}
-        onEventPress={handleEventPress}
-        onToggleComplete={toggleComplete}
-        onTapEmpty={handleTapEmpty}
-        onSwipeDay={handleSwipeDay}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragDrop}
-        dragHoverY={dragActive ? ghostY : null}
-        gridStartHour={settings.gridStartHour}
-        gridEndHour={settings.gridEndHour}
-      />
+      {/* Time grid — 3-pane sliding row */}
+      <View style={styles.gridContainer}>
+        <Animated.View style={[styles.gridRow, { transform: [{ translateX }] }]}>
+          <View style={{ width: SCREEN_WIDTH }}>
+            <TimeGrid
+              events={prevEvents}
+              getStatus={getStatus}
+              onTapEmpty={() => {}}
+              onSwipeDay={handleSwipeDay}
+              onSwipeProgress={handleSwipeProgress}
+              onSwipeCancel={handleSwipeCancel}
+              dragActive={dragActive}
+              initialScrollY={currentScrollY}
+              gridStartHour={settings.gridStartHour}
+              gridEndHour={settings.gridEndHour}
+            />
+          </View>
+          <View style={{ width: SCREEN_WIDTH }}>
+            <TimeGrid
+              events={frozenEventsRef.current ?? events}
+              getStatus={getStatus}
+              onEventPress={handleEventPress}
+              onToggleComplete={toggleComplete}
+              onTapEmpty={handleTapEmpty}
+              onSwipeDay={handleSwipeDay}
+              onSwipeProgress={handleSwipeProgress}
+              onSwipeCancel={handleSwipeCancel}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragDrop}
+              onDragCancel={handleDragCancel}
+              dragHoverY={dragActive ? ghostY : null}
+              initialScrollY={currentScrollY}
+              onScrollChange={setCurrentScrollY}
+              gridStartHour={settings.gridStartHour}
+              gridEndHour={settings.gridEndHour}
+            />
+          </View>
+          <View style={{ width: SCREEN_WIDTH }}>
+            <TimeGrid
+              events={nextEvents}
+              getStatus={getStatus}
+              onTapEmpty={() => {}}
+              onSwipeDay={handleSwipeDay}
+              onSwipeProgress={handleSwipeProgress}
+              onSwipeCancel={handleSwipeCancel}
+              dragActive={dragActive}
+              initialScrollY={currentScrollY}
+              gridStartHour={settings.gridStartHour}
+              gridEndHour={settings.gridEndHour}
+            />
+          </View>
+        </Animated.View>
+      </View>
 
       {/* Drag ghost overlay */}
       {dragActive && dragEvent && (
@@ -207,6 +330,8 @@ function CalendarContent() {
         defaultDate={dateStr}
         defaultStartTime={defaultStartTime}
         settings={settings}
+        currentStatus={editingEvent ? getStatus(editingEvent.id, editingEvent.date) : undefined}
+        onStatusChange={editingEvent ? (s) => handleStatusChange(editingEvent, s) : undefined}
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         onClose={() => setShowEventModal(false)}
@@ -281,6 +406,15 @@ const styles = StyleSheet.create({
   eventCount: {
     fontSize: 12,
     color: Colors.textLight,
+  },
+  gridContainer: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  gridRow: {
+    flex: 1,
+    flexDirection: 'row',
+    width: SCREEN_WIDTH * 3,
   },
   ghostOverlay: {
     position: 'absolute',

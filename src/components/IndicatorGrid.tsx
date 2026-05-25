@@ -8,11 +8,11 @@ interface Props {
   definitions: IndicatorDefinition[];
   counts: WeeklyCounts;
   onIncrement: (id: string) => void;
-  onReset: (id: string) => void;
+  onDecrement: (id: string) => void;
   compact?: boolean;
 }
 
-export function IndicatorGrid({ definitions, counts, onIncrement, onReset, compact }: Props) {
+export function IndicatorGrid({ definitions, counts, onIncrement, onDecrement, compact }: Props) {
   const visible = definitions.filter(d => d.visible);
   const rows: IndicatorDefinition[][] = [];
   for (let i = 0; i < visible.length; i += 2) {
@@ -29,7 +29,7 @@ export function IndicatorGrid({ definitions, counts, onIncrement, onReset, compa
               definition={def}
               count={counts[def.id] ?? 0}
               onIncrement={() => onIncrement(def.id)}
-              onReset={() => onReset(def.id)}
+              onDecrement={() => onDecrement(def.id)}
               compact={compact}
             />
           ))}

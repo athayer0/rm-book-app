@@ -1,5 +1,9 @@
 import { format, addDays, addWeeks, addMonths, parseISO } from 'date-fns';
 
+export type EventStatus = 'completed' | 'failed' | 'pending';
+
+export const TRACKABLE_TYPES = new Set(['prayer', 'temple', 'church', 'scripture', 'exercise']);
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -12,6 +16,7 @@ export interface CalendarEvent {
   recurring: boolean;
   recurringRule?: 'daily' | 'weekly' | 'monthly';
   completed?: boolean;
+  backup?: boolean;
 }
 
 export function generateId(): string {
@@ -80,4 +85,114 @@ function timeToMinutes(timeStr: string): number {
   if (ampm === 'PM' && hour !== 12) hour += 12;
   if (ampm === 'AM' && hour === 12) hour = 0;
   return hour * 60 + minute;
+}
+
+function parseStartHour(startTime: string): number {
+  const [time, ampm] = startTime.split(' ');
+  let [hour] = time.split(':').map(Number);
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour;
+}
+
+export function getKIContribution(event: CalendarEvent): { kiId: string; delta: number } | null {
+  switch (event.type) {
+    case 'prayer': {
+      const hour = parseStartHour(event.startTime);
+      return { kiId: hour < 14 ? 'morning_prayer' : 'nightly_prayer', delta: 1 };
+    }
+    case 'temple':
+      return { kiId: 'temple_attendance', delta: 1 };
+    case 'church': {
+      const mins = Math.max(0, timeToMinutes(event.endTime) - timeToMinutes(event.startTime));
+      return { kiId: 'church_hours', delta: Math.max(1, Math.round(mins / 60)) };
+    }
+    case 'scripture':
+      return { kiId: 'personal_study', delta: 1 };
+    case 'exercise':
+      return { kiId: 'times_exercised', delta: 1 };
+    default:
+      return null;
+  }
+}
+
+export function hasEventStartPassed(event: CalendarEvent): boolean {
+  const now = new Date();
+  const todayStr = format(now, 'yyyy-MM-dd');
+  if (event.date < todayStr) return true;
+  if (event.date > todayStr) return false;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  return nowMins > timeToMinutes(event.startTime);
+}
+
+export function computeEventLayout(events: CalendarEvent[]): Map<string, { col: number; numCols: number }> {
+  if (events.length === 0) return new Map();
+
+  const overlaps = (a: CalendarEvent, b: CalendarEvent) => {
+    const aS = timeToMinutes(a.startTime), aE = timeToMinutes(a.endTime);
+    const bS = timeToMinutes(b.startTime), bE = timeToMinutes(b.endTime);
+    return aS < bE && bS < aE;
+  };
+
+  const n = events.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (x: number): number => parent[x] === x ? x : (parent[x] = find(parent[x]));
+  const union = (x: number, y: number) => { parent[find(x)] = find(y); };
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (overlaps(events[i], events[j])) union(i, j);
+    }
+  }
+
+  const groupMap = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!groupMap.has(root)) groupMap.set(root, []);
+    groupMap.get(root)!.push(i);
+  }
+
+  const result = new Map<string, { col: number; numCols: number }>();
+
+  for (const [, indices] of groupMap) {
+    if (indices.length === 1) {
+      result.set(events[indices[0]].id, { col: 0, numCols: 1 });
+      continue;
+    }
+
+    // Sort: non-backup first (they get left columns), then by start time
+    const sorted = [...indices].sort((a, b) => {
+      const ea = events[a], eb = events[b];
+      if (!!ea.backup !== !!eb.backup) return ea.backup ? 1 : -1;
+      return timeToMinutes(ea.startTime) - timeToMinutes(eb.startTime);
+    });
+
+    const colEndTimes: number[] = [];
+    const colAssignment: number[] = new Array(sorted.length);
+
+    for (let i = 0; i < sorted.length; i++) {
+      const e = events[sorted[i]];
+      const startMin = timeToMinutes(e.startTime);
+      let assigned = -1;
+      for (let c = 0; c < colEndTimes.length; c++) {
+        if (colEndTimes[c] <= startMin) {
+          assigned = c;
+          break;
+        }
+      }
+      if (assigned === -1) {
+        assigned = colEndTimes.length;
+        colEndTimes.push(0);
+      }
+      colAssignment[i] = assigned;
+      colEndTimes[assigned] = timeToMinutes(e.endTime);
+    }
+
+    const numCols = colEndTimes.length;
+    sorted.forEach((originalIdx, i) => {
+      result.set(events[originalIdx].id, { col: colAssignment[i], numCols });
+    });
+  }
+
+  return result;
 }

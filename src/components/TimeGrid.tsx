@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType, Animated } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Colors } from '../constants/colors';
-import { CalendarEvent } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUtils';
 import { EventBlock } from './EventBlock';
 import { formatTime } from '../utils/dateUtils';
 
@@ -11,16 +11,23 @@ const TIME_COL_WIDTH = 52;
 
 interface Props {
   events: CalendarEvent[];
-  onEventPress: (event: CalendarEvent) => void;
+  onEventPress?: (event: CalendarEvent) => void;
   onToggleComplete?: (id: string) => void;
   onTapEmpty: (timeStr: string) => void;
   onSwipeDay: (dir: 1 | -1) => void;
+  onSwipeProgress?: (x: number) => void;
+  onSwipeCancel?: () => void;
   onDragStart?: (event: CalendarEvent, x: number, y: number) => void;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (absoluteY: number, gridTopY: number, scrollOffset: number) => void;
+  onDragCancel?: () => void;
   dragHoverY?: number | null;
+  dragActive?: boolean;
   gridStartHour?: number;
   gridEndHour?: number;
+  initialScrollY?: number;
+  onScrollChange?: (y: number) => void;
+  getStatus?: (eventId: string, dateStr: string) => EventStatus | undefined;
 }
 
 function gridHourLabel(hour: number): string {
@@ -29,10 +36,11 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onDragStart, onDragMove, onDragEnd, dragHoverY, gridStartHour = 6, gridEndHour = 22 }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, gridStartHour = 6, gridEndHour = 22, initialScrollY, onScrollChange, getStatus }: Props) {
   const HOURS = Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => gridStartHour + i);
   const totalHeight = (gridEndHour - gridStartHour) * SLOT_HEIGHT * 2;
   const scrollOffsetRef = useRef(0);
+  const scrollViewRef = useRef<ScrollView>(null);
   const gridRef = useRef<ViewType>(null);
   const gridTopAbsoluteRef = useRef(0);
 
@@ -46,6 +54,12 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   useEffect(() => {
     if (dragHoverY != null) setPressedSlot(null);
   }, [dragHoverY]);
+
+  useEffect(() => {
+    if (initialScrollY != null && initialScrollY > 0) {
+      scrollViewRef.current?.scrollTo({ y: initialScrollY, animated: false });
+    }
+  }, []);
 
   const dragSlot = dragHoverY != null
     ? Math.max(0, Math.floor((dragHoverY - gridTopAbsoluteRef.current + scrollOffsetRef.current) / SLOT_HEIGHT))
@@ -64,20 +78,30 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const swipeGesture = Gesture.Pan()
     .activeOffsetX([-25, 25])
     .failOffsetY([-15, 15])
+    .enabled(!dragActive)
     .runOnJS(true)
+    .onUpdate((e) => {
+      onSwipeProgress?.(e.translationX);
+    })
     .onEnd((e) => {
       if (Math.abs(e.translationX) > 60) {
         onSwipeDay(e.translationX < 0 ? 1 : -1);
+      } else {
+        onSwipeCancel?.();
       }
     });
 
   return (
     <GestureDetector gesture={swipeGesture}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+        onScroll={(e) => {
+          scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+          onScrollChange?.(e.nativeEvent.contentOffset.y);
+        }}
       >
         <View style={styles.grid}>
           {/* Hour labels */}
@@ -127,18 +151,28 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
             )}
 
             {/* Events */}
-            {events.map(event => (
-              <EventBlock
-                key={event.id + event.date}
-                event={event}
-                gridStartHour={gridStartHour}
-                onPress={() => onEventPress(event)}
-                onToggleComplete={onToggleComplete ? () => onToggleComplete(event.id) : undefined}
-                onDragStart={onDragStart ? (ev, x, y) => onDragStart(ev, x, y) : undefined}
-                onDragMove={onDragMove}
-                onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
-              />
-            ))}
+            {(() => {
+              const layout = computeEventLayout(events);
+              return events.map(event => {
+                const { col, numCols } = layout.get(event.id) ?? { col: 0, numCols: 1 };
+                return (
+                  <EventBlock
+                    key={event.id + event.date}
+                    event={event}
+                    status={getStatus?.(event.id, event.date)}
+                    gridStartHour={gridStartHour}
+                    columnWidth={1 / numCols}
+                    columnOffset={col / numCols}
+                    onPress={() => onEventPress?.(event)}
+                    onToggleComplete={onToggleComplete ? () => onToggleComplete(event.id) : undefined}
+                    onDragStart={onDragStart ? (ev, x, y) => onDragStart(ev, x, y) : undefined}
+                    onDragMove={onDragMove}
+                    onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
+                    onDragCancel={onDragCancel}
+                  />
+                );
+              });
+            })()}
           </Pressable>
         </View>
       </ScrollView>
