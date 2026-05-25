@@ -14,27 +14,25 @@ export function useCalendarEvents() {
     });
   }, []);
 
-  const addEvent = useCallback(async (event: Omit<CalendarEvent, 'id'>) => {
-    try {
-      const newEvent = { ...event, id: generateId() };
-      const updated = [...events, newEvent];
-      setEvents(updated);
-      await setItem('calendar_events', updated);
-      if (user) await enqueue({ table: 'calendar_events', type: 'upsert', row: { ...newEvent, user_id: user.id, updated_at: new Date().toISOString() } });
-      return newEvent;
-    } catch (e) {
-      console.error('[useCalendarEvents] addEvent failed:', e);
-      throw e;
-    }
-  }, [events, user]);
-
-  const updateEvent = useCallback(async (id: string, changes: Partial<CalendarEvent>) => {
-    const updated = events.map(e => e.id === id ? { ...e, ...changes } : e);
+  // Persist locally, then queue a remote upsert for the given event when signed in.
+  const persist = useCallback(async (updated: CalendarEvent[], changedId: string) => {
     setEvents(updated);
     await setItem('calendar_events', updated);
-    const row = updated.find(e => e.id === id);
-    if (user && row) await enqueue({ table: 'calendar_events', type: 'upsert', row: { ...row, user_id: user.id, updated_at: new Date().toISOString() } });
-  }, [events, user]);
+    const row = updated.find(e => e.id === changedId);
+    if (user && row) {
+      await enqueue({ table: 'calendar_events', type: 'upsert', row: { ...row, user_id: user.id, updated_at: new Date().toISOString() } });
+    }
+  }, [user]);
+
+  const addEvent = useCallback(async (event: Omit<CalendarEvent, 'id'>) => {
+    const newEvent = { ...event, id: generateId() };
+    await persist([...events, newEvent], newEvent.id);
+    return newEvent;
+  }, [events, persist]);
+
+  const updateEvent = useCallback(async (id: string, changes: Partial<CalendarEvent>) => {
+    await persist(events.map(e => e.id === id ? { ...e, ...changes } : e), id);
+  }, [events, persist]);
 
   const deleteEvent = useCallback(async (id: string) => {
     const updated = events.filter(e => e.id !== id);
@@ -48,12 +46,8 @@ export function useCalendarEvents() {
   }, [events]);
 
   const toggleComplete = useCallback(async (id: string) => {
-    const updated = events.map(e => e.id === id ? { ...e, completed: !e.completed } : e);
-    setEvents(updated);
-    await setItem('calendar_events', updated);
-    const row = updated.find(e => e.id === id);
-    if (user && row) await enqueue({ table: 'calendar_events', type: 'upsert', row: { ...row, user_id: user.id, updated_at: new Date().toISOString() } });
-  }, [events, user]);
+    await persist(events.map(e => e.id === id ? { ...e, completed: !e.completed } : e), id);
+  }, [events, persist]);
 
   const deleteAllEvents = useCallback(async () => {
     const toDelete = events;

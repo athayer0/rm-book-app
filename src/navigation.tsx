@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,19 +21,21 @@ export function AppNavigation() {
           tabBarActiveTintColor: Colors.primary,
           tabBarInactiveTintColor: Colors.tabBarInactive,
           tabBarStyle: {
-            backgroundColor: Colors.white,
+            backgroundColor: '#EFEFEF',
             borderTopColor: Colors.border,
             borderTopWidth: 1,
             paddingTop: 0,
             paddingBottom: 10,
-            height: 85,
+            paddingTop: 10,
+            height: 105,
           },
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: '600',
             marginTop: -2,
           },
-          tabBarIcon: ({ color, focused }) => {
+          tabBarShowLabel: false,
+          tabBarIcon: ({ focused }) => {
             const icons: Record<string, string> = {
               Home: focused ? 'home' : 'home-outline',
               Calendar: focused ? 'calendar' : 'calendar-outline',
@@ -41,7 +44,22 @@ export function AppNavigation() {
               Settings: focused ? 'settings' : 'settings-outline',
             };
             const iconName = icons[route.name] ?? 'ellipse';
-            return <Ionicons name={iconName as any} size={22} color={color} />;
+            return (
+              <View style={{
+                width: 56,
+                height: 34,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: focused ? '#8B1A4A' : 'transparent',
+              }}>
+                <Ionicons
+                  name={iconName as any}
+                  size={22}
+                  color={focused ? '#ffffff' : '#444444'}
+                />
+              </View>
+            );
           },
         })}
       >

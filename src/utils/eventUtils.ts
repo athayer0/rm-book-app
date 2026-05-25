@@ -1,4 +1,4 @@
-import { format, addDays, addWeeks, addMonths, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 export type EventStatus = 'completed' | 'failed' | 'pending';
 
@@ -24,36 +24,35 @@ export function generateId(): string {
 }
 
 export function getEventsForDate(events: CalendarEvent[], dateStr: string): CalendarEvent[] {
-  const target = dateStr;
   const results: CalendarEvent[] = [];
 
   events.forEach(event => {
     if (!event.recurring) {
-      if (event.date === target) results.push(event);
+      if (event.date === dateStr) results.push(event);
       return;
     }
 
     const startDate = parseISO(event.date);
-    const targetDate = parseISO(target);
+    const targetDate = parseISO(dateStr);
 
     if (targetDate < startDate) return;
 
     switch (event.recurringRule) {
       case 'daily': {
-        results.push({ ...event, date: target });
+        results.push({ ...event, date: dateStr });
         break;
       }
       case 'weekly': {
         const startDay = startDate.getDay();
         const targetDay = targetDate.getDay();
         if (startDay === targetDay) {
-          results.push({ ...event, date: target });
+          results.push({ ...event, date: dateStr });
         }
         break;
       }
       case 'monthly': {
         if (startDate.getDate() === targetDate.getDate()) {
-          results.push({ ...event, date: target });
+          results.push({ ...event, date: dateStr });
         }
         break;
       }
@@ -63,42 +62,35 @@ export function getEventsForDate(events: CalendarEvent[], dateStr: string): Cale
   return results.sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
-export function eventTopOffset(startTime: string, gridStartHour: number = 6): number {
-  const [time, ampm] = startTime.split(' ');
+// Parse a "9:30 AM" style string into 24-hour { hour, minute }.
+function parseTime(timeStr: string): { hour: number; minute: number } {
+  const [time, ampm] = timeStr.split(' ');
   let [hour, minute] = time.split(':').map(Number);
   if (ampm === 'PM' && hour !== 12) hour += 12;
   if (ampm === 'AM' && hour === 12) hour = 0;
+  return { hour, minute };
+}
+
+function timeToMinutes(timeStr: string): number {
+  const { hour, minute } = parseTime(timeStr);
+  return hour * 60 + minute;
+}
+
+export function eventTopOffset(startTime: string, gridStartHour: number = 6): number {
+  const { hour, minute } = parseTime(startTime);
   const totalMinutes = (hour - gridStartHour) * 60 + minute;
   return (totalMinutes / 30) * 50;
 }
 
 export function eventHeight(startTime: string, endTime: string): number {
-  const startMinutes = timeToMinutes(startTime);
-  const endMinutes = timeToMinutes(endTime);
-  const duration = Math.max(endMinutes - startMinutes, 15);
+  const duration = Math.max(timeToMinutes(endTime) - timeToMinutes(startTime), 15);
   return (duration / 30) * 50;
-}
-
-function timeToMinutes(timeStr: string): number {
-  const [time, ampm] = timeStr.split(' ');
-  let [hour, minute] = time.split(':').map(Number);
-  if (ampm === 'PM' && hour !== 12) hour += 12;
-  if (ampm === 'AM' && hour === 12) hour = 0;
-  return hour * 60 + minute;
-}
-
-function parseStartHour(startTime: string): number {
-  const [time, ampm] = startTime.split(' ');
-  let [hour] = time.split(':').map(Number);
-  if (ampm === 'PM' && hour !== 12) hour += 12;
-  if (ampm === 'AM' && hour === 12) hour = 0;
-  return hour;
 }
 
 export function getKIContribution(event: CalendarEvent): { kiId: string; delta: number } | null {
   switch (event.type) {
     case 'prayer': {
-      const hour = parseStartHour(event.startTime);
+      const { hour } = parseTime(event.startTime);
       return { kiId: hour < 14 ? 'morning_prayer' : 'nightly_prayer', delta: 1 };
     }
     case 'temple':

@@ -43,10 +43,17 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek, 
           const isToday = dateStr === todayStr;
           const isDragTarget = !!draggingEvent;
 
+          const altBg = i % 2 === 0 ? '#E8E8E8' : '#D8D8D8';
+
           return (
             <TouchableOpacity
               key={dateStr}
-              style={[styles.dayBtn, isDragTarget && styles.dayBtnDropZone, isSelected && styles.dayBtnSelected]}
+              style={[
+                styles.dayBtn,
+                { backgroundColor: altBg },
+                isDragTarget && styles.dayBtnDropZone,
+                isSelected && styles.dayBtnSelected,
+              ]}
               onPress={() => onSelectDate(day)}
               activeOpacity={0.8}
               onLayout={(e) => {
@@ -57,22 +64,12 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek, 
                 };
               }}
             >
-              <Text style={[styles.dayName, isSelected && styles.textSelected]}>
+              <Text style={[styles.dayName, isSelected && styles.dayNameSelected]}>
                 {format(day, 'EEE').slice(0, 2).toUpperCase()}
               </Text>
-              <View style={[
-                styles.dateCircle,
-                isSelected && styles.dateCircleSelected,
-                isToday && !isSelected && styles.dateCircleToday,
-              ]}>
-                <Text style={[
-                  styles.dateNum,
-                  isSelected && styles.textSelected,
-                  isToday && !isSelected && styles.textToday,
-                ]}>
-                  {format(day, 'd')}
-                </Text>
-              </View>
+              <Text style={[styles.dateNum, isSelected && styles.dateNumSelected]}>
+                {format(day, 'd')}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -84,52 +81,43 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek, 
 const styles = StyleSheet.create({
   strip: {
     flexDirection: 'row',
-    backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    backgroundColor: '#E8E8E8',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   dayBtn: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 0,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  dayBtnSelected: {},
+  dayBtnSelected: {
+    backgroundColor: '#ADD8E6',
+    borderColor: '#00008B',
+  },
   dayBtnDropZone: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   dayName: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#333',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  dateCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateCircleSelected: {
-    backgroundColor: Colors.accent,
-  },
-  dateCircleToday: {
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.7)',
+  dayNameSelected: {
+    color: '#00008B',
+    fontWeight: '700',
   },
   dateNum: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.white,
+    color: '#333',
   },
-  textSelected: {
-    color: Colors.white,
+  dateNumSelected: {
+    color: '#00008B',
     fontWeight: '700',
-  },
-  textToday: {
-    color: Colors.white,
   },
 });

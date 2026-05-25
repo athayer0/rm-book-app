@@ -21,7 +21,7 @@ import { EventTypeConfig } from '../constants/colors';
 
 const SLOT_HEIGHT = 50;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const EDGE_ZONE = 120;
+const EDGE_ZONE = 60;
 
 function CalendarContent() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -34,6 +34,9 @@ function CalendarContent() {
   const { adjustCount } = useWeeklyIndicators();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(new Date());
+  const [headerBottom, setHeaderBottom] = useState(60);
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const prevDateStr = format(addDays(selectedDate, -1), 'yyyy-MM-dd');
@@ -54,6 +57,11 @@ function CalendarContent() {
   // Keep committedDate in sync when date changes via nav buttons, week strip, today, etc.
   useEffect(() => {
     setCommittedDate(selectedDate);
+  }, [selectedDate]);
+
+  // Sync picker month to selected date when picker is closed.
+  useEffect(() => {
+    if (!showMonthPicker) setPickerMonth(selectedDate);
   }, [selectedDate]);
 
   // Reset translateX AFTER React commits new pane content — eliminates the flash frame.
@@ -79,10 +87,13 @@ function CalendarContent() {
   const goToToday = useCallback(() => setSelectedDate(new Date()), []);
   const edgeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const edgeZone: 'left' | 'right' | null = !dragActive ? null
-    : ghostX < EDGE_ZONE ? 'left'
-    : ghostX > SCREEN_WIDTH - EDGE_ZONE ? 'right'
-    : null;
+  function getEdgeZone(): 'left' | 'right' | null {
+    if (!dragActive) return null;
+    if (ghostX < EDGE_ZONE) return 'left';
+    if (ghostX > SCREEN_WIDTH - EDGE_ZONE) return 'right';
+    return null;
+  }
+  const edgeZone = getEdgeZone();
 
   // Edge-scroll while dragging — interval only resets when entering/leaving the zone.
   useEffect(() => {
@@ -144,17 +155,9 @@ function CalendarContent() {
     }
   }
 
-  async function handleDeleteEvent(id: string) {
-    await deleteEvent(id);
-  }
-
   function handleDragStart(event: CalendarEvent, x: number, y: number) {
     frozenEventsRef.current = events;
     startDrag(event, x, y);
-  }
-
-  function handleDragMove(x: number, y: number) {
-    moveDrag(x, y);
   }
 
   function handleDragCancel() {
@@ -216,13 +219,41 @@ function CalendarContent() {
     setSelectedDate(d => addDays(d, dir * 7));
   }
 
+  function getMonthGrid(month: Date): (Date | null)[][] {
+    const year = month.getFullYear();
+    const m = month.getMonth();
+    const firstDay = new Date(year, m, 1);
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
+    const weekStartsOn = settings.weekStart === 'monday' ? 1 : 0;
+    let startDow = firstDay.getDay();
+    if (weekStartsOn === 1) startDow = (startDow + 6) % 7;
+    const cells: (Date | null)[] = Array(startDow).fill(null);
+    for (let d = 0; d < daysInMonth; d++) cells.push(addDays(firstDay, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    const weeks: (Date | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks;
+  }
+
+  function navigatePickerMonth(dir: 1 | -1) {
+    setPickerMonth(m => new Date(m.getFullYear(), m.getMonth() + dir, 1));
+  }
+
+  function handlePickerDayPress(day: Date) {
+    setSelectedDate(day);
+    setShowMonthPicker(false);
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={styles.header} onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerDate}>{format(committedDate, 'MMM d')}</Text>
           <Text style={styles.headerYear}>{format(committedDate, 'yyyy')}</Text>
+          <TouchableOpacity onPress={() => setShowMonthPicker(v => !v)} style={styles.chevronBtn}>
+            <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.85)" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={goToToday} style={styles.calendarIconBtn}>
             <Ionicons name="calendar-outline" size={20} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
@@ -247,12 +278,6 @@ function CalendarContent() {
         onDayDrop={handleDayDrop}
       />
 
-      {/* Day label */}
-      <View style={styles.dayLabelRow}>
-        <Text style={styles.dayLabel}>{format(committedDate, 'EEEE, MMMM d')}</Text>
-        <Text style={styles.eventCount}>{events.length} event{events.length !== 1 ? 's' : ''}</Text>
-      </View>
-
       {/* Time grid — 3-pane sliding row */}
       <View style={styles.gridContainer}>
         <Animated.View style={[styles.gridRow, { transform: [{ translateX }] }]}>
@@ -266,6 +291,7 @@ function CalendarContent() {
               onSwipeCancel={handleSwipeCancel}
               dragActive={dragActive}
               initialScrollY={currentScrollY}
+              restoreKey={prevDateStr}
               gridStartHour={settings.gridStartHour}
               gridEndHour={settings.gridEndHour}
             />
@@ -281,11 +307,12 @@ function CalendarContent() {
               onSwipeProgress={handleSwipeProgress}
               onSwipeCancel={handleSwipeCancel}
               onDragStart={handleDragStart}
-              onDragMove={handleDragMove}
+              onDragMove={moveDrag}
               onDragEnd={handleDragDrop}
               onDragCancel={handleDragCancel}
               dragHoverY={dragActive ? ghostY : null}
               initialScrollY={currentScrollY}
+              restoreKey={dateStr}
               onScrollChange={setCurrentScrollY}
               gridStartHour={settings.gridStartHour}
               gridEndHour={settings.gridEndHour}
@@ -301,6 +328,7 @@ function CalendarContent() {
               onSwipeCancel={handleSwipeCancel}
               dragActive={dragActive}
               initialScrollY={currentScrollY}
+              restoreKey={nextDateStr}
               gridStartHour={settings.gridStartHour}
               gridEndHour={settings.gridEndHour}
             />
@@ -320,6 +348,59 @@ function CalendarContent() {
         </View>
       )}
 
+      {/* Month picker dropdown */}
+      {showMonthPicker && (
+        <>
+          <TouchableOpacity
+            style={styles.pickerBackdrop}
+            onPress={() => setShowMonthPicker(false)}
+            activeOpacity={1}
+          />
+          <View style={[styles.pickerPanel, { top: headerBottom }]}>
+            <View style={styles.pickerHeader}>
+              <TouchableOpacity onPress={() => navigatePickerMonth(-1)} style={styles.pickerNavBtn}>
+                <Ionicons name="chevron-back" size={20} color={Colors.text} />
+              </TouchableOpacity>
+              <Text style={styles.pickerMonthTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
+              <TouchableOpacity onPress={() => navigatePickerMonth(1)} style={styles.pickerNavBtn}>
+                <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.pickerDayHeaders}>
+              {(settings.weekStart === 'monday'
+                ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+                : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+              ).map(d => <Text key={d} style={styles.pickerDayHeader}>{d}</Text>)}
+            </View>
+            {getMonthGrid(pickerMonth).map((week, wi) => (
+              <View key={wi} style={styles.pickerWeek}>
+                {week.map((day, di) => {
+                  if (!day) return <View key={di} style={styles.pickerDayCell} />;
+                  const ds = format(day, 'yyyy-MM-dd');
+                  const isSelected = ds === format(selectedDate, 'yyyy-MM-dd');
+                  const isToday = ds === format(new Date(), 'yyyy-MM-dd');
+                  return (
+                    <TouchableOpacity
+                      key={di}
+                      style={[styles.pickerDayCell, isSelected && styles.pickerDayCellSelected]}
+                      onPress={() => handlePickerDayPress(day)}
+                    >
+                      <Text style={[
+                        styles.pickerDayText,
+                        isToday && !isSelected && styles.pickerDayTextToday,
+                        isSelected && styles.pickerDayTextSelected,
+                      ]}>
+                        {format(day, 'd')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
       {/* FAB */}
       <FAB onPress={handleAddEvent} />
 
@@ -333,7 +414,7 @@ function CalendarContent() {
         currentStatus={editingEvent ? getStatus(editingEvent.id, editingEvent.date) : undefined}
         onStatusChange={editingEvent ? (s) => handleStatusChange(editingEvent, s) : undefined}
         onSave={handleSaveEvent}
-        onDelete={handleDeleteEvent}
+        onDelete={deleteEvent}
         onClose={() => setShowEventModal(false)}
       />
     </SafeAreaView>
@@ -388,24 +469,77 @@ const styles = StyleSheet.create({
   navBtn: {
     padding: 4,
   },
-  dayLabelRow: {
+  chevronBtn: {
+    padding: 4,
+  },
+  pickerBackdrop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 100,
+  },
+  pickerPanel: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 12,
+    zIndex: 101,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  pickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: Colors.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
+    marginBottom: 8,
   },
-  dayLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+  pickerNavBtn: {
+    padding: 6,
+  },
+  pickerMonthTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.text,
   },
-  eventCount: {
-    fontSize: 12,
+  pickerDayHeaders: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  pickerDayHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '600',
     color: Colors.textLight,
+  },
+  pickerWeek: {
+    flexDirection: 'row',
+  },
+  pickerDayCell: {
+    flex: 1,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerDayCellSelected: {
+    backgroundColor: Colors.primary,
+    borderRadius: 18,
+  },
+  pickerDayText: {
+    fontSize: 13,
+    color: Colors.text,
+  },
+  pickerDayTextToday: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  pickerDayTextSelected: {
+    color: Colors.white,
+    fontWeight: '700',
   },
   gridContainer: {
     flex: 1,

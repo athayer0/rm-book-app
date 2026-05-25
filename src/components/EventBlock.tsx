@@ -2,8 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed } from '../utils/eventUtils';
-import { eventTopOffset, eventHeight } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventHeight } from '../utils/eventUtils';
 import { Colors, EventTypeConfig } from '../constants/colors';
 import { useDrag } from './DragContext';
 
@@ -136,7 +135,7 @@ const styles = StyleSheet.create({
   block: {
     position: 'absolute',
     borderLeftWidth: 3,
-    borderRadius: 4,
+    borderRadius: 2,
     paddingLeft: 6,
     paddingRight: 6,
     paddingVertical: 3,
