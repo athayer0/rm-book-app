@@ -51,6 +51,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     });
   }
   const [pressedSlot, setPressedSlot] = useState<number | null>(null);
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (dragHoverY != null) setPressedSlot(null);
@@ -121,8 +122,14 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
             ref={gridRef}
             style={[styles.eventCol, { height: totalHeight }]}
             onLayout={measureGridTop}
-            onPressIn={(e) => setPressedSlot(Math.floor(e.nativeEvent.locationY / SLOT_HEIGHT))}
-            onPressOut={() => setPressedSlot(null)}
+            onPressIn={(e) => {
+              const slot = Math.floor(e.nativeEvent.locationY / SLOT_HEIGHT);
+              pressTimerRef.current = setTimeout(() => setPressedSlot(slot), 120);
+            }}
+            onPressOut={() => {
+              if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; }
+              setPressedSlot(null);
+            }}
             onPress={(e) => onTapEmpty(slotToTimeStr(Math.floor(e.nativeEvent.locationY / SLOT_HEIGHT)))}
           >
             {/* Grid lines */}
@@ -230,15 +237,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: Colors.accent + '25',
+    backgroundColor: 'rgba(160,160,160,0.2)',
   },
   dragHighlight: {
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: Colors.accent + '35',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.accent + '80',
+    backgroundColor: 'rgba(160,160,160,0.2)',
   },
 });

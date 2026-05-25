@@ -11,6 +11,6 @@
 [ ] tasks with the checkbox and get crossed out
 
 
-add a little "v" shaped carrot dropdown next to the date at the top of the screen that opens up a month calendar that you can select the day on. there should be right and left arrows to navigate between the months 
+i want to make it so that tapping where the time is is included in the highligithing and also gives you a way to add an event to an otherwise already occupied 30 min block and double up, is that feasible without messing up other functionality? ask any questions you have to clarify the plan
 
-when holding down an event to move it between days, the event just gets stuck on the side of the screen and starts moving through days indefinitely. Identify the root cause and address it. 
+when holding down an event to move it between days, the new days dont get displayed as the user moves through them, it just displays the day that the event originates from. Identify the root cause and address it. 
