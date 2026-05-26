@@ -90,7 +90,7 @@ export function EventBlock({
             borderLeftColor: isBackup ? 'transparent' : event.color,
             left: `${columnOffset * 100}%` as any,
             width: `${columnWidth * 100}%` as any,
-            opacity: isBeingDragged ? 0.35 : 1,
+            opacity: isBeingDragged ? 0 : 1,
             paddingLeft: isBackup ? 8 : 9,
             paddingRight: effectiveStatus ? 36 : 6,
           },
