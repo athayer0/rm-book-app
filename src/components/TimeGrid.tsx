@@ -66,7 +66,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   }, [restoreKey]);
 
   const dragSlot = dragHoverY != null
-    ? Math.max(0, Math.floor((dragHoverY - gridTopAbsoluteRef.current + scrollOffsetRef.current) / SLOT_HEIGHT))
+    ? Math.max(0, Math.floor((dragHoverY - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / SLOT_HEIGHT))
     : null;
 
   function slotToTimeStr(slot: number): string {

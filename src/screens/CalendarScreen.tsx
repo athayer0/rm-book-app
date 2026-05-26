@@ -168,7 +168,7 @@ function CalendarContent() {
   function handleDragDrop(absoluteY: number, gridTopY: number, scrollOffset: number) {
     frozenEventsRef.current = null;
     if (!dragEvent) { endDrag(); return; }
-    const relativeY = absoluteY - gridTopY + scrollOffset;
+    const relativeY = absoluteY - SLOT_HEIGHT - gridTopY + scrollOffset;
     const thirtyMinSlot = Math.max(0, Math.floor(relativeY / SLOT_HEIGHT));
     const hour = Math.floor(thirtyMinSlot / 2) + settings.gridStartHour;
     const minute = (thirtyMinSlot % 2) * 30;

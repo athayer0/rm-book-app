@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,17 +42,29 @@ export function EventBlock({
     status ?? (TRACKABLE_TYPES.has(event.type) && hasEventStartPassed(event) ? 'pending' : undefined)
   );
 
+  const isDraggingRef = useRef(false);
+
   const dragGesture = Gesture.LongPress()
     .minDuration(400)
     .runOnJS(true)
-    .onStart((e) => onDragStart?.(event, e.absoluteX, e.absoluteY))
+    .onStart((e) => {
+      isDraggingRef.current = true;
+      onDragStart?.(event, e.absoluteX, e.absoluteY);
+    })
     .simultaneousWithExternalGesture(Gesture.Pan());
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
     .onUpdate((e) => { if (isBeingDragged) onDragMove?.(e.absoluteX, e.absoluteY); })
     .onEnd((e) => { if (isBeingDragged) onDragEnd?.(e.absoluteX, e.absoluteY); })
-    .onFinalize((_e, success) => { if (!success && isBeingDragged) onDragCancel?.(); });
+    .onFinalize((_e, success) => {
+      // Use a ref instead of isBeingDragged here: onFinalize(false) can fire before
+      // the setState from onDragStart propagates, so the React state is still stale.
+      if (!success && isDraggingRef.current) {
+        isDraggingRef.current = false;
+        onDragCancel?.();
+      }
+    });
 
   const tapGesture = Gesture.Tap()
     .runOnJS(true)
