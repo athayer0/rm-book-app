@@ -289,7 +289,7 @@ function CalendarContent() {
 
       {/* Week strip */}
       <WeekStrip
-        selectedDate={selectedDate}
+        selectedDate={committedDate}
         weekStart={settings.weekStart}
         onSelectDate={setSelectedDate}
         onSwipeWeek={handleSwipeWeek}
