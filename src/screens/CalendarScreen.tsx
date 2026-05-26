@@ -34,6 +34,7 @@ function CalendarContent() {
   const { adjustCount } = useWeeklyIndicators();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
+  const frozenDateRef = useRef<string | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [headerBottom, setHeaderBottom] = useState(60);
@@ -45,6 +46,20 @@ function CalendarContent() {
   const prevEvents = getForDate(prevDateStr);
   const nextEvents = getForDate(nextDateStr);
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
+
+  // When the user drags to a new day (edge-scroll), refresh the frozen event list so the grid
+  // shows the new day's events. Must happen during render (not useEffect) so the update is
+  // visible to TimeGrid in the same paint. The dragged event is kept in the list (deduplicated)
+  // so its EventBlock stays mounted — if it unmounts, RNGH destroys the pan gesture and
+  // onDragEnd never fires, leaving dragActive true and the edge-scroll interval running forever.
+  if (dragActive && frozenEventsRef.current !== null && frozenDateRef.current !== dateStr) {
+    const dragged = dragEvent
+      ? frozenEventsRef.current.find(e => e.id === dragEvent.id) ?? null
+      : null;
+    const base = events.filter(e => e.id !== dragEvent?.id);
+    frozenEventsRef.current = dragged ? [...base, dragged] : base;
+    frozenDateRef.current = dateStr;
+  }
 
   // Animated value lives at -SCREEN_WIDTH at rest (center pane visible).
   // Swiping left → goes more negative (next pane slides in).
@@ -157,16 +172,19 @@ function CalendarContent() {
 
   function handleDragStart(event: CalendarEvent, x: number, y: number) {
     frozenEventsRef.current = events;
+    frozenDateRef.current = dateStr;
     startDrag(event, x, y);
   }
 
   function handleDragCancel() {
     frozenEventsRef.current = null;
+    frozenDateRef.current = null;
     endDrag();
   }
 
   function handleDragDrop(absoluteY: number, gridTopY: number, scrollOffset: number) {
     frozenEventsRef.current = null;
+    frozenDateRef.current = null;
     if (!dragEvent) { endDrag(); return; }
     const relativeY = absoluteY - SLOT_HEIGHT - gridTopY + scrollOffset;
     const thirtyMinSlot = Math.max(0, Math.floor(relativeY / SLOT_HEIGHT));
@@ -183,6 +201,7 @@ function CalendarContent() {
 
   function handleDayDrop(date: Date) {
     frozenEventsRef.current = null;
+    frozenDateRef.current = null;
     if (!dragEvent) { endDrag(); return; }
     updateEvent(dragEvent.id, { date: format(date, 'yyyy-MM-dd') });
     endDrag();
