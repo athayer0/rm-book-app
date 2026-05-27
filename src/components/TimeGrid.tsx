@@ -5,6 +5,7 @@ import { Colors } from '../constants/colors';
 import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUtils';
 import { EventBlock } from './EventBlock';
 import { formatTime } from '../utils/dateUtils';
+import { Svg, Polygon } from 'react-native-svg';
 
 const SLOT_HEIGHT = 50;
 const TIME_COL_WIDTH = 52;
@@ -29,6 +30,7 @@ interface Props {
   restoreKey?: string;
   onScrollChange?: (y: number) => void;
   getStatus?: (eventId: string, dateStr: string) => EventStatus | undefined;
+  isToday?: boolean;
 }
 
 function gridHourLabel(hour: number): string {
@@ -37,7 +39,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus, isToday = false }: Props) {
   const HOURS = Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => gridStartHour + i);
   const totalHeight = (gridEndHour - gridStartHour) * SLOT_HEIGHT * 2;
   const scrollOffsetRef = useRef(0);
@@ -51,11 +53,24 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     });
   }
   const [pressedSlot, setPressedSlot] = useState<number | null>(null);
-  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (dragHoverY != null) setPressedSlot(null);
   }, [dragHoverY]);
+
+  // Current time indicator
+  const [currentMinutes, setCurrentMinutes] = useState(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  });
+  useEffect(() => {
+    if (!isToday) return;
+    const interval = setInterval(() => {
+      const now = new Date();
+      setCurrentMinutes(now.getHours() * 60 + now.getMinutes());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isToday]);
 
   useEffect(() => {
     if (initialScrollY != null && initialScrollY > 0) {
@@ -76,6 +91,14 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   }
 
   const eventLayout = computeEventLayout(events);
+
+  const nowH = Math.floor(currentMinutes / 60);
+  const nowM = currentMinutes % 60;
+  const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
+  const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
+  // Hide the hour label whose grid line the red indicator is close to
+  const HIDE_NEAR_PX = 6;
+  const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
   const swipeGesture = Gesture.Pan()
     .activeOffsetX([-25, 25])
@@ -108,13 +131,17 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
         <View style={styles.grid}>
           {/* Hour labels */}
           <View style={styles.timeCol}>
-            {HOURS.map(hour => (
-              <View key={hour} style={styles.hourLabel}>
-                <Text style={styles.hourText}>
-                  {gridHourLabel(hour)}
-                </Text>
-              </View>
-            ))}
+            {HOURS.map((hour, i) => {
+              const hourLineY = i * SLOT_HEIGHT * 2;
+              const nearIndicator = showTimeIndicator && Math.abs(timeIndicatorY - hourLineY) <= HIDE_NEAR_PX;
+              return (
+                <View key={hour} style={styles.hourLabel}>
+                  <Text style={[styles.hourText, nearIndicator && { opacity: 0 }]}>
+                    {gridHourLabel(hour)}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
 
           {/* Event column */}
@@ -122,24 +149,36 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
             ref={gridRef}
             style={[styles.eventCol, { height: totalHeight }]}
             onLayout={measureGridTop}
-            onPressIn={(e) => {
+            onPress={(e) => {
               const slot = Math.floor(e.nativeEvent.locationY / SLOT_HEIGHT);
-              pressTimerRef.current = setTimeout(() => setPressedSlot(slot), 120);
+              setPressedSlot(slot);
+              setTimeout(() => setPressedSlot(null), 500);
+              onTapEmpty(slotToTimeStr(slot));
             }}
-            onPressOut={() => {
-              if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; }
-              setPressedSlot(null);
-            }}
-            onPress={(e) => onTapEmpty(slotToTimeStr(Math.floor(e.nativeEvent.locationY / SLOT_HEIGHT)))}
           >
-            {/* Grid lines */}
+            {/* Current time indicator — rendered first so events paint on top */}
+            {showTimeIndicator && (
+              <View
+                pointerEvents="none"
+                style={[styles.nowIndicator, { top: timeIndicatorY }]}
+              >
+                {/* nowRow is first child → its top edge is exactly at timeIndicatorY */}
+                <View style={styles.nowRow}>
+                  {/* Line behind — spans full width */}
+                  <View style={styles.nowLine} />
+                  {/* Triangle on top — rendered after so it paints over the line */}
+                  <Svg width={7} height={9} style={styles.nowTriangleSvg}>
+                    <Polygon points="0,0 7,4.5 0,9" fill="#000000" />
+                  </Svg>
+                </View>
+                {/* Label floats above the line without pushing it down */}
+                <Text style={styles.nowLabel}>{timeLabel}</Text>
+              </View>
+            )}
+
+            {/* Grid lines — hour marks only */}
             {HOURS.map((hour, i) => (
-              <React.Fragment key={hour}>
-                <View style={[styles.fullLine, { top: i * SLOT_HEIGHT * 2 }]} />
-                {i < HOURS.length - 1 && (
-                  <View style={[styles.halfLine, { top: i * SLOT_HEIGHT * 2 + SLOT_HEIGHT }]} />
-                )}
-              </React.Fragment>
+              <View key={hour} style={[styles.fullLine, { top: i * SLOT_HEIGHT * 2 }]} />
             ))}
 
             {/* Tap highlight */}
@@ -210,7 +249,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textLight,
     fontWeight: '500',
-    transform: [{ translateY: -12 }],
+    transform: [{ translateY: -6 }],
   },
   eventCol: {
     flex: 1,
@@ -219,19 +258,11 @@ const styles = StyleSheet.create({
   },
   fullLine: {
     position: 'absolute',
-    left: 0,
+    left: -8,
     right: 0,
-    height: 1,
+    height: 1.5,
     backgroundColor: Colors.textLight,
-    opacity: 0.2,
-  },
-  halfLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: Colors.textLight,
-    opacity: 0.1,
+    opacity: 0.3,
   },
   tapHighlight: {
     position: 'absolute',
@@ -244,5 +275,35 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(160,160,160,0.2)',
+  },
+  nowIndicator: {
+    position: 'absolute',
+    left: -TIME_COL_WIDTH,
+    right: 0,
+  },
+  nowLabel: {
+    position: 'absolute',
+    top: -15,
+    left: 6,
+    fontSize: 11,
+    fontWeight: '500',
+    color: Colors.primary,
+  },
+  nowRow: {
+    position: 'relative',
+    height: 9,
+  },
+  nowLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 3.5,
+    height: 2,
+    backgroundColor: Colors.primary,
+  },
+  nowTriangleSvg: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
 });

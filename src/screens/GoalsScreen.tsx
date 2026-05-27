@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { KIIcon } from '../components/KIIcon';
 import { Colors } from '../constants/colors';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { IndicatorGrid } from '../components/IndicatorGrid';
@@ -15,7 +16,7 @@ import { getItem } from '../utils/storage';
 import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
 
 export function GoalsScreen() {
-  const { definitions, counts, increment, decrement, updateDefinitions, reload } = useWeeklyIndicators();
+  const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const [editMode, setEditMode] = useState(false);
@@ -104,7 +105,7 @@ export function GoalsScreen() {
                     />
                   </TouchableOpacity>
                   <View style={[styles.iconBadge, { backgroundColor: def.color + '20' }]}>
-                    <Ionicons name={def.icon as any} size={16} color={def.color} />
+                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={def.color} />
                   </View>
                   <Text style={styles.editLabel} numberOfLines={1}>{def.label}</Text>
                   <Text style={styles.editGoalLabel}>Goal:</Text>
@@ -127,8 +128,6 @@ export function GoalsScreen() {
             <IndicatorGrid
               definitions={definitions}
               counts={counts}
-              onIncrement={increment}
-              onDecrement={decrement}
             />
           )}
         </View>

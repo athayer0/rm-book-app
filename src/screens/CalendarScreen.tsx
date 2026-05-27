@@ -335,6 +335,7 @@ function CalendarContent() {
               onScrollChange={setCurrentScrollY}
               gridStartHour={settings.gridStartHour}
               gridEndHour={settings.gridEndHour}
+              isToday={isToday}
             />
           </View>
           <View style={{ width: SCREEN_WIDTH }}>

@@ -66,6 +66,10 @@ export function addWeeksToDate(date: Date, weeks: number): Date {
   return addWeeks(date, weeks);
 }
 
+export function getWeekKeyByOffset(offset: number): string {
+  return getWeekKey(addWeeks(new Date(), offset));
+}
+
 export function isInCurrentWeek(dateStr: string): boolean {
   const [year, month, day] = dateStr.split('-').map(Number);
   const date = new Date(year, month - 1, day);

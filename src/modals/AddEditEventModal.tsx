@@ -32,7 +32,7 @@ interface Props {
 const EVENT_TYPES = Object.keys(EventColors);
 
 const TIME_OPTIONS: string[] = [];
-for (let h = 6; h <= 22; h++) {
+for (let h = 0; h <= 23; h++) {
   for (let m = 0; m < 60; m += 30) {
     const h12 = h % 12 || 12;
     const mm = String(m).padStart(2, '0');
@@ -40,6 +40,7 @@ for (let h = 6; h <= 22; h++) {
     TIME_OPTIONS.push(`${h12}:${mm} ${ampm}`);
   }
 }
+TIME_OPTIONS.push('12:00 AM'); // midnight end-of-day option
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? Colors.accent;

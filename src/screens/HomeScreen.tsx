@@ -11,14 +11,15 @@ import { IndicatorGrid } from '../components/IndicatorGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { PersonCard } from '../components/PersonCard';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
-import { format } from 'date-fns';
+import { KIWeeklyModal } from '../modals/KIWeeklyModal';
 import { getWeekKey } from '../utils/dateUtils';
 
 export function HomeScreen({ navigation }: any) {
-  const { definitions, counts, increment, decrement, updateDefinitions, reload } = useWeeklyIndicators();
+  const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const { people, toggleStar } = usePeople();
+  const [editVisible, setEditVisible] = useState(false);
   const [planningVisible, setPlanningVisible] = useState(false);
 
   const weekLabel = getWeekKey();
@@ -40,17 +41,12 @@ export function HomeScreen({ navigation }: any) {
         <View style={styles.card}>
           <SectionHeader
             title="Weekly Key Indicators"
-            actionLabel="VIEW ALL"
-            onAction={() => navigation.navigate('Goals')}
+            actionLabel="EDIT"
+            onAction={() => setEditVisible(true)}
           />
-          <View style={styles.weekBadge}>
-            <Text style={styles.weekText}>{weekLabel}</Text>
-          </View>
           <IndicatorGrid
             definitions={definitions}
             counts={counts}
-            onIncrement={increment}
-            onDecrement={decrement}
           />
           <TouchableOpacity
             style={styles.planBtn}
@@ -93,11 +89,19 @@ export function HomeScreen({ navigation }: any) {
         <View style={{ height: 20 }} />
       </ScrollView>
 
+      {/* EDIT button → manage KI definitions (add/remove/default goals) */}
       <WeeklyPlanningModal
+        visible={editVisible}
+        onClose={() => setEditVisible(false)}
+        definitions={definitions}
+        onUpdateDefinitions={updateDefinitions}
+      />
+
+      {/* WEEKLY PLANNING button → week-by-week actual + goal editor */}
+      <KIWeeklyModal
         visible={planningVisible}
         onClose={() => setPlanningVisible(false)}
         definitions={definitions}
-        onUpdateDefinitions={updateDefinitions}
       />
     </SafeAreaView>
   );

@@ -7,12 +7,10 @@ import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
 interface Props {
   definitions: IndicatorDefinition[];
   counts: WeeklyCounts;
-  onIncrement: (id: string) => void;
-  onDecrement: (id: string) => void;
   compact?: boolean;
 }
 
-export function IndicatorGrid({ definitions, counts, onIncrement, onDecrement, compact }: Props) {
+export function IndicatorGrid({ definitions, counts, compact }: Props) {
   const visible = definitions.filter(d => d.visible);
   const rows: IndicatorDefinition[][] = [];
   for (let i = 0; i < visible.length; i += 2) {
@@ -28,8 +26,6 @@ export function IndicatorGrid({ definitions, counts, onIncrement, onDecrement, c
               key={def.id}
               definition={def}
               count={counts[def.id] ?? 0}
-              onIncrement={() => onIncrement(def.id)}
-              onDecrement={() => onDecrement(def.id)}
               compact={compact}
             />
           ))}

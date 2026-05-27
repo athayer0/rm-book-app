@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getItem, setItem } from '../utils/storage';
-import { getIndicatorStorageKey, isNewWeek } from '../utils/dateUtils';
+import { getIndicatorStorageKey, isNewWeek, getWeekKeyByOffset } from '../utils/dateUtils';
 import { DEFAULT_INDICATORS, IndicatorDefinition } from '../constants/defaultIndicators';
 import { enqueue } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
@@ -119,5 +119,38 @@ export function useWeeklyIndicators() {
 
   const getCount = useCallback((id: string) => counts[id] ?? 0, [counts]);
 
-  return { definitions, counts, increment, decrement, reset, resetAll, updateDefinitions, adjustCount, reload, getCount };
+  // ── Per-week data access ────────────────────────────────────────────────
+
+  const getWeekData = useCallback(async (wk: string): Promise<{ counts: WeeklyCounts; goals: Record<string, number> }> => {
+    const [wkCounts, wkGoals] = await Promise.all([
+      getItem<WeeklyCounts>(`indicators_${wk}`),
+      getItem<Record<string, number>>(`indicator_goals_${wk}`),
+    ]);
+    return { counts: wkCounts ?? {}, goals: wkGoals ?? {} };
+  }, []);
+
+  const saveCountForWeek = useCallback(async (id: string, wk: string, value: number) => {
+    const stored = await getItem<WeeklyCounts>(`indicators_${wk}`) ?? {};
+    const updated = { ...stored, [id]: value };
+    await setItem(`indicators_${wk}`, updated);
+    // If this is the current week, keep React state in sync
+    if (wk === getWeekKeyByOffset(0)) {
+      setCounts(updated);
+    }
+    if (user) {
+      await enqueue({
+        table: 'indicator_entries',
+        type: 'upsert',
+        row: { user_id: user.id, indicator_id: id, week_key: wk, count: value, updated_at: new Date().toISOString() },
+      });
+    }
+  }, [user]);
+
+  const saveGoalForWeek = useCallback(async (id: string, wk: string, value: number) => {
+    const stored = await getItem<Record<string, number>>(`indicator_goals_${wk}`) ?? {};
+    const updated = { ...stored, [id]: value };
+    await setItem(`indicator_goals_${wk}`, updated);
+  }, []);
+
+  return { definitions, counts, increment, decrement, reset, resetAll, updateDefinitions, adjustCount, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
 }

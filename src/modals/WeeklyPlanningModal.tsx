@@ -6,12 +6,38 @@ import {
 import { Colors } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
+import { KIIcon } from '../components/KIIcon';
 
-const ICON_OPTIONS: string[] = [
-  'sunny', 'moon', 'book-outline', 'heart', 'star', 'time-outline',
-  'people', 'home', 'barbell-outline', 'bicycle', 'water', 'leaf',
-  'bulb-outline', 'school', 'trophy', 'flame',
-  'musical-notes', 'compass', 'ribbon', 'cafe-outline',
+interface IconOption { name: string; family: string; }
+
+const ICON_OPTIONS: IconOption[] = [
+  // Ionicons
+  { name: 'sunny',               family: 'Ionicons' },
+  { name: 'moon',                family: 'Ionicons' },
+  { name: 'book-outline',        family: 'Ionicons' },
+  { name: 'heart',               family: 'Ionicons' },
+  { name: 'star',                family: 'Ionicons' },
+  { name: 'time-outline',        family: 'Ionicons' },
+  { name: 'people',              family: 'Ionicons' },
+  { name: 'person-outline',      family: 'Ionicons' },
+  { name: 'home',                family: 'Ionicons' },
+  { name: 'barbell-outline',     family: 'Ionicons' },
+  { name: 'bicycle',             family: 'Ionicons' },
+  { name: 'water',               family: 'Ionicons' },
+  { name: 'leaf',                family: 'Ionicons' },
+  { name: 'bulb-outline',        family: 'Ionicons' },
+  { name: 'school',              family: 'Ionicons' },
+  { name: 'trophy',              family: 'Ionicons' },
+  { name: 'restaurant-outline',  family: 'Ionicons' },
+  { name: 'musical-notes',       family: 'Ionicons' },
+  { name: 'compass',             family: 'Ionicons' },
+  { name: 'ribbon',              family: 'Ionicons' },
+  { name: 'color-palette-outline', family: 'Ionicons' },
+  // MaterialCommunityIcons
+  { name: 'synagogue',           family: 'MaterialCommunityIcons' },
+  { name: 'church',              family: 'MaterialCommunityIcons' },
+  { name: 'hands-pray',         family: 'MaterialCommunityIcons' },
+  { name: 'cross',               family: 'MaterialCommunityIcons' },
 ];
 
 const COLOR_OPTIONS: string[] = [
@@ -30,25 +56,17 @@ interface Props {
 export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDefinitions }: Props) {
   const [localDefs, setLocalDefs] = useState<IndicatorDefinition[]>(definitions);
   const [newName, setNewName] = useState('');
-  const [newGoal, setNewGoal] = useState(1);
-  const [selectedIcon, setSelectedIcon] = useState(ICON_OPTIONS[0]);
+  const [selectedIconOpt, setSelectedIconOpt] = useState<IconOption>(ICON_OPTIONS[0]);
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
 
   useEffect(() => {
     if (visible) {
       setLocalDefs(definitions);
       setNewName('');
-      setNewGoal(1);
-      setSelectedIcon(ICON_OPTIONS[0]);
+      setSelectedIconOpt(ICON_OPTIONS[0]);
       setSelectedColor(COLOR_OPTIONS[0]);
     }
   }, [visible]);
-
-  function adjustGoal(id: string, delta: number) {
-    setLocalDefs(prev =>
-      prev.map(d => d.id === id ? { ...d, goal: Math.max(1, d.goal + delta) } : d),
-    );
-  }
 
   function removeKI(id: string) {
     setLocalDefs(prev => prev.filter(d => d.id !== id));
@@ -60,9 +78,9 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
     const newDef: IndicatorDefinition = {
       id: `custom_${Date.now()}`,
       label: trimmed,
-      icon: selectedIcon,
-      iconFamily: 'Ionicons',
-      goal: newGoal,
+      icon: selectedIconOpt.name,
+      iconFamily: selectedIconOpt.family,
+      goal: 1,
       type: 'numeric',
       color: selectedColor,
       visible: true,
@@ -70,8 +88,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
     };
     setLocalDefs(prev => [...prev, newDef]);
     setNewName('');
-    setNewGoal(1);
-    setSelectedIcon(ICON_OPTIONS[0]);
+    setSelectedIconOpt(ICON_OPTIONS[0]);
     setSelectedColor(COLOR_OPTIONS[0]);
   }
 
@@ -84,7 +101,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.header}>
         <View style={{ width: 60 }} />
-        <Text style={styles.headerTitle}>Weekly Planning</Text>
+        <Text style={styles.headerTitle}>Edit KIs</Text>
         <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
@@ -105,26 +122,9 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
               style={[styles.kiRow, index === localDefs.length - 1 && styles.kiRowLast]}
             >
               <View style={[styles.kiIcon, { backgroundColor: def.color + '20' }]}>
-                <Ionicons name={def.icon as any} size={20} color={def.color} />
+                <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={def.color} />
               </View>
               <Text style={styles.kiLabel} numberOfLines={1}>{def.label}</Text>
-              <View style={styles.goalStepper}>
-                <TouchableOpacity
-                  onPress={() => adjustGoal(def.id, -1)}
-                  style={styles.stepBtn}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Ionicons name="remove" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
-                <Text style={styles.goalNum}>{def.goal}</Text>
-                <TouchableOpacity
-                  onPress={() => adjustGoal(def.id, 1)}
-                  style={styles.stepBtn}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Ionicons name="add" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
               {def.builtIn ? (
                 <View style={styles.lockIcon}>
                   <Ionicons name="lock-closed-outline" size={16} color={Colors.textLight} />
@@ -150,27 +150,6 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
             returnKeyType="done"
           />
 
-          <View style={styles.addRow}>
-            <Text style={styles.addRowLabel}>Weekly Goal</Text>
-            <View style={styles.goalStepper}>
-              <TouchableOpacity
-                onPress={() => setNewGoal(g => Math.max(1, g - 1))}
-                style={styles.stepBtn}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <Ionicons name="remove" size={14} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              <Text style={styles.goalNum}>{newGoal}</Text>
-              <TouchableOpacity
-                onPress={() => setNewGoal(g => g + 1)}
-                style={styles.stepBtn}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <Ionicons name="add" size={14} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
           <Text style={styles.pickerLabel}>Icon</Text>
           <ScrollView
             horizontal
@@ -178,22 +157,26 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
             style={styles.iconScroll}
             contentContainerStyle={styles.iconScrollContent}
           >
-            {ICON_OPTIONS.map(icon => (
-              <TouchableOpacity
-                key={icon}
-                onPress={() => setSelectedIcon(icon)}
-                style={[
-                  styles.iconOption,
-                  selectedIcon === icon && { backgroundColor: selectedColor + '25', borderColor: selectedColor },
-                ]}
-              >
-                <Ionicons
-                  name={icon as any}
-                  size={22}
-                  color={selectedIcon === icon ? selectedColor : Colors.textSecondary}
-                />
-              </TouchableOpacity>
-            ))}
+            {ICON_OPTIONS.map(opt => {
+              const isSelected = selectedIconOpt.name === opt.name && selectedIconOpt.family === opt.family;
+              return (
+                <TouchableOpacity
+                  key={`${opt.family}:${opt.name}`}
+                  onPress={() => setSelectedIconOpt(opt)}
+                  style={[
+                    styles.iconOption,
+                    isSelected && { backgroundColor: selectedColor + '25', borderColor: selectedColor },
+                  ]}
+                >
+                  <KIIcon
+                    icon={opt.name}
+                    iconFamily={opt.family}
+                    size={22}
+                    color={isSelected ? selectedColor : Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
           <Text style={styles.pickerLabel}>Color</Text>
@@ -219,10 +202,9 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
           {newName.trim() ? (
             <View style={styles.previewRow}>
               <View style={[styles.kiIcon, { backgroundColor: selectedColor + '20' }]}>
-                <Ionicons name={selectedIcon as any} size={20} color={selectedColor} />
+                <KIIcon icon={selectedIconOpt.name} iconFamily={selectedIconOpt.family} size={20} color={selectedColor} />
               </View>
               <Text style={[styles.previewLabel, { color: selectedColor }]}>{newName.trim()}</Text>
-              <Text style={styles.previewGoal}>Goal: {newGoal}</Text>
             </View>
           ) : null}
 

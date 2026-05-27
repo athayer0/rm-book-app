@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from './constants/colors';
 import { HomeScreen } from './screens/HomeScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
-import { GoalsScreen } from './screens/GoalsScreen';
 import { PeopleScreen } from './screens/PeopleScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 
@@ -39,7 +38,6 @@ export function AppNavigation() {
             const icons: Record<string, string> = {
               Home: focused ? 'home' : 'home-outline',
               Calendar: focused ? 'calendar' : 'calendar-outline',
-              Goals: focused ? 'stats-chart' : 'stats-chart-outline',
               People: focused ? 'people' : 'people-outline',
               Settings: focused ? 'settings' : 'settings-outline',
             };
@@ -65,7 +63,6 @@ export function AppNavigation() {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Calendar" component={CalendarScreen} />
-        <Tab.Screen name="Goals" component={GoalsScreen} />
         <Tab.Screen name="People" component={PeopleScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>

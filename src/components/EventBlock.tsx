@@ -31,10 +31,10 @@ export function EventBlock({
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
 }: Props) {
   const { active, event: draggingEvent } = useDrag();
-  const top = eventTopOffset(event.startTime, gridStartHour);
+  const top = eventTopOffset(event.startTime, gridStartHour) + 1;
   const config = EventTypeConfig[event.type];
   const isFixed = config?.hasCheckbox ?? false;
-  const height = Math.max(eventHeight(event.startTime, event.endTime), 25);
+  const height = Math.max(eventHeight(event.startTime, event.endTime) - 1, 24);
   const isBeingDragged = active && draggingEvent?.id === event.id;
 
   const isBackup = !!event.backup;
@@ -85,7 +85,6 @@ export function EventBlock({
           {
             top,
             height,
-            backgroundColor: event.color + '70',
             borderLeftWidth: isBackup ? 0 : 3,
             borderLeftColor: isBackup ? 'transparent' : event.color,
             left: `${columnOffset * 100}%` as any,
@@ -97,6 +96,8 @@ export function EventBlock({
         ]}
         onStartShouldSetResponder={() => true}
       >
+        {/* Opaque white base + semi-transparent color tint so block fully covers grid lines */}
+        <View style={[styles.blockTint, { backgroundColor: event.color + '70' }]} />
         {isBackup && (
           <View style={[styles.backupBar, { backgroundColor: event.color + '40', height }]}>
             {Array.from({ length: stripeCount }).map((_, i) => (
@@ -152,6 +153,10 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     paddingVertical: 3,
     overflow: 'hidden',
+    backgroundColor: Colors.white,
+  },
+  blockTint: {
+    ...StyleSheet.absoluteFillObject,
   },
   row: {
     flexDirection: 'row',

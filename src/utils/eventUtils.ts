@@ -83,7 +83,10 @@ export function eventTopOffset(startTime: string, gridStartHour: number = 6): nu
 }
 
 export function eventHeight(startTime: string, endTime: string): number {
-  const duration = Math.max(timeToMinutes(endTime) - timeToMinutes(startTime), 15);
+  let end = timeToMinutes(endTime);
+  const start = timeToMinutes(startTime);
+  if (end <= start) end += 24 * 60; // midnight end-of-day wrap ("12:00 AM" = 0 → 1440)
+  const duration = Math.max(end - start, 15);
   return (duration / 30) * 50;
 }
 
