@@ -1,28 +1,21 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { format, addDays, startOfWeek } from 'date-fns';
 import { Colors } from '../constants/colors';
-import { CalendarEvent } from '../utils/eventUtils';
-
 interface Props {
   selectedDate: Date;
   weekStart: 'monday' | 'sunday';
   onSelectDate: (date: Date) => void;
   onSwipeWeek: (dir: 1 | -1) => void;
-  draggingEvent?: CalendarEvent | null;
-  onDayDrop?: (date: Date) => void;
 }
 
-export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek, draggingEvent, onDayDrop }: Props) {
+export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }: Props) {
   const weekStartsOn = weekStart === 'monday' ? 1 : 0;
   const monday = startOfWeek(selectedDate, { weekStartsOn });
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
-
-  // Track x positions of each day cell for drop detection
-  const cellLayouts = useRef<{ x: number; width: number; date: Date }[]>([]);
 
   const swipeGesture = Gesture.Pan()
     .activeOffsetX([-30, 30])
@@ -41,7 +34,6 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek, 
           const dateStr = format(day, 'yyyy-MM-dd');
           const isSelected = dateStr === format(selectedDate, 'yyyy-MM-dd');
           const isToday = dateStr === todayStr;
-          const isDragTarget = !!draggingEvent;
 
           const altBg = i % 2 === 0 ? '#E8E8E8' : '#D8D8D8';
 
@@ -51,18 +43,10 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek, 
               style={[
                 styles.dayBtn,
                 { backgroundColor: altBg },
-                isDragTarget && styles.dayBtnDropZone,
                 isSelected && styles.dayBtnSelected,
               ]}
               onPress={() => onSelectDate(day)}
               activeOpacity={0.8}
-              onLayout={(e) => {
-                cellLayouts.current[i] = {
-                  x: e.nativeEvent.layout.x,
-                  width: e.nativeEvent.layout.width,
-                  date: day,
-                };
-              }}
             >
               <Text style={[styles.dayName, isSelected && styles.dayNameSelected]}>
                 {format(day, 'EEE').slice(0, 2).toUpperCase()}
@@ -96,9 +80,6 @@ const styles = StyleSheet.create({
   dayBtnSelected: {
     backgroundColor: '#ADD8E6',
     borderColor: '#00008B',
-  },
-  dayBtnDropZone: {
-    borderColor: 'rgba(255,255,255,0.4)',
   },
   dayName: {
     fontSize: 10,

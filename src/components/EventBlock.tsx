@@ -1,15 +1,18 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventHeight } from '../utils/eventUtils';
 import { Colors, EventTypeConfig } from '../constants/colors';
 import { useDrag } from './DragContext';
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const TIME_COL_WIDTH = 52;
+
 const STATUS_CONFIG: Record<EventStatus, { color: string; icon: string }> = {
-  completed: { color: '#1A7A40', icon: 'checkmark' },
-  failed:    { color: '#B03030', icon: 'close' },
-  pending:   { color: '#F39C12', icon: 'alert' },
+  completed: { color: '#1A7A40', icon: 'checkmark-circle' },
+  failed:    { color: '#B03030', icon: 'ban' },
+  pending:   { color: '#F39C12', icon: 'alert-circle' },
 };
 
 interface Props {
@@ -17,7 +20,7 @@ interface Props {
   status?: EventStatus;
   onPress: () => void;
   onToggleComplete?: () => void;
-  onDragStart?: (event: CalendarEvent, x: number, y: number) => void;
+  onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (x: number, y: number) => void;
   onDragCancel?: () => void;
@@ -49,7 +52,8 @@ export function EventBlock({
     .runOnJS(true)
     .onStart((e) => {
       isDraggingRef.current = true;
-      onDragStart?.(event, e.absoluteX, e.absoluteY);
+      const dragPixelWidth = columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH);
+      onDragStart?.(event, e.absoluteX, e.absoluteY, dragPixelWidth, height);
     })
     .simultaneousWithExternalGesture(Gesture.Pan());
 
@@ -91,7 +95,7 @@ export function EventBlock({
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
             paddingLeft: isBackup ? 8 : 9,
-            paddingRight: effectiveStatus ? 36 : 6,
+            paddingRight: effectiveStatus ? 42 : 6,
           },
         ]}
         onStartShouldSetResponder={() => true}
@@ -130,13 +134,21 @@ export function EventBlock({
 
         {effectiveStatus && (
           <View style={styles.statusWrap}>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_CONFIG[effectiveStatus].color }]}>
-              <Ionicons
-                name={STATUS_CONFIG[effectiveStatus].icon as any}
-                size={11}
-                color="#fff"
-              />
-            </View>
+            {effectiveStatus === 'failed' ? (
+              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: STATUS_CONFIG.failed.color, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="ban-outline" size={26} color={Colors.white} style={{ transform: [{ scaleX: -1 }] }} />
+              </View>
+            ) : effectiveStatus === 'completed' ? (
+              <View style={{ width: 36, height: 36 }}>
+                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, top: 6, left: 6 }} />
+                <Ionicons name="checkmark-circle" size={36} color={STATUS_CONFIG.completed.color} />
+              </View>
+            ) : (
+              <View style={{ width: 36, height: 36 }}>
+                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, top: 6, left: 6 }} />
+                <Ionicons name="alert-circle" size={36} color={STATUS_CONFIG.pending.color} />
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -166,13 +178,13 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   title: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: Colors.text,
     flexShrink: 1,
   },
   time: {
-    fontSize: 10,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginLeft: 4,
     flexShrink: 0,
@@ -181,15 +193,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    right: 12,
-    width: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    right: 6,
+    width: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },

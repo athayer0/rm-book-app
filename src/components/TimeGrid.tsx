@@ -18,7 +18,8 @@ interface Props {
   onSwipeDay: (dir: 1 | -1) => void;
   onSwipeProgress?: (x: number) => void;
   onSwipeCancel?: () => void;
-  onDragStart?: (event: CalendarEvent, x: number, y: number) => void;
+  onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
+  dragEventHeight?: number;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (absoluteY: number, gridTopY: number, scrollOffset: number) => void;
   onDragCancel?: () => void;
@@ -39,7 +40,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus, isToday = false }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, dragEventHeight, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus, isToday = false }: Props) {
   const HOURS = Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => gridStartHour + i);
   const totalHeight = (gridEndHour - gridStartHour) * SLOT_HEIGHT * 2;
   const scrollOffsetRef = useRef(0);
@@ -116,6 +117,14 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
       }
     });
 
+  function handleSlotTap(locationY: number) {
+    const maxSlot = (gridEndHour - gridStartHour) * 2 - 1;
+    const slot = Math.min(maxSlot, Math.max(0, Math.floor((locationY - 16) / SLOT_HEIGHT)));
+    setPressedSlot(slot);
+    setTimeout(() => setPressedSlot(null), 500);
+    onTapEmpty(slotToTimeStr(slot));
+  }
+
   return (
     <GestureDetector gesture={swipeGesture}>
       <ScrollView
@@ -130,7 +139,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
       >
         <View style={styles.grid}>
           {/* Hour labels */}
-          <View style={styles.timeCol}>
+          <Pressable style={styles.timeCol} onPress={(e) => handleSlotTap(e.nativeEvent.locationY)}>
             {HOURS.map((hour, i) => {
               const hourLineY = i * SLOT_HEIGHT * 2;
               const nearIndicator = showTimeIndicator && Math.abs(timeIndicatorY - hourLineY) <= HIDE_NEAR_PX;
@@ -142,19 +151,14 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
                 </View>
               );
             })}
-          </View>
+          </Pressable>
 
           {/* Event column */}
           <Pressable
             ref={gridRef}
             style={[styles.eventCol, { height: totalHeight }]}
             onLayout={measureGridTop}
-            onPress={(e) => {
-              const slot = Math.floor(e.nativeEvent.locationY / SLOT_HEIGHT);
-              setPressedSlot(slot);
-              setTimeout(() => setPressedSlot(null), 500);
-              onTapEmpty(slotToTimeStr(slot));
-            }}
+            onPress={(e) => handleSlotTap(e.nativeEvent.locationY + 16)}
           >
             {/* Current time indicator — rendered first so events paint on top */}
             {showTimeIndicator && (
@@ -193,7 +197,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
             {dragSlot !== null && (
               <View
                 pointerEvents="none"
-                style={[styles.dragHighlight, { top: dragSlot * SLOT_HEIGHT, height: SLOT_HEIGHT }]}
+                style={[styles.dragHighlight, { top: dragSlot * SLOT_HEIGHT + 1, height: dragEventHeight ?? SLOT_HEIGHT }]}
               />
             )}
 
@@ -228,6 +232,7 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
     backgroundColor: Colors.white,
+    marginTop: 6,
   },
   grid: {
     flexDirection: 'row',
@@ -241,7 +246,6 @@ const styles = StyleSheet.create({
   hourLabel: {
     height: SLOT_HEIGHT * 2,
     justifyContent: 'flex-start',
-    paddingTop: 6,
     alignItems: 'flex-end',
     paddingRight: 8,
   },
@@ -254,7 +258,7 @@ const styles = StyleSheet.create({
   eventCol: {
     flex: 1,
     position: 'relative',
-    marginTop: 28,
+    marginTop: 16,
   },
   fullLine: {
     position: 'absolute',
@@ -266,7 +270,7 @@ const styles = StyleSheet.create({
   },
   tapHighlight: {
     position: 'absolute',
-    left: 0,
+    left: -TIME_COL_WIDTH,
     right: 0,
     backgroundColor: 'rgba(160,160,160,0.2)',
   },

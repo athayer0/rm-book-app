@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, Switch,
@@ -8,12 +8,12 @@ import { Colors, EventColors, EventTypeLabels, EventTypeConfig } from '../consta
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES } from '../utils/eventUtils';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 const STATUS_OPTIONS: { value: EventStatus; label: string; icon: string; color: string }[] = [
-  { value: 'pending',   label: 'Pending',   icon: 'alert',    color: '#F39C12' },
-  { value: 'completed', label: 'Completed', icon: 'checkmark', color: '#27AE60' },
-  { value: 'failed',    label: 'Failed',    icon: 'close',    color: '#E74C3C' },
+  { value: 'pending',   label: 'Pending',   icon: 'alert-circle',    color: '#F39C12' },
+  { value: 'completed', label: 'Completed', icon: 'checkmark-circle', color: '#1A7A40' },
+  { value: 'failed',    label: 'Failed',    icon: 'ban',             color: '#B03030' },
 ];
 
 interface Props {
@@ -41,6 +41,22 @@ for (let h = 0; h <= 23; h++) {
   }
 }
 TIME_OPTIONS.push('12:00 AM'); // midnight end-of-day option
+
+function getMonthGrid(month: Date, weekStart: 'monday' | 'sunday'): (Date | null)[][] {
+  const year = month.getFullYear();
+  const m = month.getMonth();
+  const firstDay = new Date(year, m, 1);
+  const daysInMonth = new Date(year, m + 1, 0).getDate();
+  const weekStartsOn = weekStart === 'monday' ? 1 : 0;
+  let startDow = firstDay.getDay();
+  if (weekStartsOn === 1) startDow = (startDow + 6) % 7;
+  const cells: (Date | null)[] = Array(startDow).fill(null);
+  for (let d = 0; d < daysInMonth; d++) cells.push(addDays(firstDay, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? Colors.accent;
@@ -70,7 +86,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(new Date());
   const [error, setError] = useState('');
+  const startScrollRef = useRef<ScrollView>(null);
+  const endScrollRef = useRef<ScrollView>(null);
+  const DROPDOWN_ITEM_HEIGHT = 40;
 
   useEffect(() => {
     if (event) {
@@ -97,7 +118,33 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
     setLocalStatus(currentStatus);
     setError('');
+    setShowDatePicker(false);
+    const initialDateStr = event ? event.date : (defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
+    const [py, pm] = initialDateStr.split('-').map(Number);
+    setPickerMonth(new Date(py, pm - 1, 1));
   }, [event, defaultDate, defaultStartTime, visible, currentStatus]);
+
+  useEffect(() => {
+    if (showStartPicker) {
+      const idx = TIME_OPTIONS.findIndex(t => t === startTime);
+      if (idx >= 0) {
+        requestAnimationFrame(() => {
+          startScrollRef.current?.scrollTo({ y: idx * DROPDOWN_ITEM_HEIGHT, animated: false });
+        });
+      }
+    }
+  }, [showStartPicker]);
+
+  useEffect(() => {
+    if (showEndPicker) {
+      const idx = TIME_OPTIONS.findIndex(t => t === endTime);
+      if (idx >= 0) {
+        requestAnimationFrame(() => {
+          endScrollRef.current?.scrollTo({ y: idx * DROPDOWN_ITEM_HEIGHT, animated: false });
+        });
+      }
+    }
+  }, [showEndPicker]);
 
   function handleStatusTap(value: EventStatus) {
     const next = localStatus === value ? undefined : value;
@@ -163,29 +210,35 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           {/* Status (only when editing a non-backup trackable event type) */}
           {event && !isBackup && TRACKABLE_TYPES.has(type) && (
             <View style={styles.section}>
-              <Text style={styles.label}>Status</Text>
               <View style={styles.statusRow}>
-                {STATUS_OPTIONS.map(opt => {
-                  const selected = localStatus === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      onPress={() => handleStatusTap(opt.value)}
-                      style={[
-                        styles.statusBtn,
-                        { borderColor: opt.color },
-                        selected && { backgroundColor: opt.color + '18' },
-                      ]}
-                    >
-                      <View style={[styles.statusCircle, { backgroundColor: opt.color }]}>
-                        <Ionicons name={opt.icon as any} size={13} color="#fff" />
-                      </View>
-                      <Text style={[styles.statusLabel, { color: selected ? opt.color : Colors.textSecondary }]}>
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                <Text style={[styles.label, { marginBottom: 0, paddingLeft: 6, fontSize: 16 }]}>
+                  {localStatus ? STATUS_OPTIONS.find(o => o.value === localStatus)?.label : 'None'}
+                </Text>
+                <View style={styles.statusIcons}>
+                  {STATUS_OPTIONS.map(opt => {
+                    const selected = localStatus === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        onPress={() => handleStatusTap(opt.value)}
+                        style={opt.icon === 'ban' ? { width: 51, height: 54, alignItems: 'center', justifyContent: 'center' } : undefined}
+                      >
+                        {opt.icon === 'ban' && selected ? (
+                          <View style={{ width: 45, height: 45, borderRadius: 23, backgroundColor: opt.color, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="ban-outline" size={39} color="#fff" style={{ transform: [{ scaleX: -1 }] }} />
+                          </View>
+                        ) : (
+                          <Ionicons
+                            name={(selected ? opt.icon : opt.icon + '-outline') as any}
+                            size={opt.icon === 'ban' ? 51 : 54}
+                            color={opt.color}
+                            style={opt.icon === 'ban' ? { transform: [{ scaleX: -1 }] } : undefined}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             </View>
           )}
@@ -202,48 +255,89 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          {/* Type */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Event Type</Text>
-            <TouchableOpacity style={styles.picker} onPress={() => setShowTypePicker(!showTypePicker)}>
-              <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
-              <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
-              <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-            </TouchableOpacity>
-            {showTypePicker && (
-              <View style={styles.dropdown}>
-                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                  {EVENT_TYPES.map(t => (
-                    <TouchableOpacity
-                      key={t}
-                      style={styles.dropdownItem}
-                      onPress={() => handleTypeChange(t)}
-                    >
-                      <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
-                      <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
-                      {type === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+          {/* Type + Date row */}
+          <View style={styles.row}>
+            <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
+              <Text style={styles.label}>Event Type</Text>
+              <TouchableOpacity style={styles.picker} onPress={() => setShowTypePicker(!showTypePicker)}>
+                <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
+                <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
+                <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
+              </TouchableOpacity>
+              {showTypePicker && (
+                <View style={styles.dropdown}>
+                  <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                    {EVENT_TYPES.map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        style={styles.dropdownItem}
+                        onPress={() => handleTypeChange(t)}
+                      >
+                        <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
+                        <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
+                        {type === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+            <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
+              <Text style={styles.label}>Date</Text>
+              <TouchableOpacity style={styles.picker} onPress={() => setShowDatePicker(v => !v)}>
+                <Text style={styles.pickerText}>{format(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</Text>
+                <Ionicons name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+              </TouchableOpacity>
+            </View>
+          </View>
+          {showDatePicker && (
+            <View style={styles.datePickerPanel}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setPickerMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} style={styles.pickerNavBtn}>
+                  <Ionicons name="chevron-back" size={20} color={Colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.pickerMonthTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
+                <TouchableOpacity onPress={() => setPickerMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} style={styles.pickerNavBtn}>
+                  <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
-
-          {/* Date */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Date</Text>
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.textLight}
-            />
-          </View>
+              <View style={styles.pickerDayHeaders}>
+                {(settings.weekStart === 'monday'
+                  ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+                  : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+                ).map(day => <Text key={day} style={styles.pickerDayHeader}>{day}</Text>)}
+              </View>
+              {getMonthGrid(pickerMonth, settings.weekStart).map((week, wi) => (
+                <View key={wi} style={styles.pickerWeek}>
+                  {week.map((day, di) => {
+                    if (!day) return <View key={di} style={styles.pickerDayCell} />;
+                    const ds = format(day, 'yyyy-MM-dd');
+                    const isSelected = ds === date;
+                    const isToday = ds === format(new Date(), 'yyyy-MM-dd');
+                    return (
+                      <TouchableOpacity
+                        key={di}
+                        style={[styles.pickerDayCell, isSelected && styles.pickerDayCellSelected]}
+                        onPress={() => { setDate(ds); setShowDatePicker(false); }}
+                      >
+                        <Text style={[
+                          styles.pickerDayText,
+                          isToday && !isSelected && styles.pickerDayTextToday,
+                          isSelected && styles.pickerDayTextSelected,
+                        ]}>
+                          {format(day, 'd')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Times */}
           <View style={styles.row}>
-            <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
+            <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
               <Text style={styles.label}>Start Time</Text>
               <TouchableOpacity style={styles.picker} onPress={() => setShowStartPicker(!showStartPicker)}>
                 <Text style={styles.pickerText}>{startTime}</Text>
@@ -251,9 +345,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               </TouchableOpacity>
               {showStartPicker && (
                 <View style={styles.dropdown}>
-                  <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
-                    {TIME_OPTIONS.map(t => (
-                      <TouchableOpacity key={t} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
+                  <ScrollView ref={startScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled>
+                    {TIME_OPTIONS.map((t, i) => (
+                      <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
                         <Text style={styles.dropdownText}>{t}</Text>
                         {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
                       </TouchableOpacity>
@@ -264,7 +358,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
 
             {!fixed && (
-              <View style={[styles.section, { flex: 1 }]}>
+              <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
                 <Text style={styles.label}>End Time</Text>
                 <TouchableOpacity style={styles.picker} onPress={() => setShowEndPicker(!showEndPicker)}>
                   <Text style={styles.pickerText}>{endTime}</Text>
@@ -272,9 +366,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 </TouchableOpacity>
                 {showEndPicker && (
                   <View style={styles.dropdown}>
-                    <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
-                      {TIME_OPTIONS.map(t => (
-                        <TouchableOpacity key={t} style={styles.dropdownItem} onPress={() => { setEndTime(t); setShowEndPicker(false); }}>
+                    <ScrollView ref={endScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled>
+                      {TIME_OPTIONS.map((t, i) => (
+                        <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => { setEndTime(t); setShowEndPicker(false); }}>
                           <Text style={styles.dropdownText}>{t}</Text>
                           {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
                         </TouchableOpacity>
@@ -454,28 +548,37 @@ const styles = StyleSheet.create({
   errorBanner: { fontSize: 13, color: Colors.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: Colors.danger + '12' },
   statusRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
   },
-  statusBtn: {
-    flex: 1,
+  statusIcons: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  datePickerPanel: {
+    marginTop: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 8,
+    backgroundColor: Colors.white,
+  },
+  pickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  statusCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  pickerNavBtn: { padding: 6 },
+  pickerMonthTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  pickerDayHeaders: { flexDirection: 'row', marginBottom: 4 },
+  pickerDayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: Colors.textLight },
+  pickerWeek: { flexDirection: 'row' },
+  pickerDayCell: { flex: 1, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pickerDayCellSelected: { backgroundColor: Colors.primary, borderRadius: 18 },
+  pickerDayText: { fontSize: 13, color: Colors.text },
+  pickerDayTextToday: { color: Colors.primary, fontWeight: '700' },
+  pickerDayTextSelected: { color: Colors.white, fontWeight: '700' },
 });

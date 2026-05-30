@@ -15,3 +15,5 @@ There is a bug I want you to fix in the calendar section. Here is how the bug pl
 Is this reinventing the wheel? The 3-pane recycling approach is the industry standard (Google Calendar, Apple Calendar all use it). react-native-pager-view is the canonical native-backed option, but it is not installed, would require significant refactor, and doesn't integrate naturally with the existing drag-to-edge-scroll feature in DragContext. react-native-reanimated v4 is installed and could eventually provide a cleaner solution (UI-thread animations eliminate bridge latency and the race window), but that is a larger migration. The targeted fix below is the correct minimal fix.
 
 make it so i can scroll even if my finger starts on an event
+
+make it so the colors are in order and not random

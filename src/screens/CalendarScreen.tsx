@@ -11,13 +11,12 @@ import { TimeGrid } from '../components/TimeGrid';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
-import { CalendarEvent, EventStatus, getKIContribution } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, getKIContribution, eventHeight } from '../utils/eventUtils';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventStatuses } from '../hooks/useEventStatuses';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { isInCurrentWeek } from '../utils/dateUtils';
-import { addMinutesToTimeString, formatTime } from '../utils/dateUtils';
-import { EventTypeConfig } from '../constants/colors';
+import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
 
 const SLOT_HEIGHT = 50;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -32,7 +31,7 @@ function CalendarContent() {
   const { settings } = useSettings();
   const { getStatus, setStatus } = useEventStatuses();
   const { adjustCount } = useWeeklyIndicators();
-  const { active: dragActive, event: dragEvent, ghostX, ghostY, endDrag, startDrag, moveDrag } = useDrag();
+  const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -170,10 +169,10 @@ function CalendarContent() {
     }
   }
 
-  function handleDragStart(event: CalendarEvent, x: number, y: number) {
+  function handleDragStart(event: CalendarEvent, x: number, y: number, width: number, height: number) {
     frozenEventsRef.current = events;
     frozenDateRef.current = dateStr;
-    startDrag(event, x, y);
+    startDrag(event, x, y, width, height);
   }
 
   function handleDragCancel() {
@@ -191,19 +190,13 @@ function CalendarContent() {
     const hour = Math.floor(thirtyMinSlot / 2) + settings.gridStartHour;
     const minute = (thirtyMinSlot % 2) * 30;
     const newStart = formatTime(Math.min(hour, 23), minute);
-    const config = EventTypeConfig[dragEvent.type];
-    const durationMins = config?.defaultMinutes === 0 ? 15 :
-      (settings.eventTypeDefaultMinutes[dragEvent.type] ?? config?.defaultMinutes ?? 30);
+    const { hour: sh, minute: sm } = parseTimeString(dragEvent.startTime);
+    const { hour: eh, minute: em } = parseTimeString(dragEvent.endTime);
+    const startMins = sh * 60 + sm;
+    const endMins = eh * 60 + em;
+    const durationMins = Math.max(endMins > startMins ? endMins - startMins : endMins + 1440 - startMins, 15);
     const newEnd = addMinutesToTimeString(newStart, durationMins);
     updateEvent(dragEvent.id, { startTime: newStart, endTime: newEnd, date: dateStr });
-    endDrag();
-  }
-
-  function handleDayDrop(date: Date) {
-    frozenEventsRef.current = null;
-    frozenDateRef.current = null;
-    if (!dragEvent) { endDrag(); return; }
-    updateEvent(dragEvent.id, { date: format(date, 'yyyy-MM-dd') });
     endDrag();
   }
 
@@ -293,8 +286,6 @@ function CalendarContent() {
         weekStart={settings.weekStart}
         onSelectDate={setSelectedDate}
         onSwipeWeek={handleSwipeWeek}
-        draggingEvent={dragActive ? dragEvent : null}
-        onDayDrop={handleDayDrop}
       />
 
       {/* Time grid — 3-pane sliding row */}
@@ -330,6 +321,7 @@ function CalendarContent() {
               onDragEnd={handleDragDrop}
               onDragCancel={handleDragCancel}
               dragHoverY={dragActive ? ghostY : null}
+              dragEventHeight={dragActive && dragEvent ? Math.max(eventHeight(dragEvent.startTime, dragEvent.endTime) - 1, 24) : undefined}
               initialScrollY={currentScrollY}
               restoreKey={dateStr}
               onScrollChange={setCurrentScrollY}
@@ -359,10 +351,11 @@ function CalendarContent() {
       {/* Drag ghost overlay */}
       {dragActive && dragEvent && (
         <View
-          style={[styles.ghostOverlay, { left: ghostX - 80, top: ghostY }]}
+          style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: ghostY, width: ghostWidth }]}
           pointerEvents="none"
         >
-          <View style={[styles.ghostBlock, { backgroundColor: dragEvent.color + 'EE', borderLeftColor: dragEvent.color }]}>
+          <View style={[styles.ghostBlock, { backgroundColor: Colors.white, borderLeftColor: dragEvent.color, height: ghostHeight }]}>
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '70' }]} />
             <Text style={styles.ghostTitle} numberOfLines={1}>{dragEvent.title}</Text>
           </View>
         </View>
@@ -564,6 +557,7 @@ const styles = StyleSheet.create({
   gridContainer: {
     flex: 1,
     overflow: 'hidden',
+    backgroundColor: Colors.white,
   },
   gridRow: {
     flex: 1,
@@ -572,7 +566,6 @@ const styles = StyleSheet.create({
   },
   ghostOverlay: {
     position: 'absolute',
-    width: 160,
     zIndex: 999,
   },
   ghostBlock: {
@@ -580,8 +573,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    height: 30,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -589,7 +581,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   ghostTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: Colors.text,
   },
