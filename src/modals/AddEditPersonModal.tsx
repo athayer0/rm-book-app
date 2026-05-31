@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
 
 interface Props {
@@ -18,6 +19,9 @@ interface Props {
 const STATUS_OPTIONS = ['Friend', 'Dating', 'Fellowship Contact', 'Family', 'Other'];
 
 export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Friend');
   const [phone, setPhone] = useState('');
@@ -149,99 +153,101 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.card,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  cancel: { fontSize: 16, color: Colors.textSecondary },
-  save: { fontSize: 16, fontWeight: '600', color: Colors.accent },
-  form: { flex: 1, backgroundColor: Colors.background },
-  section: {
-    backgroundColor: Colors.card,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 12,
-    padding: 12,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  input: {
-    fontSize: 16,
-    color: Colors.text,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    paddingVertical: 4,
-  },
-  notesInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-    paddingTop: 4,
-  },
-  picker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  pickerText: { flex: 1, fontSize: 16, color: Colors.text },
-  dropdown: {
-    marginTop: 4,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  dropdownText: { flex: 1, fontSize: 15, color: Colors.text },
-  starRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  starText: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-  },
-  deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    margin: 16,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.danger + '12',
-  },
-  deleteText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.danger,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      backgroundColor: C.card,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: C.text,
+    },
+    cancel: { fontSize: 16, color: C.textSecondary },
+    save: { fontSize: 16, fontWeight: '600', color: C.accent },
+    form: { flex: 1, backgroundColor: C.background },
+    section: {
+      backgroundColor: C.card,
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 12,
+      padding: 12,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 8,
+    },
+    input: {
+      fontSize: 16,
+      color: C.text,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      paddingVertical: 4,
+    },
+    notesInput: {
+      minHeight: 80,
+      textAlignVertical: 'top',
+      paddingTop: 4,
+    },
+    picker: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    pickerText: { flex: 1, fontSize: 16, color: C.text },
+    dropdown: {
+      marginTop: 4,
+      backgroundColor: C.background,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: C.border,
+      overflow: 'hidden',
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    dropdownText: { flex: 1, fontSize: 15, color: C.text },
+    starRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    starText: {
+      fontSize: 15,
+      color: C.textSecondary,
+    },
+    deleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      margin: 16,
+      padding: 14,
+      borderRadius: 12,
+      backgroundColor: C.danger + '12',
+    },
+    deleteText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.danger,
+    },
+  });
+}

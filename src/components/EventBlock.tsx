@@ -1,9 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventHeight } from '../utils/eventUtils';
-import { Colors, EventTypeConfig } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
+import { EventTypeConfig } from '../constants/colors';
 import { useDrag } from './DragContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -33,6 +35,9 @@ export function EventBlock({
   event, status, onPress, onToggleComplete, onDragStart, onDragMove, onDragEnd, onDragCancel,
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
 }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const { active, event: draggingEvent } = useDrag();
   const top = eventTopOffset(event.startTime, gridStartHour) + 1;
   const config = EventTypeConfig[event.type];
@@ -62,8 +67,6 @@ export function EventBlock({
     .onUpdate((e) => { if (isBeingDragged) onDragMove?.(e.absoluteX, e.absoluteY); })
     .onEnd((e) => { if (isBeingDragged) onDragEnd?.(e.absoluteX, e.absoluteY); })
     .onFinalize((_e, success) => {
-      // Use a ref instead of isBeingDragged here: onFinalize(false) can fire before
-      // the setState from onDragStart propagates, so the React state is still stale.
       if (!success && isDraggingRef.current) {
         isDraggingRef.current = false;
         onDragCancel?.();
@@ -100,8 +103,7 @@ export function EventBlock({
         ]}
         onStartShouldSetResponder={() => true}
       >
-        {/* Opaque white base + semi-transparent color tint so block fully covers grid lines */}
-        <View style={[styles.blockTint, { backgroundColor: event.color + '70' }]} />
+        <View style={[styles.blockTint, { backgroundColor: event.color + '35' }]} />
         {isBackup && (
           <View style={[styles.backupBar, { backgroundColor: event.color + '40', height }]}>
             {Array.from({ length: stripeCount }).map((_, i) => (
@@ -140,12 +142,12 @@ export function EventBlock({
               </View>
             ) : effectiveStatus === 'completed' ? (
               <View style={{ width: 36, height: 36 }}>
-                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, top: 6, left: 6 }} />
+                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.card, top: 6, left: 6 }} />
                 <Ionicons name="checkmark-circle" size={36} color={STATUS_CONFIG.completed.color} />
               </View>
             ) : (
               <View style={{ width: 36, height: 36 }}>
-                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, top: 6, left: 6 }} />
+                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.card, top: 6, left: 6 }} />
                 <Ionicons name="alert-circle" size={36} color={STATUS_CONFIG.pending.color} />
               </View>
             )}
@@ -156,60 +158,62 @@ export function EventBlock({
   );
 }
 
-const styles = StyleSheet.create({
-  block: {
-    position: 'absolute',
-    borderLeftWidth: 3,
-    borderRadius: 2,
-    paddingLeft: 6,
-    paddingRight: 6,
-    paddingVertical: 3,
-    overflow: 'hidden',
-    backgroundColor: Colors.white,
-  },
-  blockTint: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    marginRight: 4,
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.text,
-    flexShrink: 1,
-  },
-  time: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginLeft: 4,
-    flexShrink: 0,
-  },
-  statusWrap: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 6,
-    width: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backupBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 4,
-    overflow: 'hidden',
-  },
-  backupStripe: {
-    position: 'absolute',
-    left: -10,
-    width: 24,
-    height: 2.5,
-    transform: [{ rotate: '-45deg' }],
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    block: {
+      position: 'absolute',
+      borderLeftWidth: 3,
+      borderRadius: 2,
+      paddingLeft: 6,
+      paddingRight: 6,
+      paddingVertical: 3,
+      overflow: 'hidden',
+      backgroundColor: C.card,
+    },
+    blockTint: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    checkbox: {
+      marginRight: 4,
+    },
+    title: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: C.text,
+      flexShrink: 1,
+    },
+    time: {
+      fontSize: 13,
+      color: C.textSecondary,
+      marginLeft: 4,
+      flexShrink: 0,
+    },
+    statusWrap: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      right: 6,
+      width: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backupBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      width: 4,
+      overflow: 'hidden',
+    },
+    backupStripe: {
+      position: 'absolute',
+      left: -10,
+      width: 24,
+      height: 2.5,
+      transform: [{ rotate: '-45deg' }],
+    },
+  });
+}

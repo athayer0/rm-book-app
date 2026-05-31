@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from './constants/colors';
+import { useColors } from './hooks/useColors';
 import { HomeScreen } from './screens/HomeScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { PeopleScreen } from './screens/PeopleScreen';
@@ -12,6 +12,8 @@ import { SettingsScreen } from './screens/SettingsScreen';
 const Tab = createBottomTabNavigator();
 
 export function AppNavigation() {
+  const Colors = useColors();
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -20,10 +22,9 @@ export function AppNavigation() {
           tabBarActiveTintColor: Colors.primary,
           tabBarInactiveTintColor: Colors.tabBarInactive,
           tabBarStyle: {
-            backgroundColor: '#EFEFEF',
+            backgroundColor: Colors.tabBar,
             borderTopColor: Colors.border,
             borderTopWidth: 1,
-            paddingTop: 0,
             paddingBottom: 10,
             paddingTop: 10,
             height: 105,
@@ -49,12 +50,12 @@ export function AppNavigation() {
                 borderRadius: 18,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: focused ? '#8B1A4A' : 'transparent',
+                backgroundColor: focused ? Colors.primary : 'transparent',
               }}>
                 <Ionicons
                   name={iconName as any}
                   size={22}
-                  color={focused ? '#ffffff' : '#444444'}
+                  color={focused ? Colors.white : Colors.tabBarInactive}
                 />
               </View>
             );

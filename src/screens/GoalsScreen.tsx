@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, Alert,
@@ -6,7 +6,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { KIIcon } from '../components/KIIcon';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { IndicatorGrid } from '../components/IndicatorGrid';
 import { SectionHeader } from '../components/SectionHeader';
@@ -16,6 +17,9 @@ import { getItem } from '../utils/storage';
 import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
 
 export function GoalsScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
@@ -132,7 +136,6 @@ export function GoalsScreen() {
           )}
         </View>
 
-        {/* Past Weeks */}
         <View style={styles.card}>
           <SectionHeader title="Past 8 Weeks" />
           <View style={styles.pastList}>
@@ -159,87 +162,89 @@ export function GoalsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.primary },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.white },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  editText: { fontSize: 14, color: Colors.white, fontWeight: '600' },
-  scroll: { flex: 1, backgroundColor: Colors.background },
-  content: { paddingTop: 12, paddingBottom: 20 },
-  card: {
-    backgroundColor: Colors.card,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  editList: { paddingHorizontal: 12, paddingBottom: 12 },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    gap: 8,
-  },
-  visibilityBtn: { padding: 4 },
-  iconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editLabel: { flex: 1, fontSize: 14, color: Colors.text, fontWeight: '500' },
-  editGoalLabel: { fontSize: 12, color: Colors.textSecondary },
-  goalInput: {
-    width: 44,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    textAlign: 'center',
-    fontSize: 14,
-    color: Colors.text,
-  },
-  deleteBtn: { padding: 4 },
-  pastList: { padding: 16 },
-  pastRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  pastLabel: { width: 110, fontSize: 12, color: Colors.textSecondary },
-  barBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: Colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  pastCount: { width: 50, fontSize: 12, color: Colors.textSecondary, textAlign: 'right' },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: C.primary },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: C.primary,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    editBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+    editText: { fontSize: 14, color: C.white, fontWeight: '600' },
+    scroll: { flex: 1, backgroundColor: C.background },
+    content: { paddingTop: 12, paddingBottom: 20 },
+    card: {
+      backgroundColor: C.card,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    editList: { paddingHorizontal: 12, paddingBottom: 12 },
+    editRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      gap: 8,
+    },
+    visibilityBtn: { padding: 4 },
+    iconBadge: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    editLabel: { flex: 1, fontSize: 14, color: C.text, fontWeight: '500' },
+    editGoalLabel: { fontSize: 12, color: C.textSecondary },
+    goalInput: {
+      width: 44,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 4,
+      textAlign: 'center',
+      fontSize: 14,
+      color: C.text,
+    },
+    deleteBtn: { padding: 4 },
+    pastList: { padding: 16 },
+    pastRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+      gap: 10,
+    },
+    pastLabel: { width: 110, fontSize: 12, color: C.textSecondary },
+    barBg: {
+      flex: 1,
+      height: 8,
+      backgroundColor: C.border,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    barFill: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    pastCount: { width: 50, fontSize: 12, color: C.textSecondary, textAlign: 'right' },
+  });
+}

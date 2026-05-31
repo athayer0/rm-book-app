@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, ScrollView,
   StyleSheet, TextInput, Keyboard, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
@@ -32,6 +33,9 @@ interface Props {
 }
 
 export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const { getWeekData, saveCountForWeek, saveGoalForWeek } = useWeeklyIndicators();
 
   const [activeTab, setActiveTab] = useState<'graph' | 'goals'>('goals');
@@ -52,8 +56,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
   const weekKey = getWeekKeyByOffset(weekOffset);
   const isFuture = weekOffset > 0;
   const weekLabel = formatWeekLabel(weekKey);
-
-  // ── Load week data ───────────────────────────────────────────────────────
 
   const loadWeek = useCallback(async (offset: number) => {
     const wk = getWeekKeyByOffset(offset);
@@ -83,8 +85,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
     }
   }, [weekOffset]);
 
-  // ── Navigation ───────────────────────────────────────────────────────────
-
   function handlePrev() {
     if (weekOffset > MIN_OFFSET) setWeekOffset(o => o - 1);
   }
@@ -92,8 +92,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
   function handleNext() {
     if (weekOffset < MAX_OFFSET) setWeekOffset(o => o + 1);
   }
-
-  // ── Editing ──────────────────────────────────────────────────────────────
 
   function openEdit(id: string, field: 'actual' | 'goal') {
     const current = rowData[id];
@@ -111,13 +109,11 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
     const parsed = parseInt(tempValue, 10);
     const value = isNaN(parsed) || parsed < 0 ? 0 : parsed;
 
-    // Update local rowData immediately
     setRowData(prev => ({
       ...prev,
       [id]: { ...prev[id], [field]: value },
     }));
 
-    // Persist
     if (field === 'actual') {
       await saveCountForWeek(id, weekKey, value);
     } else {
@@ -131,8 +127,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
     setEditingField(null);
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
-
   const editingDef = editingField ? definitions.find(d => d.id === editingField.id) : null;
 
   return (
@@ -143,7 +137,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
       onRequestClose={onClose}
     >
       <View style={styles.flex}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color={Colors.textSecondary} />
@@ -152,7 +145,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Tab bar */}
         <View style={styles.tabBar}>
           {(['graph', 'goals'] as const).map(tab => (
             <TouchableOpacity
@@ -169,15 +161,12 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           ))}
         </View>
 
-        {/* Graph tab */}
         {activeTab === 'graph' && (
           <KIGraphTab definitions={definitions} />
         )}
 
-        {/* Goals tab */}
         {activeTab === 'goals' && <>
 
-        {/* Week Navigator */}
         <View style={styles.weekNav}>
           <View style={styles.weekLabelRow}>
             <Ionicons name="calendar-outline" size={16} color={Colors.accent} style={{ marginRight: 6 }} />
@@ -203,7 +192,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           </View>
         </View>
 
-        {/* KI list */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.listContent}
@@ -220,15 +208,12 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
                   key={def.id}
                   style={[styles.kiRow, index === visibleDefs.length - 1 && styles.kiRowLast]}
                 >
-                  {/* Icon */}
                   <View style={[styles.iconBadge, { backgroundColor: def.color + '20' }]}>
                     <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={def.color} />
                   </View>
 
-                  {/* Label */}
                   <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
 
-                  {/* Actual value */}
                   <TouchableOpacity
                     onPress={() => !isFuture && openEdit(def.id, 'actual')}
                     disabled={isFuture}
@@ -245,7 +230,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
 
                   <Text style={styles.divider}>/</Text>
 
-                  {/* Goal value */}
                   <TouchableOpacity
                     onPress={() => openEdit(def.id, 'goal')}
                     style={styles.numBtn}
@@ -269,7 +253,6 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Numeric edit overlay */}
         {editingField && (
           <View style={styles.editOverlay}>
             <TouchableOpacity style={styles.editOverlayBg} onPress={cancelEdit} activeOpacity={1} />
@@ -307,197 +290,176 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: Colors.background },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.card,
-  },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
-  closeBtn: { width: 44, alignItems: 'flex-start' },
-
-  // Tab bar
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    position: 'relative',
-  },
-  tabLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  tabLabelActive: {
-    color: Colors.accent,
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: 0,
-    left: '15%',
-    right: '15%',
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: Colors.accent,
-  },
-
-  // Week navigator
-  weekNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  weekLabelRow: { flexDirection: 'row', alignItems: 'center' },
-  weekLabelText: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  arrows: { flexDirection: 'row', gap: 4 },
-  arrowBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowDisabled: { opacity: 0.35 },
-
-  // Column headers
-  colHeaders: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: Colors.background,
-  },
-  colHeaderLabel: { flex: 1, fontSize: 10, fontWeight: '700', color: Colors.textLight, letterSpacing: 0.8, marginLeft: 46 },
-  colHeaderNum: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, width: 36, textAlign: 'center' },
-  colDivider: { width: 12, textAlign: 'center' },
-
-  // List
-  scroll: { flex: 1 },
-  listContent: { paddingHorizontal: 12, paddingTop: 12 },
-  kiCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  kiRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    gap: 10,
-  },
-  kiRowLast: { borderBottomWidth: 0 },
-  iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  kiLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: Colors.text },
-  numBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: Colors.background,
-  },
-  numBtnDisabled: { opacity: 0.45 },
-  numText: { fontSize: 17, fontWeight: '700' },
-  divider: { fontSize: 16, color: Colors.textLight, width: 12, textAlign: 'center' },
-
-  futureNote: {
-    fontSize: 12,
-    color: Colors.textLight,
-    textAlign: 'center',
-    marginTop: 16,
-    paddingHorizontal: 24,
-    fontStyle: 'italic',
-  },
-
-  // Edit overlay
-  editOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  editOverlayBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  editSheet: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  editTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, textAlign: 'center' },
-  editSubtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 8 },
-  editInput: {
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 28,
-    fontWeight: '700',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  editCancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-  },
-  editCancelText: { fontSize: 15, fontWeight: '600', color: Colors.textSecondary },
-  editDoneBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-  },
-  editDoneText: { fontSize: 15, fontWeight: '700', color: Colors.white },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: C.background },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      backgroundColor: C.card,
+    },
+    headerTitle: { fontSize: 17, fontWeight: '600', color: C.text },
+    closeBtn: { width: 44, alignItems: 'flex-start' },
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: C.card,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    tabBtn: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      position: 'relative',
+    },
+    tabLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: C.textSecondary,
+    },
+    tabLabelActive: {
+      color: C.accent,
+    },
+    tabUnderline: {
+      position: 'absolute',
+      bottom: 0,
+      left: '15%',
+      right: '15%',
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: C.accent,
+    },
+    weekNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: C.card,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    weekLabelRow: { flexDirection: 'row', alignItems: 'center' },
+    weekLabelText: { fontSize: 15, fontWeight: '600', color: C.text },
+    arrows: { flexDirection: 'row', gap: 4 },
+    arrowBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: C.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    arrowDisabled: { opacity: 0.35 },
+    scroll: { flex: 1 },
+    listContent: { paddingHorizontal: 12, paddingTop: 12 },
+    kiCard: {
+      backgroundColor: C.card,
+      borderRadius: 12,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    kiRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      gap: 10,
+    },
+    kiRowLast: { borderBottomWidth: 0 },
+    iconBadge: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    kiLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: C.text },
+    numBtn: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 8,
+      backgroundColor: C.background,
+    },
+    numBtnDisabled: { opacity: 0.45 },
+    numText: { fontSize: 17, fontWeight: '700' },
+    divider: { fontSize: 16, color: C.textLight, width: 12, textAlign: 'center' },
+    futureNote: {
+      fontSize: 12,
+      color: C.textLight,
+      textAlign: 'center',
+      marginTop: 16,
+      paddingHorizontal: 24,
+      fontStyle: 'italic',
+    },
+    editOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+    },
+    editOverlayBg: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+    },
+    editSheet: {
+      backgroundColor: C.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+      gap: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    editTitle: { fontSize: 16, fontWeight: '700', color: C.text, textAlign: 'center' },
+    editSubtitle: { fontSize: 13, color: C.textSecondary, textAlign: 'center', marginBottom: 8 },
+    editInput: {
+      borderWidth: 1.5,
+      borderColor: C.accent,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 28,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+    },
+    editActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 8,
+    },
+    editCancelBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      backgroundColor: C.background,
+      alignItems: 'center',
+    },
+    editCancelText: { fontSize: 15, fontWeight: '600', color: C.textSecondary },
+    editDoneBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      backgroundColor: C.primary,
+      alignItems: 'center',
+    },
+    editDoneText: { fontSize: 15, fontWeight: '700', color: C.white },
+  });
+}

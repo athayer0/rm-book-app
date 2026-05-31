@@ -1,7 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUtils';
 import { EventBlock } from './EventBlock';
 import { formatTime } from '../utils/dateUtils';
@@ -41,6 +42,9 @@ function gridHourLabel(hour: number): string {
 }
 
 export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, dragEventHeight, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus, isToday = false }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const HOURS = Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => gridStartHour + i);
   const totalHeight = (gridEndHour - gridStartHour) * SLOT_HEIGHT * 2;
   const scrollOffsetRef = useRef(0);
@@ -59,7 +63,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     if (dragHoverY != null) setPressedSlot(null);
   }, [dragHoverY]);
 
-  // Current time indicator
   const [currentMinutes, setCurrentMinutes] = useState(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
@@ -97,7 +100,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const nowM = currentMinutes % 60;
   const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
   const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
-  // Hide the hour label whose grid line the red indicator is close to
   const HIDE_NEAR_PX = 6;
   const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
@@ -138,7 +140,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
         }}
       >
         <View style={styles.grid}>
-          {/* Hour labels */}
           <Pressable style={styles.timeCol} onPress={(e) => handleSlotTap(e.nativeEvent.locationY)}>
             {HOURS.map((hour, i) => {
               const hourLineY = i * SLOT_HEIGHT * 2;
@@ -153,39 +154,31 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
             })}
           </Pressable>
 
-          {/* Event column */}
           <Pressable
             ref={gridRef}
             style={[styles.eventCol, { height: totalHeight }]}
             onLayout={measureGridTop}
             onPress={(e) => handleSlotTap(e.nativeEvent.locationY + 16)}
           >
-            {/* Current time indicator — rendered first so events paint on top */}
             {showTimeIndicator && (
               <View
                 pointerEvents="none"
                 style={[styles.nowIndicator, { top: timeIndicatorY }]}
               >
-                {/* nowRow is first child → its top edge is exactly at timeIndicatorY */}
                 <View style={styles.nowRow}>
-                  {/* Line behind — spans full width */}
                   <View style={styles.nowLine} />
-                  {/* Triangle on top — rendered after so it paints over the line */}
                   <Svg width={7} height={9} style={styles.nowTriangleSvg}>
-                    <Polygon points="0,0 7,4.5 0,9" fill="#000000" />
+                    <Polygon points="0,0 7,4.5 0,9" fill={Colors.primary} />
                   </Svg>
                 </View>
-                {/* Label floats above the line without pushing it down */}
                 <Text style={styles.nowLabel}>{timeLabel}</Text>
               </View>
             )}
 
-            {/* Grid lines — hour marks only */}
             {HOURS.map((hour, i) => (
               <View key={hour} style={[styles.fullLine, { top: i * SLOT_HEIGHT * 2 }]} />
             ))}
 
-            {/* Tap highlight */}
             {pressedSlot !== null && (
               <View
                 pointerEvents="none"
@@ -193,7 +186,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
               />
             )}
 
-            {/* Drag hover highlight */}
             {dragSlot !== null && (
               <View
                 pointerEvents="none"
@@ -201,7 +193,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
               />
             )}
 
-            {/* Events */}
             {events.map(event => {
               const { col, numCols } = eventLayout.get(event.id) ?? { col: 0, numCols: 1 };
               return (
@@ -228,86 +219,88 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: Colors.white,
-    marginTop: 6,
-  },
-  grid: {
-    flexDirection: 'row',
-    paddingBottom: 16,
-  },
-  timeCol: {
-    width: TIME_COL_WIDTH,
-    paddingTop: 16,
-    paddingRight: 8,
-  },
-  hourLabel: {
-    height: SLOT_HEIGHT * 2,
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingRight: 8,
-  },
-  hourText: {
-    fontSize: 11,
-    color: Colors.textLight,
-    fontWeight: '500',
-    transform: [{ translateY: -6 }],
-  },
-  eventCol: {
-    flex: 1,
-    position: 'relative',
-    marginTop: 16,
-  },
-  fullLine: {
-    position: 'absolute',
-    left: -8,
-    right: 0,
-    height: 1.5,
-    backgroundColor: Colors.textLight,
-    opacity: 0.3,
-  },
-  tapHighlight: {
-    position: 'absolute',
-    left: -TIME_COL_WIDTH,
-    right: 0,
-    backgroundColor: 'rgba(160,160,160,0.2)',
-  },
-  dragHighlight: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(160,160,160,0.2)',
-  },
-  nowIndicator: {
-    position: 'absolute',
-    left: -TIME_COL_WIDTH,
-    right: 0,
-  },
-  nowLabel: {
-    position: 'absolute',
-    top: -15,
-    left: 6,
-    fontSize: 11,
-    fontWeight: '500',
-    color: Colors.primary,
-  },
-  nowRow: {
-    position: 'relative',
-    height: 9,
-  },
-  nowLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 3.5,
-    height: 2,
-    backgroundColor: Colors.primary,
-  },
-  nowTriangleSvg: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    scroll: {
+      flex: 1,
+      backgroundColor: C.card,
+      marginTop: 6,
+    },
+    grid: {
+      flexDirection: 'row',
+      paddingBottom: 16,
+    },
+    timeCol: {
+      width: TIME_COL_WIDTH,
+      paddingTop: 16,
+      paddingRight: 8,
+    },
+    hourLabel: {
+      height: SLOT_HEIGHT * 2,
+      justifyContent: 'flex-start',
+      alignItems: 'flex-end',
+      paddingRight: 8,
+    },
+    hourText: {
+      fontSize: 11,
+      color: C.textLight,
+      fontWeight: '500',
+      transform: [{ translateY: -6 }],
+    },
+    eventCol: {
+      flex: 1,
+      position: 'relative',
+      marginTop: 16,
+    },
+    fullLine: {
+      position: 'absolute',
+      left: -8,
+      right: 0,
+      height: 1.5,
+      backgroundColor: C.textLight,
+      opacity: 0.3,
+    },
+    tapHighlight: {
+      position: 'absolute',
+      left: -TIME_COL_WIDTH,
+      right: 0,
+      backgroundColor: 'rgba(160,160,160,0.2)',
+    },
+    dragHighlight: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      backgroundColor: 'rgba(160,160,160,0.2)',
+    },
+    nowIndicator: {
+      position: 'absolute',
+      left: -TIME_COL_WIDTH,
+      right: 0,
+    },
+    nowLabel: {
+      position: 'absolute',
+      top: -15,
+      left: 6,
+      fontSize: 11,
+      fontWeight: '500',
+      color: C.primary,
+    },
+    nowRow: {
+      position: 'relative',
+      height: 9,
+    },
+    nowLine: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 3.5,
+      height: 2,
+      backgroundColor: C.primary,
+    },
+    nowTriangleSvg: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+    },
+  });
+}

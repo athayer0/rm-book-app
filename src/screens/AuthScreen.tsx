@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,13 @@ import {
   Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 
 export function AuthScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -95,52 +99,54 @@ export function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: Colors.primary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  input: {
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  buttonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  toggle: {
-    color: Colors.accent,
-    textAlign: 'center',
-    fontSize: 14,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: C.background,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: '700',
+      color: C.primary,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: C.textSecondary,
+      textAlign: 'center',
+      marginBottom: 32,
+    },
+    input: {
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      padding: 14,
+      fontSize: 16,
+      color: C.text,
+      marginBottom: 12,
+    },
+    button: {
+      backgroundColor: C.primary,
+      borderRadius: 10,
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    buttonText: {
+      color: C.white,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    toggle: {
+      color: C.accent,
+      textAlign: 'center',
+      fontSize: 14,
+    },
+  });
+}

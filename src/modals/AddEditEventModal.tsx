@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
+import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES } from '../utils/eventUtils';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
@@ -40,7 +42,7 @@ for (let h = 0; h <= 23; h++) {
     TIME_OPTIONS.push(`${h12}:${mm} ${ampm}`);
   }
 }
-TIME_OPTIONS.push('12:00 AM'); // midnight end-of-day option
+TIME_OPTIONS.push('12:00 AM');
 
 function getMonthGrid(month: Date, weekStart: 'monday' | 'sunday'): (Date | null)[][] {
   const year = month.getFullYear();
@@ -59,12 +61,12 @@ function getMonthGrid(month: Date, weekStart: 'monday' | 'sunday'): (Date | null
 }
 
 function resolvedColor(type: string, settings: AppSettings): string {
-  return settings.eventTypeColors[type] ?? EventColors[type] ?? Colors.accent;
+  return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
 }
 
 function resolvedDefaultMinutes(type: string, settings: AppSettings): number {
   const config = EventTypeConfig[type];
-  if (config?.defaultMinutes === 0) return 15; // fixed block
+  if (config?.defaultMinutes === 0) return 15;
   return settings.eventTypeDefaultMinutes[type] ?? config?.defaultMinutes ?? 30;
 }
 
@@ -73,6 +75,9 @@ function isFixedType(type: string): boolean {
 }
 
 export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const [title, setTitle] = useState('');
   const [type, setType] = useState('scripture');
   const [localStatus, setLocalStatus] = useState<EventStatus | undefined>(currentStatus);
@@ -207,7 +212,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
-          {/* Status (only when editing a non-backup trackable event type) */}
           {event && !isBackup && TRACKABLE_TYPES.has(type) && (
             <View style={styles.section}>
               <View style={styles.statusRow}>
@@ -243,7 +247,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           )}
 
-          {/* Title */}
           <View style={styles.section}>
             <Text style={styles.label}>Title</Text>
             <TextInput
@@ -255,7 +258,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          {/* Type + Date row */}
           <View style={styles.row}>
             <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
               <Text style={styles.label}>Event Type</Text>
@@ -313,7 +315,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     if (!day) return <View key={di} style={styles.pickerDayCell} />;
                     const ds = format(day, 'yyyy-MM-dd');
                     const isSelected = ds === date;
-                    const isToday = ds === format(new Date(), 'yyyy-MM-dd');
+                    const isTodayDate = ds === format(new Date(), 'yyyy-MM-dd');
                     return (
                       <TouchableOpacity
                         key={di}
@@ -322,7 +324,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                       >
                         <Text style={[
                           styles.pickerDayText,
-                          isToday && !isSelected && styles.pickerDayTextToday,
+                          isTodayDate && !isSelected && styles.pickerDayTextToday,
                           isSelected && styles.pickerDayTextSelected,
                         ]}>
                           {format(day, 'd')}
@@ -335,7 +337,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           )}
 
-          {/* Times */}
           <View style={styles.row}>
             <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
               <Text style={styles.label}>Start Time</Text>
@@ -380,7 +381,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
           </View>
 
-          {/* Notes */}
           <View style={styles.section}>
             <Text style={styles.label}>Notes (optional)</Text>
             <TextInput
@@ -394,7 +394,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          {/* Recurring */}
           <View style={styles.section}>
             <View style={styles.switchRow}>
               <Text style={styles.label}>Recurring</Text>
@@ -422,7 +421,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
           </View>
 
-          {/* Backup */}
           <View style={styles.section}>
             <View style={styles.switchRow}>
               <View>
@@ -438,7 +436,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           </View>
 
-          {/* Delete */}
           {event && onDelete && (
             <TouchableOpacity
               style={styles.deleteBtn}
@@ -456,129 +453,131 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.card,
-  },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
-  cancel: { fontSize: 16, color: Colors.textSecondary },
-  save: { fontSize: 16, fontWeight: '600', color: Colors.accent },
-  form: { flex: 1, backgroundColor: Colors.background },
-  section: {
-    backgroundColor: Colors.card,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 12,
-    padding: 12,
-  },
-  row: { flexDirection: 'row', marginHorizontal: 0 },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  input: {
-    fontSize: 16,
-    color: Colors.text,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    paddingVertical: 4,
-  },
-  notesInput: { minHeight: 72, textAlignVertical: 'top', paddingTop: 4 },
-  picker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 8 },
-  pickerText: { flex: 1, fontSize: 16, color: Colors.text },
-  dropdown: {
-    marginTop: 4,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  dropdownText: { flex: 1, fontSize: 15, color: Colors.text },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchHint: { fontSize: 11, color: Colors.textLight, marginTop: 2, maxWidth: 220 },
-  ruleRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
-  ruleChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  ruleChipActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + '20' },
-  ruleText: { fontSize: 13, color: Colors.textSecondary },
-  ruleTextActive: { color: Colors.accent, fontWeight: '600' },
-  deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    margin: 16,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.danger + '12',
-  },
-  deleteText: { fontSize: 15, fontWeight: '600', color: Colors.danger },
-  errorBanner: { fontSize: 13, color: Colors.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: Colors.danger + '12' },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  datePickerPanel: {
-    marginTop: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    padding: 8,
-    backgroundColor: Colors.white,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  pickerNavBtn: { padding: 6 },
-  pickerMonthTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  pickerDayHeaders: { flexDirection: 'row', marginBottom: 4 },
-  pickerDayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: Colors.textLight },
-  pickerWeek: { flexDirection: 'row' },
-  pickerDayCell: { flex: 1, height: 36, alignItems: 'center', justifyContent: 'center' },
-  pickerDayCellSelected: { backgroundColor: Colors.primary, borderRadius: 18 },
-  pickerDayText: { fontSize: 13, color: Colors.text },
-  pickerDayTextToday: { color: Colors.primary, fontWeight: '700' },
-  pickerDayTextSelected: { color: Colors.white, fontWeight: '700' },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      backgroundColor: C.card,
+    },
+    headerTitle: { fontSize: 17, fontWeight: '600', color: C.text },
+    cancel: { fontSize: 16, color: C.textSecondary },
+    save: { fontSize: 16, fontWeight: '600', color: C.accent },
+    form: { flex: 1, backgroundColor: C.background },
+    section: {
+      backgroundColor: C.card,
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 12,
+      padding: 12,
+    },
+    row: { flexDirection: 'row', marginHorizontal: 0 },
+    label: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 8,
+    },
+    input: {
+      fontSize: 16,
+      color: C.text,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      paddingVertical: 4,
+    },
+    notesInput: { minHeight: 72, textAlignVertical: 'top', paddingTop: 4 },
+    picker: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 8 },
+    pickerText: { flex: 1, fontSize: 16, color: C.text },
+    dropdown: {
+      marginTop: 4,
+      backgroundColor: C.background,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: C.border,
+      overflow: 'hidden',
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    dropdownText: { flex: 1, fontSize: 15, color: C.text },
+    switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    switchHint: { fontSize: 11, color: C.textLight, marginTop: 2, maxWidth: 220 },
+    ruleRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
+    ruleChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: C.border,
+    },
+    ruleChipActive: { borderColor: C.accent, backgroundColor: C.accent + '20' },
+    ruleText: { fontSize: 13, color: C.textSecondary },
+    ruleTextActive: { color: C.accent, fontWeight: '600' },
+    deleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      margin: 16,
+      padding: 14,
+      borderRadius: 12,
+      backgroundColor: C.danger + '12',
+    },
+    deleteText: { fontSize: 15, fontWeight: '600', color: C.danger },
+    errorBanner: { fontSize: 13, color: C.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: C.danger + '12' },
+    statusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 6,
+    },
+    statusIcons: {
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'center',
+    },
+    datePickerPanel: {
+      marginTop: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      borderRadius: 12,
+      padding: 8,
+      backgroundColor: C.card,
+    },
+    pickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    pickerNavBtn: { padding: 6 },
+    pickerMonthTitle: { fontSize: 15, fontWeight: '700', color: C.text },
+    pickerDayHeaders: { flexDirection: 'row', marginBottom: 4 },
+    pickerDayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: C.textLight },
+    pickerWeek: { flexDirection: 'row' },
+    pickerDayCell: { flex: 1, height: 36, alignItems: 'center', justifyContent: 'center' },
+    pickerDayCellSelected: { backgroundColor: C.primary, borderRadius: 18 },
+    pickerDayText: { fontSize: 13, color: C.text },
+    pickerDayTextToday: { color: C.primary, fontWeight: '700' },
+    pickerDayTextSelected: { color: C.white, fontWeight: '700' },
+  });
+}

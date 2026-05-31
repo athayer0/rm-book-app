@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, Switch, Alert,
@@ -7,16 +7,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
+import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useAuth } from '../lib/AuthContext';
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
-// 4 AM (4) through 10 AM (10)
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
-// 9 PM (21) through midnight (24)
 const END_HOUR_OPTIONS = [21, 22, 23, 24];
 
 function hourLabel(h: number): string {
@@ -26,14 +26,16 @@ function hourLabel(h: number): string {
 }
 
 const COLOR_SWATCHES = [
-  '#E05C6B', '#E74C3C', '#800000', '#D2691E', '#F39C12',
-  '#F4D03F', '#2ECC71', '#27AE60', '#1A3A6B', '#2979FF',
-  '#00B5C8', '#9B59B6', '#A29BFE', '#795548', '#9E9E9E', '#4E342E',
+  '#E74C3C', '#E05C6B', '#800000', '#D2691E', '#F39C12', '#F4D03F', '#2ECC71', '#27AE60',
+  '#1A3A6B', '#2979FF', '#00B5C8', '#A29BFE', '#9B59B6', '#795548', '#9E9E9E', '#4E342E',
 ];
 
 const EVENT_TYPES = Object.keys(EventColors);
 
 export function SettingsScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const { settings, updateSettings } = useSettings();
   const { resetAll } = useWeeklyIndicators();
   const { deleteAllEvents } = useCalendarEvents();
@@ -110,7 +112,6 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>SCHEDULE HOURS</Text>
           <View style={styles.card}>
-            {/* Start hour */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => setHourDropdown(hourDropdown === 'start' ? null : 'start')}
@@ -143,7 +144,6 @@ export function SettingsScreen() {
               </View>
             )}
 
-            {/* End hour */}
             <TouchableOpacity
               style={[styles.row, hourDropdown !== 'end' && styles.rowLast]}
               onPress={() => setHourDropdown(hourDropdown === 'end' ? null : 'end')}
@@ -204,10 +204,10 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>THEME</Text>
           <View style={styles.card}>
-            {(['light', 'dark', 'system'] as const).map(theme => (
+            {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
               <TouchableOpacity
                 key={theme}
-                style={styles.row}
+                style={[styles.row, i === arr.length - 1 && styles.rowLast]}
                 onPress={() => updateSettings({ theme })}
               >
                 <Text style={styles.rowLabel}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</Text>
@@ -249,23 +249,23 @@ export function SettingsScreen() {
 
                   {isExpanded && (
                     <View style={[styles.expandedPanel, isLast && styles.expandedPanelLast]}>
-                      {/* Color swatches */}
                       <Text style={styles.panelLabel}>Color</Text>
-                      <View style={styles.swatchGrid}>
-                        {COLOR_SWATCHES.map(swatch => (
-                          <TouchableOpacity
-                            key={swatch}
-                            style={[
-                              styles.swatch,
-                              { backgroundColor: swatch },
-                              color === swatch && styles.swatchSelected,
-                            ]}
-                            onPress={() => setColor(type, swatch)}
-                          />
-                        ))}
-                      </View>
+                      {[COLOR_SWATCHES.slice(0, 8), COLOR_SWATCHES.slice(8, 16)].map((row, ri) => (
+                        <View key={ri} style={styles.swatchGrid}>
+                          {row.map(swatch => (
+                            <TouchableOpacity
+                              key={swatch}
+                              style={[
+                                styles.swatch,
+                                { backgroundColor: swatch },
+                                color === swatch && styles.swatchSelected,
+                              ]}
+                              onPress={() => setColor(type, swatch)}
+                            />
+                          ))}
+                        </View>
+                      ))}
 
-                      {/* Duration pills */}
                       {mins !== null ? (
                         <>
                           <Text style={[styles.panelLabel, { marginTop: 12 }]}>Default Duration</Text>
@@ -403,155 +403,158 @@ export function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.primary },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.white },
-  scroll: { flex: 1, backgroundColor: Colors.background },
-  section: { marginTop: 20, paddingHorizontal: 16 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textLight,
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  card: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  rowLast: {
-    borderBottomWidth: 0,
-  },
-  rowLabel: { flex: 1, fontSize: 15, color: Colors.text },
-  rowValue: { fontSize: 14, color: Colors.textSecondary },
-  colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
-  durationBadge: {
-    fontSize: 12,
-    color: Colors.textLight,
-    marginRight: 4,
-  },
-  expandedPanel: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.background,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  expandedPanelLast: {
-    borderBottomWidth: 0,
-  },
-  panelLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  swatchGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  swatch: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  swatchSelected: {
-    borderColor: Colors.text,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
-  },
-  pillActive: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + '20',
-  },
-  pillText: { fontSize: 13, color: Colors.textSecondary },
-  pillTextActive: { color: Colors.accent, fontWeight: '600' },
-  dropdownList: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-  },
-  dropdownListLast: {
-    borderBottomWidth: 0,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.background,
-  },
-  dropdownItemLast: {
-    borderBottomWidth: 0,
-  },
-  dropdownItemText: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  dropdownItemActive: {
-    color: Colors.accent,
-    fontWeight: '600',
-  },
-  fixedLabel: {
-    fontSize: 13,
-    color: Colors.textLight,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  scriptureRow: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    paddingVertical: 16,
-    borderBottomWidth: 0,
-  },
-  scripture: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-    lineHeight: 22,
-  },
-  scriptureRef: {
-    fontSize: 12,
-    color: Colors.textLight,
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: C.primary },
+    header: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: C.primary,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    scroll: { flex: 1, backgroundColor: C.background },
+    section: { marginTop: 20, paddingHorizontal: 16 },
+    sectionTitle: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: C.textLight,
+      letterSpacing: 0.8,
+      marginBottom: 8,
+      marginLeft: 4,
+    },
+    card: {
+      backgroundColor: C.card,
+      borderRadius: 12,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    rowLast: {
+      borderBottomWidth: 0,
+    },
+    rowLabel: { flex: 1, fontSize: 15, color: C.text },
+    rowValue: { fontSize: 14, color: C.textSecondary },
+    colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
+    durationBadge: {
+      fontSize: 12,
+      color: C.textLight,
+      marginRight: 4,
+    },
+    expandedPanel: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: C.background,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    expandedPanelLast: {
+      borderBottomWidth: 0,
+    },
+    panelLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: C.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 8,
+    },
+    swatchGrid: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    swatch: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    swatchSelected: {
+      borderColor: C.text,
+    },
+    pillRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    pill: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+    },
+    pillActive: {
+      borderColor: C.accent,
+      backgroundColor: C.accent + '20',
+    },
+    pillText: { fontSize: 13, color: C.textSecondary },
+    pillTextActive: { color: C.accent, fontWeight: '600' },
+    dropdownList: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+    },
+    dropdownListLast: {
+      borderBottomWidth: 0,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      backgroundColor: C.background,
+    },
+    dropdownItemLast: {
+      borderBottomWidth: 0,
+    },
+    dropdownItemText: {
+      flex: 1,
+      fontSize: 15,
+      color: C.text,
+    },
+    dropdownItemActive: {
+      color: C.accent,
+      fontWeight: '600',
+    },
+    fixedLabel: {
+      fontSize: 13,
+      color: C.textLight,
+      marginTop: 4,
+      fontStyle: 'italic',
+    },
+    scriptureRow: {
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      paddingVertical: 16,
+      borderBottomWidth: 0,
+    },
+    scripture: {
+      fontSize: 14,
+      color: C.textSecondary,
+      fontStyle: 'italic',
+      lineHeight: 22,
+    },
+    scriptureRef: {
+      fontSize: 12,
+      color: C.textLight,
+      marginTop: 4,
+      alignSelf: 'flex-end',
+    },
+  });
+}

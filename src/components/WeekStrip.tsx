@@ -1,8 +1,12 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useMemo, useRef, useLayoutEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { format, addDays, startOfWeek } from 'date-fns';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 interface Props {
   selectedDate: Date;
   weekStart: 'monday' | 'sunday';
@@ -11,31 +15,69 @@ interface Props {
 }
 
 export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const weekStartsOn = weekStart === 'monday' ? 1 : 0;
-  const monday = startOfWeek(selectedDate, { weekStartsOn });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
+
+  const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  const pendingResetRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (pendingResetRef.current) {
+      pendingResetRef.current = false;
+      translateX.setValue(-SCREEN_WIDTH);
+    }
+  }, [selectedDate]);
+
+  function getDaysForWeekOf(date: Date) {
+    const monday = startOfWeek(date, { weekStartsOn });
+    return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  }
+
+  const prevDays = getDaysForWeekOf(addDays(selectedDate, -7));
+  const currDays = getDaysForWeekOf(selectedDate);
+  const nextDays = getDaysForWeekOf(addDays(selectedDate, 7));
 
   const swipeGesture = Gesture.Pan()
     .activeOffsetX([-30, 30])
     .failOffsetY([-15, 15])
     .runOnJS(true)
+    .onUpdate((e) => {
+      translateX.setValue(-SCREEN_WIDTH + e.translationX);
+    })
     .onEnd((e) => {
       if (Math.abs(e.translationX) > 60) {
-        onSwipeWeek(e.translationX < 0 ? 1 : -1);
+        const dir: 1 | -1 = e.translationX < 0 ? 1 : -1;
+        const target = dir === 1 ? -SCREEN_WIDTH * 2 : 0;
+        Animated.spring(translateX, {
+          toValue: target,
+          useNativeDriver: true,
+          tension: 40,
+          friction: 8,
+        }).start(() => {
+          pendingResetRef.current = true;
+          onSwipeWeek(dir);
+        });
+      } else {
+        Animated.spring(translateX, {
+          toValue: -SCREEN_WIDTH,
+          useNativeDriver: true,
+          tension: 40,
+          friction: 8,
+        }).start();
       }
     });
 
-  return (
-    <GestureDetector gesture={swipeGesture}>
-      <View style={styles.strip}>
+  function renderWeek(days: Date[]) {
+    return (
+      <View style={{ width: SCREEN_WIDTH, flexDirection: 'row' }}>
         {days.map((day, i) => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const isSelected = dateStr === format(selectedDate, 'yyyy-MM-dd');
-          const isToday = dateStr === todayStr;
-
-          const altBg = i % 2 === 0 ? '#E8E8E8' : '#D8D8D8';
+          const altBg = i % 2 === 0 ? Colors.weekStripBg : Colors.weekStripBgAlt;
 
           return (
             <TouchableOpacity
@@ -58,47 +100,66 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }
           );
         })}
       </View>
+    );
+  }
+
+  return (
+    <GestureDetector gesture={swipeGesture}>
+      <View style={styles.strip}>
+        <Animated.View
+          style={{
+            flexDirection: 'row',
+            width: SCREEN_WIDTH * 3,
+            transform: [{ translateX }],
+          }}
+        >
+          {renderWeek(prevDays)}
+          {renderWeek(currDays)}
+          {renderWeek(nextDays)}
+        </Animated.View>
+      </View>
     </GestureDetector>
   );
 }
 
-const styles = StyleSheet.create({
-  strip: {
-    flexDirection: 'row',
-    backgroundColor: '#E8E8E8',
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-  },
-  dayBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderRadius: 0,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  dayBtnSelected: {
-    backgroundColor: '#ADD8E6',
-    borderColor: '#00008B',
-  },
-  dayName: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#333',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  dayNameSelected: {
-    color: '#00008B',
-    fontWeight: '700',
-  },
-  dateNum: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-  },
-  dateNumSelected: {
-    color: '#00008B',
-    fontWeight: '700',
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    strip: {
+      overflow: 'hidden',
+      flexDirection: 'row',
+      backgroundColor: C.weekStripBg,
+    },
+    dayBtn: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 6,
+      borderRadius: 0,
+      borderWidth: 2.4,
+      borderColor: 'transparent',
+    },
+    dayBtnSelected: {
+      backgroundColor: C.selectedDayBg,
+      borderColor: C.selectedDayBorder,
+    },
+    dayName: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: C.textSecondary,
+      letterSpacing: 0.5,
+      marginBottom: 2,
+    },
+    dayNameSelected: {
+      color: C.selectedDayBorder,
+      fontWeight: '700',
+    },
+    dateNum: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.text,
+    },
+    dateNumSelected: {
+      color: C.selectedDayBorder,
+      fontWeight: '700',
+    },
+  });
+}

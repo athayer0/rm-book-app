@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays } from 'date-fns';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useSettings } from '../hooks/useSettings';
 import { TimeGrid } from '../components/TimeGrid';
@@ -23,6 +24,9 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
 
 function CalendarContent() {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -46,11 +50,6 @@ function CalendarContent() {
   const nextEvents = getForDate(nextDateStr);
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
 
-  // When the user drags to a new day (edge-scroll), refresh the frozen event list so the grid
-  // shows the new day's events. Must happen during render (not useEffect) so the update is
-  // visible to TimeGrid in the same paint. The dragged event is kept in the list (deduplicated)
-  // so its EventBlock stays mounted — if it unmounts, RNGH destroys the pan gesture and
-  // onDragEnd never fires, leaving dragActive true and the edge-scroll interval running forever.
   if (dragActive && frozenEventsRef.current !== null && frozenDateRef.current !== dateStr) {
     const dragged = dragEvent
       ? frozenEventsRef.current.find(e => e.id === dragEvent.id) ?? null
@@ -60,25 +59,19 @@ function CalendarContent() {
     frozenDateRef.current = dateStr;
   }
 
-  // Animated value lives at -SCREEN_WIDTH at rest (center pane visible).
-  // Swiping left → goes more negative (next pane slides in).
-  // Swiping right → goes toward 0 (prev pane slides in).
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const [currentScrollY, setCurrentScrollY] = useState(0);
   const [committedDate, setCommittedDate] = useState(new Date());
   const pendingResetRef = useRef(false);
 
-  // Keep committedDate in sync when date changes via nav buttons, week strip, today, etc.
   useEffect(() => {
     setCommittedDate(selectedDate);
   }, [selectedDate]);
 
-  // Sync picker month to selected date when picker is closed.
   useEffect(() => {
     if (!showMonthPicker) setPickerMonth(selectedDate);
   }, [selectedDate]);
 
-  // Reset translateX AFTER React commits new pane content — eliminates the flash frame.
   useLayoutEffect(() => {
     if (pendingResetRef.current) {
       pendingResetRef.current = false;
@@ -86,7 +79,6 @@ function CalendarContent() {
     }
   }, [selectedDate]);
 
-  // Snap row back to center if the swipe gesture partially moved it before drag activated.
   useEffect(() => {
     if (dragActive) {
       Animated.spring(translateX, {
@@ -109,7 +101,6 @@ function CalendarContent() {
   }
   const edgeZone = getEdgeZone();
 
-  // Edge-scroll while dragging — interval only resets when entering/leaving the zone.
   useEffect(() => {
     if (edgeZone === null) {
       if (edgeIntervalRef.current) {
@@ -258,7 +249,6 @@ function CalendarContent() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
       <View style={styles.header} onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerDate}>{format(committedDate, 'MMM d')}</Text>
@@ -280,7 +270,6 @@ function CalendarContent() {
         </View>
       </View>
 
-      {/* Week strip */}
       <WeekStrip
         selectedDate={committedDate}
         weekStart={settings.weekStart}
@@ -288,7 +277,6 @@ function CalendarContent() {
         onSwipeWeek={handleSwipeWeek}
       />
 
-      {/* Time grid — 3-pane sliding row */}
       <View style={styles.gridContainer}>
         <Animated.View style={[styles.gridRow, { transform: [{ translateX }] }]}>
           <View style={{ width: SCREEN_WIDTH }}>
@@ -348,20 +336,18 @@ function CalendarContent() {
         </Animated.View>
       </View>
 
-      {/* Drag ghost overlay */}
       {dragActive && dragEvent && (
         <View
           style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: ghostY, width: ghostWidth }]}
           pointerEvents="none"
         >
-          <View style={[styles.ghostBlock, { backgroundColor: Colors.white, borderLeftColor: dragEvent.color, height: ghostHeight }]}>
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '70' }]} />
-            <Text style={styles.ghostTitle} numberOfLines={1}>{dragEvent.title}</Text>
+          <View style={[styles.ghostBlock, { backgroundColor: Colors.card, borderLeftColor: dragEvent.color, height: ghostHeight }]}>
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '35' }]} />
+            <Text style={[styles.ghostTitle, { color: Colors.text }]} numberOfLines={1}>{dragEvent.title}</Text>
           </View>
         </View>
       )}
 
-      {/* Month picker dropdown */}
       {showMonthPicker && (
         <>
           <TouchableOpacity
@@ -391,7 +377,7 @@ function CalendarContent() {
                   if (!day) return <View key={di} style={styles.pickerDayCell} />;
                   const ds = format(day, 'yyyy-MM-dd');
                   const isSelected = ds === format(selectedDate, 'yyyy-MM-dd');
-                  const isToday = ds === format(new Date(), 'yyyy-MM-dd');
+                  const isTodayDate = ds === format(new Date(), 'yyyy-MM-dd');
                   return (
                     <TouchableOpacity
                       key={di}
@@ -400,7 +386,7 @@ function CalendarContent() {
                     >
                       <Text style={[
                         styles.pickerDayText,
-                        isToday && !isSelected && styles.pickerDayTextToday,
+                        isTodayDate && !isSelected && styles.pickerDayTextToday,
                         isSelected && styles.pickerDayTextSelected,
                       ]}>
                         {format(day, 'd')}
@@ -414,10 +400,8 @@ function CalendarContent() {
         </>
       )}
 
-      {/* FAB */}
       <FAB onPress={handleAddEvent} />
 
-      {/* Event modal */}
       <AddEditEventModal
         visible={showEventModal}
         event={editingEvent}
@@ -442,147 +426,148 @@ export function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: Colors.primary,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  headerDate: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  headerYear: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '400',
-  },
-  calendarIconBtn: {
-    padding: 4,
-    marginLeft: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  navBtn: {
-    padding: 4,
-  },
-  chevronBtn: {
-    padding: 4,
-  },
-  pickerBackdrop: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 100,
-  },
-  pickerPanel: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 12,
-    zIndex: 101,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  pickerNavBtn: {
-    padding: 6,
-  },
-  pickerMonthTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  pickerDayHeaders: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  pickerDayHeader: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textLight,
-  },
-  pickerWeek: {
-    flexDirection: 'row',
-  },
-  pickerDayCell: {
-    flex: 1,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerDayCellSelected: {
-    backgroundColor: Colors.primary,
-    borderRadius: 18,
-  },
-  pickerDayText: {
-    fontSize: 13,
-    color: Colors.text,
-  },
-  pickerDayTextToday: {
-    color: Colors.primary,
-    fontWeight: '700',
-  },
-  pickerDayTextSelected: {
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  gridContainer: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: Colors.white,
-  },
-  gridRow: {
-    flex: 1,
-    flexDirection: 'row',
-    width: SCREEN_WIDTH * 3,
-  },
-  ghostOverlay: {
-    position: 'absolute',
-    zIndex: 999,
-  },
-  ghostBlock: {
-    borderLeftWidth: 3,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    justifyContent: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  ghostTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: C.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: C.primary,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    headerDate: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: C.white,
+    },
+    headerYear: {
+      fontSize: 14,
+      color: 'rgba(255,255,255,0.7)',
+      fontWeight: '400',
+    },
+    calendarIconBtn: {
+      padding: 4,
+      marginLeft: 2,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    navBtn: {
+      padding: 4,
+    },
+    chevronBtn: {
+      padding: 4,
+    },
+    pickerBackdrop: {
+      position: 'absolute',
+      top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 100,
+    },
+    pickerPanel: {
+      position: 'absolute',
+      left: 12,
+      right: 12,
+      backgroundColor: C.card,
+      borderRadius: 12,
+      padding: 12,
+      zIndex: 101,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    pickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    pickerNavBtn: {
+      padding: 6,
+    },
+    pickerMonthTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: C.text,
+    },
+    pickerDayHeaders: {
+      flexDirection: 'row',
+      marginBottom: 4,
+    },
+    pickerDayHeader: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: 11,
+      fontWeight: '600',
+      color: C.textLight,
+    },
+    pickerWeek: {
+      flexDirection: 'row',
+    },
+    pickerDayCell: {
+      flex: 1,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pickerDayCellSelected: {
+      backgroundColor: C.primary,
+      borderRadius: 18,
+    },
+    pickerDayText: {
+      fontSize: 13,
+      color: C.text,
+    },
+    pickerDayTextToday: {
+      color: C.primary,
+      fontWeight: '700',
+    },
+    pickerDayTextSelected: {
+      color: C.white,
+      fontWeight: '700',
+    },
+    gridContainer: {
+      flex: 1,
+      overflow: 'hidden',
+      backgroundColor: C.card,
+    },
+    gridRow: {
+      flex: 1,
+      flexDirection: 'row',
+      width: SCREEN_WIDTH * 3,
+    },
+    ghostOverlay: {
+      position: 'absolute',
+      zIndex: 999,
+    },
+    ghostBlock: {
+      borderLeftWidth: 3,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      justifyContent: 'flex-start',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6,
+      elevation: 8,
+    },
+    ghostTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+    },
+  });
+}

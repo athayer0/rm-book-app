@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, LayoutChangeEvent,
 } from 'react-native';
 import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { KIIcon } from './KIIcon';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
@@ -20,15 +21,17 @@ interface Props {
   definitions: IndicatorDefinition[];
 }
 
-// Chart padding constants
 const LEFT_PAD = 32;
 const RIGHT_PAD = 8;
 const TOP_PAD = 22;
 const BOTTOM_PAD = 44;
 const CHART_H = 180;
-const N_WEEKS = 6; // offsets -5 → 0
+const N_WEEKS = 6;
 
 export function KIGraphTab({ definitions }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const { getWeekData } = useWeeklyIndicators();
   const visibleDefs = definitions.filter(d => d.visible);
 
@@ -39,8 +42,6 @@ export function KIGraphTab({ definitions }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
 
   const selectedDef = visibleDefs.find(d => d.id === selectedId) ?? visibleDefs[0];
-
-  // ── Load data ────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async (id: string) => {
     if (!id) return;
@@ -59,7 +60,6 @@ export function KIGraphTab({ definitions }: Props) {
     }
     setWeekData(points);
 
-    // Next week (for summary only)
     const nextWk = getWeekKeyByOffset(1);
     const { counts: nc, goals: ng } = await getWeekData(nextWk);
     setNextWeek({ actual: nc[id] ?? 0, goal: ng[id] ?? def.goal });
@@ -69,14 +69,11 @@ export function KIGraphTab({ definitions }: Props) {
     if (selectedId) loadData(selectedId);
   }, [selectedId]);
 
-  // Reload when tab becomes active (definitions might change)
   useEffect(() => {
     const first = visibleDefs[0]?.id;
     if (!selectedId && first) setSelectedId(first);
     else if (selectedId) loadData(selectedId);
   }, [definitions]);
-
-  // ── SVG geometry ─────────────────────────────────────────────────────────
 
   const svgW = containerWidth;
   const svgH = TOP_PAD + CHART_H + BOTTOM_PAD;
@@ -87,7 +84,7 @@ export function KIGraphTab({ definitions }: Props) {
   const rawMax = weekData.length
     ? Math.max(...weekData.map(p => p.goal), ...weekData.map(p => p.actual), 1)
     : 1;
-  const maxVal = rawMax * 1.2; // 20% headroom so bars don't touch the top
+  const maxVal = rawMax * 1.2;
 
   function yFor(v: number) {
     return TOP_PAD + CHART_H - (v / maxVal) * CHART_H;
@@ -95,30 +92,27 @@ export function KIGraphTab({ definitions }: Props) {
   function barX(i: number) { return LEFT_PAD + i * colW + (colW - barW) / 2; }
   function dotX(i: number) { return LEFT_PAD + i * colW + colW / 2; }
 
-  // Y-axis gridlines: up to 4 levels, based on rawMax so they stay inside the chart
   const gridLevels = [0.25, 0.5, 0.75, 1.0]
     .map(f => Math.round(rawMax * f))
-    .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i); // remove zeros and duplicates
+    .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i);
 
-  // Polyline points string
   const linePoints = weekData
     .map((p, i) => `${dotX(i)},${yFor(p.actual)}`)
     .join(' ');
 
-  // X-axis labels: split formatWeekLabel on " – "
   function xLabels(wk: string): [string, string] {
-    const full = formatWeekLabel(wk); // e.g. "May 26 – Jun 1"
+    const full = formatWeekLabel(wk);
     const parts = full.split(' – ');
     return [parts[0] ?? '', parts[1] ?? ''];
   }
 
-  // Summary data
   const lastWeek = weekData[N_WEEKS - 2] ?? { actual: 0, goal: 0 };
   const thisWeek = weekData[N_WEEKS - 1] ?? { actual: 0, goal: 0 };
 
+  const goalBarFill = Colors.border;
+
   return (
     <View style={styles.container}>
-      {/* ── Dropdown ── */}
       <View style={styles.dropdownWrapper}>
         <TouchableOpacity
           style={styles.dropdownBtn}
@@ -169,7 +163,6 @@ export function KIGraphTab({ definitions }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Summary row ── */}
         {selectedDef && (
           <View style={styles.summaryRow}>
             <View style={styles.summaryCol}>
@@ -198,14 +191,12 @@ export function KIGraphTab({ definitions }: Props) {
           </View>
         )}
 
-        {/* ── Chart ── */}
         <View
           style={styles.chartContainer}
           onLayout={(e: LayoutChangeEvent) => setContainerWidth(e.nativeEvent.layout.width)}
         >
           {containerWidth > 0 && weekData.length === N_WEEKS && selectedDef && (
             <Svg width={svgW} height={svgH}>
-              {/* Y-axis gridlines */}
               {gridLevels.map((val, gi) => {
                 const y = yFor(val);
                 return (
@@ -232,7 +223,6 @@ export function KIGraphTab({ definitions }: Props) {
                 );
               })}
 
-              {/* Grey goal bars */}
               {weekData.map((p, i) => {
                 const bh = (p.goal / maxVal) * CHART_H;
                 const by = TOP_PAD + CHART_H - bh;
@@ -243,13 +233,12 @@ export function KIGraphTab({ definitions }: Props) {
                     y={by}
                     width={barW}
                     height={bh}
-                    fill="#E0E0E0"
+                    fill={goalBarFill}
                     rx={3}
                   />
                 );
               })}
 
-              {/* Connecting line */}
               {weekData.length > 1 && (
                 <Polyline
                   points={linePoints}
@@ -260,7 +249,6 @@ export function KIGraphTab({ definitions }: Props) {
                 />
               )}
 
-              {/* Dots + labels */}
               {weekData.map((p, i) => {
                 const cy = yFor(p.actual);
                 const cx = dotX(i);
@@ -288,7 +276,6 @@ export function KIGraphTab({ definitions }: Props) {
                 );
               })}
 
-              {/* X-axis labels */}
               {weekData.map((p, i) => {
                 const [line1, line2] = xLabels(p.weekKey);
                 const cx = dotX(i);
@@ -314,124 +301,119 @@ export function KIGraphTab({ definitions }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-
-  // Dropdown
-  dropdownWrapper: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
-    zIndex: 10,
-  },
-  dropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  dropIconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  dropList: {
-    position: 'absolute',
-    top: 66,
-    left: 16,
-    right: 16,
-    backgroundColor: Colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 6,
-    zIndex: 20,
-  },
-  dropItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  dropItemActive: {
-    backgroundColor: Colors.primary + '08',
-  },
-  dropItemText: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.text,
-  },
-
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 8 },
-
-  // Summary row
-  summaryRow: {
-    flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  summaryCol: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  summaryDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
-    marginVertical: 4,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: Colors.textLight,
-    fontWeight: '500',
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  summaryGoalText: {
-    fontSize: 20,
-    color: Colors.textSecondary,
-    fontWeight: '700',
-  },
-
-  // Chart
-  chartContainer: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.background },
+    dropdownWrapper: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 6,
+      zIndex: 10,
+    },
+    dropdownBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    dropIconBadge: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dropLabel: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '500',
+      color: C.text,
+    },
+    dropList: {
+      position: 'absolute',
+      top: 66,
+      left: 16,
+      right: 16,
+      backgroundColor: C.card,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: C.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 6,
+      zIndex: 20,
+    },
+    dropItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    dropItemActive: {
+      backgroundColor: C.primary + '08',
+    },
+    dropItemText: {
+      flex: 1,
+      fontSize: 14,
+      color: C.text,
+    },
+    scroll: { flex: 1 },
+    scrollContent: { paddingHorizontal: 16, paddingTop: 8 },
+    summaryRow: {
+      flexDirection: 'row',
+      backgroundColor: C.card,
+      borderRadius: 12,
+      marginBottom: 16,
+      paddingVertical: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    summaryCol: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 4,
+    },
+    summaryDivider: {
+      width: StyleSheet.hairlineWidth,
+      backgroundColor: C.border,
+      marginVertical: 4,
+    },
+    summaryLabel: {
+      fontSize: 11,
+      color: C.textLight,
+      fontWeight: '500',
+    },
+    summaryValue: {
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    summaryGoalText: {
+      fontSize: 20,
+      color: C.textSecondary,
+      fontWeight: '700',
+    },
+    chartContainer: {
+      backgroundColor: C.card,
+      borderRadius: 12,
+      padding: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+  });
+}

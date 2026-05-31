@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { usePeople } from '../hooks/usePeople';
 import { IndicatorGrid } from '../components/IndicatorGrid';
@@ -15,6 +16,9 @@ import { KIWeeklyModal } from '../modals/KIWeeklyModal';
 import { getWeekKey } from '../utils/dateUtils';
 
 export function HomeScreen({ navigation }: any) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
@@ -37,7 +41,6 @@ export function HomeScreen({ navigation }: any) {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Weekly Key Indicators */}
         <View style={styles.card}>
           <SectionHeader
             title="Weekly Key Indicators"
@@ -57,7 +60,6 @@ export function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* Progressing People */}
         <View style={styles.card}>
           <SectionHeader
             title="Progressing People"
@@ -89,7 +91,6 @@ export function HomeScreen({ navigation }: any) {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* EDIT button → manage KI definitions (add/remove/default goals) */}
       <WeeklyPlanningModal
         visible={editVisible}
         onClose={() => setEditVisible(false)}
@@ -97,7 +98,6 @@ export function HomeScreen({ navigation }: any) {
         onUpdateDefinitions={updateDefinitions}
       />
 
-      {/* WEEKLY PLANNING button → week-by-week actual + goal editor */}
       <KIWeeklyModal
         visible={planningVisible}
         onClose={() => setPlanningVisible(false)}
@@ -107,92 +107,80 @@ export function HomeScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-  card: {
-    backgroundColor: Colors.card,
-    marginHorizontal: 0,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  weekBadge: {
-    alignSelf: 'flex-start',
-    marginLeft: 16,
-    marginBottom: 8,
-    backgroundColor: Colors.primary + '15',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  weekText: {
-    fontSize: 11,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  planBtn: {
-    margin: 16,
-    marginTop: 8,
-    borderWidth: 2,
-    borderColor: Colors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  planBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.accent,
-    letterSpacing: 1.2,
-  },
-  peopleList: {
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  emptyPeople: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: Colors.textLight,
-    marginTop: 8,
-  },
-  emptyAction: {
-    fontSize: 14,
-    color: Colors.accent,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: C.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: C.primary,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: C.white,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    scroll: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    content: {
+      paddingTop: 12,
+      paddingBottom: 20,
+    },
+    card: {
+      backgroundColor: C.card,
+      marginHorizontal: 0,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    planBtn: {
+      margin: 16,
+      marginTop: 8,
+      borderWidth: 2,
+      borderColor: C.accent,
+      borderRadius: 8,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    planBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: C.accent,
+      letterSpacing: 1.2,
+    },
+    peopleList: {
+      paddingTop: 8,
+      paddingBottom: 8,
+    },
+    emptyPeople: {
+      alignItems: 'center',
+      padding: 32,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: C.textLight,
+      marginTop: 8,
+    },
+    emptyAction: {
+      fontSize: 14,
+      color: C.accent,
+      fontWeight: '600',
+      marginTop: 8,
+    },
+  });
+}

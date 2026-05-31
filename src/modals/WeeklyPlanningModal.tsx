@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, ScrollView,
   StyleSheet, TextInput,
 } from 'react-native';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { KIIcon } from '../components/KIIcon';
@@ -11,7 +12,6 @@ import { KIIcon } from '../components/KIIcon';
 interface IconOption { name: string; family: string; }
 
 const ICON_OPTIONS: IconOption[] = [
-  // Ionicons
   { name: 'sunny',               family: 'Ionicons' },
   { name: 'moon',                family: 'Ionicons' },
   { name: 'book-outline',        family: 'Ionicons' },
@@ -33,7 +33,6 @@ const ICON_OPTIONS: IconOption[] = [
   { name: 'compass',             family: 'Ionicons' },
   { name: 'ribbon',              family: 'Ionicons' },
   { name: 'color-palette-outline', family: 'Ionicons' },
-  // MaterialCommunityIcons
   { name: 'synagogue',           family: 'MaterialCommunityIcons' },
   { name: 'church',              family: 'MaterialCommunityIcons' },
   { name: 'hands-pray',         family: 'MaterialCommunityIcons' },
@@ -41,9 +40,8 @@ const ICON_OPTIONS: IconOption[] = [
 ];
 
 const COLOR_OPTIONS: string[] = [
-  '#F39C12', '#9B59B6', '#00B5C8', '#27AE60',
-  '#3498DB', '#E74C3C', '#E91E63', '#F0C040',
-  '#8B1A4A', '#FF6B35',
+  '#E74C3C', '#E05C6B', '#800000', '#D2691E', '#F39C12', '#F4D03F', '#2ECC71', '#27AE60',
+  '#1A3A6B', '#2979FF', '#00B5C8', '#A29BFE', '#9B59B6', '#795548', '#9E9E9E', '#4E342E',
 ];
 
 interface Props {
@@ -54,6 +52,9 @@ interface Props {
 }
 
 export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDefinitions }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
   const [localDefs, setLocalDefs] = useState<IndicatorDefinition[]>(definitions);
   const [newName, setNewName] = useState('');
   const [selectedIconOpt, setSelectedIconOpt] = useState<IconOption>(ICON_OPTIONS[0]);
@@ -113,7 +114,6 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Current KI list */}
         <Text style={styles.sectionLabel}>KEY INDICATORS</Text>
         <View style={styles.kiList}>
           {localDefs.map((def, index) => (
@@ -138,7 +138,6 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
           ))}
         </View>
 
-        {/* Add new KI */}
         <Text style={[styles.sectionLabel, { marginTop: 24 }]}>ADD KEY INDICATOR</Text>
         <View style={styles.addCard}>
           <TextInput
@@ -180,25 +179,26 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
           </ScrollView>
 
           <Text style={styles.pickerLabel}>Color</Text>
-          <View style={styles.colorRow}>
-            {COLOR_OPTIONS.map(color => (
-              <TouchableOpacity
-                key={color}
-                onPress={() => setSelectedColor(color)}
-                style={[
-                  styles.colorDot,
-                  { backgroundColor: color },
-                  selectedColor === color && styles.colorDotSelected,
-                ]}
-              >
-                {selectedColor === color && (
-                  <Ionicons name="checkmark" size={13} color="#fff" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
+          {[COLOR_OPTIONS.slice(0, 8), COLOR_OPTIONS.slice(8, 16)].map((row, ri) => (
+            <View key={ri} style={styles.colorRow}>
+              {row.map(color => (
+                <TouchableOpacity
+                  key={color}
+                  onPress={() => setSelectedColor(color)}
+                  style={[
+                    styles.colorDot,
+                    { backgroundColor: color },
+                    selectedColor === color && styles.colorDotSelected,
+                  ]}
+                >
+                  {selectedColor === color && (
+                    <Ionicons name="checkmark" size={13} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
 
-          {/* Preview */}
           {newName.trim() ? (
             <View style={styles.previewRow}>
               <View style={[styles.kiIcon, { backgroundColor: selectedColor + '20' }]}>
@@ -228,222 +228,187 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.card,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  closeBtn: {
-    width: 60,
-    alignItems: 'flex-end',
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    padding: 16,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textLight,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  kiList: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  kiRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    gap: 10,
-  },
-  kiRowLast: {
-    borderBottomWidth: 0,
-  },
-  kiIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kiLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  goalStepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  stepBtn: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goalNum: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-    minWidth: 22,
-    textAlign: 'center',
-  },
-  lockIcon: {
-    width: 28,
-    alignItems: 'center',
-  },
-  deleteIcon: {
-    width: 28,
-    alignItems: 'center',
-  },
-  addCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  nameInput: {
-    fontSize: 15,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  addRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  addRowLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  pickerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  iconScroll: {
-    marginBottom: 16,
-  },
-  iconScrollContent: {
-    gap: 6,
-  },
-  iconOption: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  colorRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  colorDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorDotSelected: {
-    borderWidth: 2.5,
-    borderColor: Colors.text,
-  },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    marginBottom: 14,
-  },
-  previewLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  previewGoal: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: Colors.accent,
-    borderRadius: 10,
-    paddingVertical: 12,
-  },
-  addBtnDisabled: {
-    opacity: 0.4,
-  },
-  addBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  saveBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  saveBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.white,
-    letterSpacing: 0.5,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      backgroundColor: C.card,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: C.text,
+    },
+    closeBtn: {
+      width: 60,
+      alignItems: 'flex-end',
+    },
+    scroll: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    content: {
+      padding: 16,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: C.textLight,
+      letterSpacing: 1,
+      marginBottom: 8,
+    },
+    kiList: {
+      backgroundColor: C.card,
+      borderRadius: 12,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    kiRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      gap: 10,
+    },
+    kiRowLast: {
+      borderBottomWidth: 0,
+    },
+    kiIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    kiLabel: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '500',
+      color: C.text,
+    },
+    lockIcon: {
+      width: 28,
+      alignItems: 'center',
+    },
+    deleteIcon: {
+      width: 28,
+      alignItems: 'center',
+    },
+    addCard: {
+      backgroundColor: C.card,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    nameInput: {
+      fontSize: 15,
+      color: C.text,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 14,
+    },
+    pickerLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textSecondary,
+      marginBottom: 8,
+    },
+    iconScroll: {
+      marginBottom: 16,
+    },
+    iconScrollContent: {
+      gap: 6,
+    },
+    iconOption: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.background,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    colorRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    colorDot: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    colorDotSelected: {
+      borderWidth: 2,
+      borderColor: C.text,
+    },
+    previewRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      backgroundColor: C.background,
+      borderRadius: 8,
+      marginBottom: 14,
+    },
+    previewLabel: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    addBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: C.accent,
+      borderRadius: 10,
+      paddingVertical: 12,
+    },
+    addBtnDisabled: {
+      opacity: 0.4,
+    },
+    addBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.white,
+    },
+    saveBtn: {
+      backgroundColor: C.primary,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    saveBtnText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: C.white,
+      letterSpacing: 0.5,
+    },
+  });
+}

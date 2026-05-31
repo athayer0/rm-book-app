@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
 
 interface Props {
@@ -10,15 +11,18 @@ interface Props {
   onToggleStar: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Friend: Colors.accent,
-  Dating: '#E84393',
-  'Fellowship Contact': '#27AE60',
-  Family: '#A0522D',
-  Other: '#95A5A6',
-};
-
 export function PersonCard({ person, onPress, onToggleStar }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
+  const STATUS_COLORS: Record<string, string> = {
+    Friend: Colors.accent,
+    Dating: '#E84393',
+    'Fellowship Contact': '#27AE60',
+    Family: '#A0522D',
+    Other: '#95A5A6',
+  };
+
   const statusColor = STATUS_COLORS[person.status] ?? Colors.textLight;
 
   return (
@@ -52,65 +56,67 @@ export function PersonCard({ person, onPress, onToggleStar }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  avatarWrapper: {
-    marginRight: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  avatarPlaceholder: {
-    backgroundColor: Colors.primary + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  info: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  tag: {
-    alignSelf: 'flex-start',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginBottom: 4,
-  },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  meta: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-  star: {
-    padding: 4,
-  },
-});
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      borderRadius: 12,
+      padding: 12,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.07,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    avatarWrapper: {
+      marginRight: 12,
+    },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+    },
+    avatarPlaceholder: {
+      backgroundColor: C.primary + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitial: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: C.primary,
+    },
+    info: {
+      flex: 1,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: C.text,
+      marginBottom: 4,
+    },
+    tag: {
+      alignSelf: 'flex-start',
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      marginBottom: 4,
+    },
+    tagText: {
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: 0.3,
+    },
+    meta: {
+      fontSize: 12,
+      color: C.textLight,
+    },
+    star: {
+      padding: 4,
+    },
+  });
+}
