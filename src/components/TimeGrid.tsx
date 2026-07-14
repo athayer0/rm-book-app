@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUtils';
@@ -9,6 +10,7 @@ import { formatTime } from '../utils/dateUtils';
 import { Svg, Polygon } from 'react-native-svg';
 
 const SLOT_HEIGHT = 50;
+const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 const TIME_COL_WIDTH = 52;
 
 interface Props {
@@ -61,6 +63,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
 
   useEffect(() => {
     if (dragHoverY != null) setPressedSlot(null);
+    if (dragHoverY == null) dragSlotHapticRef.current = null;
   }, [dragHoverY]);
 
   const [currentMinutes, setCurrentMinutes] = useState(() => {
@@ -85,8 +88,21 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   }, [restoreKey]);
 
   const dragSlot = dragHoverY != null
-    ? Math.max(0, Math.floor((dragHoverY - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / SLOT_HEIGHT))
+    ? Math.max(0, Math.floor((dragHoverY - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT))
     : null;
+
+  const dragSlotHapticRef = useRef<number | null>(null);
+
+  function handleDragMove(x: number, y: number) {
+    const slot = Math.max(0, Math.floor(
+      (y - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT
+    ));
+    if (slot !== dragSlotHapticRef.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      dragSlotHapticRef.current = slot;
+    }
+    onDragMove?.(x, y);
+  }
 
   function slotToTimeStr(slot: number): string {
     const hour = Math.floor(slot / 2) + gridStartHour;
@@ -124,6 +140,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     const slot = Math.min(maxSlot, Math.max(0, Math.floor((locationY - 16) / SLOT_HEIGHT)));
     setPressedSlot(slot);
     setTimeout(() => setPressedSlot(null), 500);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onTapEmpty(slotToTimeStr(slot));
   }
 
@@ -189,7 +206,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
             {dragSlot !== null && (
               <View
                 pointerEvents="none"
-                style={[styles.dragHighlight, { top: dragSlot * SLOT_HEIGHT + 1, height: dragEventHeight ?? SLOT_HEIGHT }]}
+                style={[styles.dragHighlight, { top: dragSlot * DRAG_SLOT_HEIGHT + 1, height: dragEventHeight ?? SLOT_HEIGHT }]}
               />
             )}
 
@@ -206,7 +223,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
                   onPress={() => onEventPress?.(event)}
                   onToggleComplete={onToggleComplete ? () => onToggleComplete(event.id) : undefined}
                   onDragStart={onDragStart}
-                  onDragMove={onDragMove}
+                  onDragMove={handleDragMove}
                   onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
                   onDragCancel={onDragCancel}
                 />
@@ -232,7 +249,7 @@ function makeStyles(C: ColorPalette) {
     },
     timeCol: {
       width: TIME_COL_WIDTH,
-      paddingTop: 16,
+      paddingTop: 11,
       paddingRight: 8,
     },
     hourLabel: {

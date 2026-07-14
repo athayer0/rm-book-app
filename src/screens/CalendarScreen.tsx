@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMe
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Animated,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
@@ -20,6 +21,7 @@ import { isInCurrentWeek } from '../utils/dateUtils';
 import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
 
 const SLOT_HEIGHT = 50;
+const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
 
@@ -38,6 +40,7 @@ function CalendarContent() {
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
+  const isAnimatingRef = useRef(false);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [headerBottom, setHeaderBottom] = useState(60);
@@ -111,6 +114,7 @@ function CalendarContent() {
     }
 
     edgeIntervalRef.current = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setSelectedDate(d => edgeZone === 'left' ? addDays(d, -1) : addDays(d, 1));
     }, 500);
 
@@ -177,9 +181,9 @@ function CalendarContent() {
     frozenDateRef.current = null;
     if (!dragEvent) { endDrag(); return; }
     const relativeY = absoluteY - SLOT_HEIGHT - gridTopY + scrollOffset;
-    const thirtyMinSlot = Math.max(0, Math.floor(relativeY / SLOT_HEIGHT));
-    const hour = Math.floor(thirtyMinSlot / 2) + settings.gridStartHour;
-    const minute = (thirtyMinSlot % 2) * 30;
+    const fifteenMinSlot = Math.max(0, Math.floor(relativeY / DRAG_SLOT_HEIGHT));
+    const hour = Math.floor(fifteenMinSlot / 4) + settings.gridStartHour;
+    const minute = (fifteenMinSlot % 4) * 15;
     const newStart = formatTime(Math.min(hour, 23), minute);
     const { hour: sh, minute: sm } = parseTimeString(dragEvent.startTime);
     const { hour: eh, minute: em } = parseTimeString(dragEvent.endTime);
@@ -192,27 +196,32 @@ function CalendarContent() {
   }
 
   function handleSwipeProgress(x: number) {
+    if (isAnimatingRef.current) return;
     translateX.setValue(-SCREEN_WIDTH + x);
   }
 
   function handleSwipeCancel() {
+    if (isAnimatingRef.current) return;
     Animated.spring(translateX, {
       toValue: -SCREEN_WIDTH,
       useNativeDriver: true,
-      tension: 40,
-      friction: 8,
+      tension: 180,
+      friction: 24,
     }).start();
   }
 
   function handleSwipeDay(dir: 1 | -1) {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
     setCommittedDate(d => addDays(d, dir));
     const target = dir === 1 ? -SCREEN_WIDTH * 2 : 0;
     Animated.spring(translateX, {
       toValue: target,
       useNativeDriver: true,
-      tension: 40,
-      friction: 8,
+      tension: 180,
+      friction: 24,
     }).start(() => {
+      isAnimatingRef.current = false;
       pendingResetRef.current = true;
       setSelectedDate(d => addDays(d, dir));
     });

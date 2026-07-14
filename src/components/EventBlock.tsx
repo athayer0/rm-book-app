@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventHeight } from '../utils/eventUtils';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -57,6 +58,7 @@ export function EventBlock({
     .runOnJS(true)
     .onStart((e) => {
       isDraggingRef.current = true;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const dragPixelWidth = columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH);
       onDragStart?.(event, e.absoluteX, e.absoluteY, dragPixelWidth, height);
     })
