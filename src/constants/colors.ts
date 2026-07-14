@@ -45,7 +45,7 @@ export const DarkColors: typeof LightColors = {
   weekStripBg: '#1A1A1A',
   weekStripBgAlt: '#141414',
   selectedDayBg: '#263040',
-  selectedDayBorder: '#5C7A96',
+  selectedDayBorder: '#8AAFC8',
 };
 
 export const Colors = LightColors;
