@@ -13,7 +13,7 @@ import { AppSettings } from '../hooks/useSettings';
 import { format, addDays } from 'date-fns';
 
 const STATUS_OPTIONS: { value: EventStatus; label: string; icon: string; color: string }[] = [
-  { value: 'pending',   label: 'Pending',   icon: 'alert-circle',    color: '#F39C12' },
+  { value: 'pending',   label: 'Pending',   icon: 'alert-circle',    color: '#E8980E' },
   { value: 'completed', label: 'Completed', icon: 'checkmark-circle', color: '#1A7A40' },
   { value: 'failed',    label: 'Failed',    icon: 'ban',             color: '#B03030' },
 ];

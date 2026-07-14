@@ -128,7 +128,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               <Ionicons
                 name={starred ? 'star' : 'star-outline'}
                 size={20}
-                color={starred ? '#F39C12' : Colors.textLight}
+                color={starred ? '#E8980E' : Colors.textLight}
               />
               <Text style={styles.starText}>
                 {starred ? 'Favorited' : 'Mark as favorite'}

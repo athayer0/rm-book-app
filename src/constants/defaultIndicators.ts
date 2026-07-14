@@ -18,7 +18,7 @@ export const DEFAULT_INDICATORS: IndicatorDefinition[] = [
     iconFamily: 'Ionicons',
     goal: 7,
     type: 'daily',
-    color: '#F39C12',
+    color: '#E8980E',
     visible: true,
     builtIn: true,
   },

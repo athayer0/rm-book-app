@@ -40,7 +40,7 @@ const ICON_OPTIONS: IconOption[] = [
 ];
 
 const COLOR_OPTIONS: string[] = [
-  '#E74C3C', '#E05C6B', '#800000', '#D2691E', '#F39C12', '#F4D03F', '#2ECC71', '#27AE60',
+  '#E74C3C', '#E05C6B', '#800000', '#D2691E', '#E8980E', '#E8B820', '#2ECC71', '#27AE60',
   '#1A3A6B', '#2979FF', '#00B5C8', '#A29BFE', '#9B59B6', '#795548', '#9E9E9E', '#4E342E',
 ];
 

@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
+import { useIsDark } from '../hooks/useIsDark';
+import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { KIIcon } from './KIIcon';
@@ -14,14 +16,15 @@ interface Props {
 
 export function IndicatorCard({ definition, count, compact }: Props) {
   const Colors = useColors();
+  const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const goalReached = count >= definition.goal;
 
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
-      <View style={[styles.iconWrapper, { backgroundColor: definition.color + '20' }]}>
-        <KIIcon icon={definition.icon} iconFamily={definition.iconFamily} size={compact ? 20 : 24} color={definition.color} />
+      <View style={[styles.iconWrapper, { backgroundColor: isDark ? definition.color : definition.color + '20' }]}>
+        <KIIcon icon={definition.icon} iconFamily={definition.iconFamily} size={compact ? 20 : 24} color={isDark ? lightenColor(definition.color) : definition.color} />
       </View>
 
       <View style={styles.textCol}>

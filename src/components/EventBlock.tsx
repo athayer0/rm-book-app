@@ -15,7 +15,7 @@ const TIME_COL_WIDTH = 52;
 const STATUS_CONFIG: Record<EventStatus, { color: string; icon: string }> = {
   completed: { color: '#1A7A40', icon: 'checkmark-circle' },
   failed:    { color: '#B03030', icon: 'ban' },
-  pending:   { color: '#F39C12', icon: 'alert-circle' },
+  pending:   { color: '#E8980E', icon: 'alert-circle' },
 };
 
 interface Props {
@@ -105,7 +105,7 @@ export function EventBlock({
         ]}
         onStartShouldSetResponder={() => true}
       >
-        <View style={[styles.blockTint, { backgroundColor: event.color + '35' }]} />
+        <View style={[styles.blockTint, { backgroundColor: event.color + '55' }]} />
         {isBackup && (
           <View style={[styles.backupBar, { backgroundColor: event.color + '40', height }]}>
             {Array.from({ length: stripeCount }).map((_, i) => (

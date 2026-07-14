@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
+import { useIsDark } from '../hooks/useIsDark';
+import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
 
@@ -13,7 +15,8 @@ interface Props {
 
 export function PersonCard({ person, onPress, onToggleStar }: Props) {
   const Colors = useColors();
-  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const isDark = useIsDark();
+  const styles = useMemo(() => makeStyles(Colors, isDark), [Colors, isDark]);
 
   const STATUS_COLORS: Record<string, string> = {
     Friend: Colors.accent,
@@ -49,14 +52,14 @@ export function PersonCard({ person, onPress, onToggleStar }: Props) {
         <Ionicons
           name={person.starred ? 'star' : 'star-outline'}
           size={20}
-          color={person.starred ? '#F39C12' : Colors.textLight}
+          color={person.starred ? '#E8980E' : Colors.textLight}
         />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 }
 
-function makeStyles(C: ColorPalette) {
+function makeStyles(C: ColorPalette, isDark: boolean) {
   return StyleSheet.create({
     card: {
       flexDirection: 'row',
@@ -81,14 +84,14 @@ function makeStyles(C: ColorPalette) {
       borderRadius: 24,
     },
     avatarPlaceholder: {
-      backgroundColor: C.primary + '20',
+      backgroundColor: isDark ? C.primary : C.primary + '20',
       alignItems: 'center',
       justifyContent: 'center',
     },
     avatarInitial: {
       fontSize: 20,
       fontWeight: '700',
-      color: C.primary,
+      color: isDark ? lightenColor(C.primary) : C.primary,
     },
     info: {
       flex: 1,
