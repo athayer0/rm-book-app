@@ -10,6 +10,7 @@ import type { ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useSettings } from '../hooks/useSettings';
 import { TimeGrid } from '../components/TimeGrid';
+import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
@@ -43,6 +44,8 @@ function CalendarContent() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [headerBottom, setHeaderBottom] = useState(60);
+  // Shared vertical scroll offset so every day page stays aligned to the same time-of-day.
+  const [syncScrollY, setSyncScrollY] = useState(0);
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const events = getForDate(dateStr);
@@ -163,10 +166,6 @@ function CalendarContent() {
     endDrag();
   }
 
-  function handleSwipeDay(dir: 1 | -1) {
-    setSelectedDate(d => addDays(d, dir));
-  }
-
   function handleSwipeWeek(dir: 1 | -1) {
     setSelectedDate(d => addDays(d, dir * 7));
   }
@@ -227,22 +226,46 @@ function CalendarContent() {
       />
 
       <View style={styles.gridContainer}>
-        <TimeGrid
-          events={frozenEventsRef.current ?? events}
-          getStatus={getStatus}
-          onEventPress={handleEventPress}
-          onToggleComplete={toggleComplete}
-          onTapEmpty={handleTapEmpty}
-          onSwipeDay={handleSwipeDay}
-          onDragStart={handleDragStart}
-          onDragMove={moveDrag}
-          onDragEnd={handleDragDrop}
-          onDragCancel={handleDragCancel}
-          dragHoverY={dragActive ? ghostY : null}
-          dragEventHeight={dragActive && dragEvent ? Math.max(eventHeight(dragEvent.startTime, dragEvent.endTime) - 1, 24) : undefined}
-          gridStartHour={settings.gridStartHour}
-          gridEndHour={settings.gridEndHour}
-          isToday={isToday}
+        <DayPager
+          selectedDate={selectedDate}
+          onChangeDate={(dir) => setSelectedDate(d => addDays(d, dir))}
+          scrollEnabled={!dragActive}
+          renderDay={(ds, role) => {
+            if (role === 'current') {
+              return (
+                <TimeGrid
+                  events={frozenEventsRef.current ?? events}
+                  getStatus={getStatus}
+                  onEventPress={handleEventPress}
+                  onToggleComplete={toggleComplete}
+                  onTapEmpty={handleTapEmpty}
+                  onDragStart={handleDragStart}
+                  onDragMove={moveDrag}
+                  onDragEnd={handleDragDrop}
+                  onDragCancel={handleDragCancel}
+                  dragHoverY={dragActive ? ghostY : null}
+                  dragEventHeight={dragActive && dragEvent ? Math.max(eventHeight(dragEvent.startTime, dragEvent.endTime) - 1, 24) : undefined}
+                  gridStartHour={settings.gridStartHour}
+                  gridEndHour={settings.gridEndHour}
+                  isToday={isToday}
+                  initialScrollY={syncScrollY}
+                  onScrollSettle={setSyncScrollY}
+                />
+              );
+            }
+            return (
+              <TimeGrid
+                events={getForDate(ds)}
+                getStatus={getStatus}
+                onTapEmpty={() => {}}
+                gridStartHour={settings.gridStartHour}
+                gridEndHour={settings.gridEndHour}
+                isToday={ds === format(new Date(), 'yyyy-MM-dd')}
+                initialScrollY={syncScrollY}
+                syncScrollY={syncScrollY}
+              />
+            );
+          }}
         />
       </View>
 

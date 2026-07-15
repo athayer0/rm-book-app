@@ -2,10 +2,10 @@ FEATURES
 
 [ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts
 [ ] save recent convert info on where they are on the covenant path
-[ ] figure out people section
 [ ] daily review
-[ ] be able to pinch 
+[ ] be able to pinch, or add small, medium, large options in terms of zoom
 [ ] tasks with the checkbox and get crossed out
+[ ] make friends and districts, be able to view each others KIs
 
 
 BUGS
