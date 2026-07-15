@@ -1,8 +1,13 @@
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { ScrollView, View, Dimensions, StyleSheet, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { format, addDays } from 'date-fns';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+// After a committed swipe settles, keep the day grid frozen for this long so a rapid
+// re-swipe can't move it (matches the pager's commit → recenter cadence, the real load limiter).
+const SWIPE_COOLDOWN_MS = 250;
+// Fallback unlock if onMomentumScrollEnd never fires after a drag (e.g. zero-velocity release).
+const LOCK_SAFETY_MS = 600;
 
 type Role = 'prev' | 'current' | 'next';
 
@@ -25,6 +30,24 @@ interface Props {
  */
 export function DayPager({ selectedDate, onChangeDate, scrollEnabled = true, renderDay }: Props) {
   const pagerRef = useRef<ScrollView>(null);
+  const [locked, setLocked] = useState(false);
+  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearTimers() {
+    if (lockTimerRef.current) { clearTimeout(lockTimerRef.current); lockTimerRef.current = null; }
+    if (safetyTimerRef.current) { clearTimeout(safetyTimerRef.current); safetyTimerRef.current = null; }
+  }
+
+  useEffect(() => clearTimers, []);
+
+  // Finger lifted: freeze the grid immediately (overlay) so a fast re-swipe can't grab the
+  // still-settling pager. onMomentumScrollEnd will decide when to unlock.
+  function handleScrollEndDrag() {
+    setLocked(true);
+    if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
+    safetyTimerRef.current = setTimeout(() => setLocked(false), LOCK_SAFETY_MS);
+  }
 
   const prevStr = format(addDays(selectedDate, -1), 'yyyy-MM-dd');
   const currStr = format(selectedDate, 'yyyy-MM-dd');
@@ -41,37 +64,60 @@ export function DayPager({ selectedDate, onChangeDate, scrollEnabled = true, ren
   }, [selectedDate]);
 
   function handleEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (safetyTimerRef.current) { clearTimeout(safetyTimerRef.current); safetyTimerRef.current = null; }
     const x = e.nativeEvent.contentOffset.x;
-    if (x <= SCREEN_WIDTH * 0.5) {
-      onChangeDate(-1);
-    } else if (x >= SCREEN_WIDTH * 1.5) {
-      onChangeDate(1);
+    const committed = x <= SCREEN_WIDTH * 0.5 || x >= SCREEN_WIDTH * 1.5;
+    if (committed) {
+      onChangeDate(x <= SCREEN_WIDTH * 0.5 ? -1 : 1);
+      // Hold the freeze for the cooldown, timed from the moment the page settles.
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+      lockTimerRef.current = setTimeout(() => setLocked(false), SWIPE_COOLDOWN_MS);
+    } else {
+      // Settled back on the center page: no day change, release immediately.
+      clearTimers();
+      setLocked(false);
     }
-    // Settled back on the center page: nothing to do.
   }
 
   return (
-    <ScrollView
-      ref={pagerRef}
-      horizontal
-      pagingEnabled
-      scrollEnabled={scrollEnabled}
-      showsHorizontalScrollIndicator={false}
-      directionalLockEnabled
-      disableIntervalMomentum
-      contentOffset={{ x: SCREEN_WIDTH, y: 0 }}
-      onLayout={() => recenter(false)}
-      onMomentumScrollEnd={handleEnd}
-      style={styles.pager}
-    >
-      <View style={styles.page}>{renderDay(prevStr, 'prev')}</View>
-      <View style={styles.page}>{renderDay(currStr, 'current')}</View>
-      <View style={styles.page}>{renderDay(nextStr, 'next')}</View>
-    </ScrollView>
+    <View style={styles.container}>
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        scrollEnabled={scrollEnabled}
+        showsHorizontalScrollIndicator={false}
+        directionalLockEnabled
+        disableIntervalMomentum
+        contentOffset={{ x: SCREEN_WIDTH, y: 0 }}
+        onLayout={() => recenter(false)}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollEnd={handleEnd}
+        style={styles.pager}
+      >
+        <View style={styles.page}>{renderDay(prevStr, 'prev')}</View>
+        <View style={styles.page}>{renderDay(currStr, 'current')}</View>
+        <View style={styles.page}>{renderDay(nextStr, 'next')}</View>
+      </ScrollView>
+
+      {/* While frozen, this overlay captures every touch so nothing in the grid moves.
+          It only blocks touches — the native snap and imperative recenter continue underneath. */}
+      {locked && (
+        <View
+          style={StyleSheet.absoluteFill}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
   pager: {
     flex: 1,
   },
