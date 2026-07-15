@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Animated,
+  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,17 +40,12 @@ function CalendarContent() {
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
-  const isAnimatingRef = useRef(false);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [headerBottom, setHeaderBottom] = useState(60);
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
-  const prevDateStr = format(addDays(selectedDate, -1), 'yyyy-MM-dd');
-  const nextDateStr = format(addDays(selectedDate,  1), 'yyyy-MM-dd');
-  const events     = getForDate(dateStr);
-  const prevEvents = getForDate(prevDateStr);
-  const nextEvents = getForDate(nextDateStr);
+  const events = getForDate(dateStr);
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
 
   if (dragActive && frozenEventsRef.current !== null && frozenDateRef.current !== dateStr) {
@@ -62,36 +57,9 @@ function CalendarContent() {
     frozenDateRef.current = dateStr;
   }
 
-  const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
-  const [currentScrollY, setCurrentScrollY] = useState(0);
-  const [committedDate, setCommittedDate] = useState(new Date());
-  const pendingResetRef = useRef(false);
-
-  useEffect(() => {
-    setCommittedDate(selectedDate);
-  }, [selectedDate]);
-
   useEffect(() => {
     if (!showMonthPicker) setPickerMonth(selectedDate);
   }, [selectedDate]);
-
-  useLayoutEffect(() => {
-    if (pendingResetRef.current) {
-      pendingResetRef.current = false;
-      translateX.setValue(-SCREEN_WIDTH);
-    }
-  }, [selectedDate]);
-
-  useEffect(() => {
-    if (dragActive) {
-      Animated.spring(translateX, {
-        toValue: -SCREEN_WIDTH,
-        useNativeDriver: true,
-        tension: 40,
-        friction: 8,
-      }).start();
-    }
-  }, [dragActive]);
 
   const goToToday = useCallback(() => setSelectedDate(new Date()), []);
   const edgeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -195,36 +163,8 @@ function CalendarContent() {
     endDrag();
   }
 
-  function handleSwipeProgress(x: number) {
-    if (isAnimatingRef.current) return;
-    translateX.setValue(-SCREEN_WIDTH + x);
-  }
-
-  function handleSwipeCancel() {
-    if (isAnimatingRef.current) return;
-    Animated.spring(translateX, {
-      toValue: -SCREEN_WIDTH,
-      useNativeDriver: true,
-      tension: 180,
-      friction: 24,
-    }).start();
-  }
-
   function handleSwipeDay(dir: 1 | -1) {
-    if (isAnimatingRef.current) return;
-    isAnimatingRef.current = true;
-    setCommittedDate(d => addDays(d, dir));
-    const target = dir === 1 ? -SCREEN_WIDTH * 2 : 0;
-    Animated.spring(translateX, {
-      toValue: target,
-      useNativeDriver: true,
-      tension: 180,
-      friction: 24,
-    }).start(() => {
-      isAnimatingRef.current = false;
-      pendingResetRef.current = true;
-      setSelectedDate(d => addDays(d, dir));
-    });
+    setSelectedDate(d => addDays(d, dir));
   }
 
   function handleSwipeWeek(dir: 1 | -1) {
@@ -260,8 +200,8 @@ function CalendarContent() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header} onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerDate}>{format(committedDate, 'MMM d')}</Text>
-          <Text style={styles.headerYear}>{format(committedDate, 'yyyy')}</Text>
+          <Text style={styles.headerDate}>{format(selectedDate, 'MMM d')}</Text>
+          <Text style={styles.headerYear}>{format(selectedDate, 'yyyy')}</Text>
           <TouchableOpacity onPress={() => setShowMonthPicker(v => !v)} style={styles.chevronBtn}>
             <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
@@ -280,69 +220,30 @@ function CalendarContent() {
       </View>
 
       <WeekStrip
-        selectedDate={committedDate}
+        selectedDate={selectedDate}
         weekStart={settings.weekStart}
         onSelectDate={setSelectedDate}
         onSwipeWeek={handleSwipeWeek}
       />
 
       <View style={styles.gridContainer}>
-        <Animated.View style={[styles.gridRow, { transform: [{ translateX }] }]}>
-          <View style={{ width: SCREEN_WIDTH }}>
-            <TimeGrid
-              events={prevEvents}
-              getStatus={getStatus}
-              onTapEmpty={() => {}}
-              onSwipeDay={handleSwipeDay}
-              onSwipeProgress={handleSwipeProgress}
-              onSwipeCancel={handleSwipeCancel}
-              dragActive={dragActive}
-              initialScrollY={currentScrollY}
-              restoreKey={prevDateStr}
-              gridStartHour={settings.gridStartHour}
-              gridEndHour={settings.gridEndHour}
-            />
-          </View>
-          <View style={{ width: SCREEN_WIDTH }}>
-            <TimeGrid
-              events={frozenEventsRef.current ?? events}
-              getStatus={getStatus}
-              onEventPress={handleEventPress}
-              onToggleComplete={toggleComplete}
-              onTapEmpty={handleTapEmpty}
-              onSwipeDay={handleSwipeDay}
-              onSwipeProgress={handleSwipeProgress}
-              onSwipeCancel={handleSwipeCancel}
-              onDragStart={handleDragStart}
-              onDragMove={moveDrag}
-              onDragEnd={handleDragDrop}
-              onDragCancel={handleDragCancel}
-              dragHoverY={dragActive ? ghostY : null}
-              dragEventHeight={dragActive && dragEvent ? Math.max(eventHeight(dragEvent.startTime, dragEvent.endTime) - 1, 24) : undefined}
-              initialScrollY={currentScrollY}
-              restoreKey={dateStr}
-              onScrollChange={setCurrentScrollY}
-              gridStartHour={settings.gridStartHour}
-              gridEndHour={settings.gridEndHour}
-              isToday={isToday}
-            />
-          </View>
-          <View style={{ width: SCREEN_WIDTH }}>
-            <TimeGrid
-              events={nextEvents}
-              getStatus={getStatus}
-              onTapEmpty={() => {}}
-              onSwipeDay={handleSwipeDay}
-              onSwipeProgress={handleSwipeProgress}
-              onSwipeCancel={handleSwipeCancel}
-              dragActive={dragActive}
-              initialScrollY={currentScrollY}
-              restoreKey={nextDateStr}
-              gridStartHour={settings.gridStartHour}
-              gridEndHour={settings.gridEndHour}
-            />
-          </View>
-        </Animated.View>
+        <TimeGrid
+          events={frozenEventsRef.current ?? events}
+          getStatus={getStatus}
+          onEventPress={handleEventPress}
+          onToggleComplete={toggleComplete}
+          onTapEmpty={handleTapEmpty}
+          onSwipeDay={handleSwipeDay}
+          onDragStart={handleDragStart}
+          onDragMove={moveDrag}
+          onDragEnd={handleDragDrop}
+          onDragCancel={handleDragCancel}
+          dragHoverY={dragActive ? ghostY : null}
+          dragEventHeight={dragActive && dragEvent ? Math.max(eventHeight(dragEvent.startTime, dragEvent.endTime) - 1, 24) : undefined}
+          gridStartHour={settings.gridStartHour}
+          gridEndHour={settings.gridEndHour}
+          isToday={isToday}
+        />
       </View>
 
       {dragActive && dragEvent && (
@@ -551,13 +452,7 @@ function makeStyles(C: ColorPalette) {
     },
     gridContainer: {
       flex: 1,
-      overflow: 'hidden',
       backgroundColor: C.card,
-    },
-    gridRow: {
-      flex: 1,
-      flexDirection: 'row',
-      width: SCREEN_WIDTH * 3,
     },
     ghostOverlay: {
       position: 'absolute',

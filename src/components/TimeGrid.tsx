@@ -19,8 +19,6 @@ interface Props {
   onToggleComplete?: (id: string) => void;
   onTapEmpty: (timeStr: string) => void;
   onSwipeDay: (dir: 1 | -1) => void;
-  onSwipeProgress?: (x: number) => void;
-  onSwipeCancel?: () => void;
   onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
   dragEventHeight?: number;
   onDragMove?: (x: number, y: number) => void;
@@ -30,9 +28,6 @@ interface Props {
   dragActive?: boolean;
   gridStartHour?: number;
   gridEndHour?: number;
-  initialScrollY?: number;
-  restoreKey?: string;
-  onScrollChange?: (y: number) => void;
   getStatus?: (eventId: string, dateStr: string) => EventStatus | undefined;
   isToday?: boolean;
 }
@@ -43,7 +38,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, dragEventHeight, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus, isToday = false }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, dragEventHeight, gridStartHour = 6, gridEndHour = 22, getStatus, isToday = false }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
@@ -78,14 +73,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     }, 60000);
     return () => clearInterval(interval);
   }, [isToday]);
-
-  useEffect(() => {
-    if (initialScrollY != null && initialScrollY > 0) {
-      requestAnimationFrame(() => {
-        scrollViewRef.current?.scrollTo({ y: initialScrollY, animated: false });
-      });
-    }
-  }, [restoreKey]);
 
   const dragSlot = dragHoverY != null
     ? Math.max(0, Math.floor((dragHoverY - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT))
@@ -124,14 +111,9 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     .failOffsetY([-15, 15])
     .enabled(!dragActive)
     .runOnJS(true)
-    .onUpdate((e) => {
-      onSwipeProgress?.(e.translationX);
-    })
     .onEnd((e) => {
       if (Math.abs(e.translationX) > 60) {
         onSwipeDay(e.translationX < 0 ? 1 : -1);
-      } else {
-        onSwipeCancel?.();
       }
     });
 
@@ -153,7 +135,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
         scrollEventThrottle={16}
         onScroll={(e) => {
           scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
-          onScrollChange?.(e.nativeEvent.contentOffset.y);
         }}
       >
         <View style={styles.grid}>
