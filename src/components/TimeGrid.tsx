@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useReducer } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -12,6 +12,10 @@ import { Svg, Polygon } from 'react-native-svg';
 const SLOT_HEIGHT = 50;
 const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 const TIME_COL_WIDTH = 52;
+const VERTICAL_EDGE_ZONE = 70;
+const AUTOSCROLL_TICK_MS = 30;
+const AUTOSCROLL_MIN_SPEED = 100; // px/sec, right at the zone boundary
+const AUTOSCROLL_MAX_SPEED = 550; // px/sec, at the very edge
 
 interface Props {
   events: CalendarEvent[];
@@ -48,13 +52,55 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const scrollViewRef = useRef<ScrollView>(null);
   const gridRef = useRef<ViewType>(null);
   const gridTopAbsoluteRef = useRef(0);
+  const viewportTopRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const dragHoverYRef = useRef<number | null>(null);
+  const [, forceRerender] = useReducer((n) => n + 1, 0);
 
   function measureGridTop() {
     gridRef.current?.measure((_x, _y, _w, _h, _pageX, pageY) => {
       gridTopAbsoluteRef.current = pageY;
     });
   }
+
+  function measureViewport() {
+    (scrollViewRef.current as unknown as ViewType | null)?.measure((_x: number, _y: number, _w: number, h: number, _pageX: number, pageY: number) => {
+      viewportTopRef.current = pageY;
+      viewportHeightRef.current = h;
+    });
+  }
   const [pressedSlot, setPressedSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    dragHoverYRef.current = dragHoverY ?? null;
+  }, [dragHoverY]);
+
+  function getVerticalEdgeZone(): 'top' | 'bottom' | null {
+    if (dragHoverY == null) return null;
+    if (dragHoverY < viewportTopRef.current + VERTICAL_EDGE_ZONE) return 'top';
+    if (dragHoverY > viewportTopRef.current + viewportHeightRef.current - VERTICAL_EDGE_ZONE) return 'bottom';
+    return null;
+  }
+  const verticalEdgeZone = getVerticalEdgeZone();
+
+  useEffect(() => {
+    if (verticalEdgeZone === null) return;
+    const interval = setInterval(() => {
+      const y = dragHoverYRef.current;
+      if (y == null) return;
+      const dir = verticalEdgeZone === 'top' ? -1 : 1;
+      const distanceIntoZone = verticalEdgeZone === 'top'
+        ? VERTICAL_EDGE_ZONE - (y - viewportTopRef.current)
+        : VERTICAL_EDGE_ZONE - (viewportTopRef.current + viewportHeightRef.current - y);
+      const proximity = Math.min(1, Math.max(0, distanceIntoZone / VERTICAL_EDGE_ZONE));
+      const speed = AUTOSCROLL_MIN_SPEED + proximity * (AUTOSCROLL_MAX_SPEED - AUTOSCROLL_MIN_SPEED);
+      const delta = dir * speed * (AUTOSCROLL_TICK_MS / 1000);
+      const target = Math.max(0, scrollOffsetRef.current + delta);
+      scrollViewRef.current?.scrollTo({ y: target, animated: false });
+      forceRerender();
+    }, AUTOSCROLL_TICK_MS);
+    return () => clearInterval(interval);
+  }, [verticalEdgeZone]);
 
   useEffect(() => {
     if (dragHoverY != null) setPressedSlot(null);
@@ -133,6 +179,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
+        onLayout={measureViewport}
         onScroll={(e) => {
           scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
         }}

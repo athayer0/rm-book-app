@@ -10,5 +10,5 @@ FEATURES
 
 BUGS
 
-[ ]make it so i can scroll even if my finger starts on an event
+[x] make it so i can scroll even if my finger starts on an event
 [ ] remove swiping animation when moving between apps to see if that removes the glitchiness of it. tapping the arrows is clean and doesn't have errors
