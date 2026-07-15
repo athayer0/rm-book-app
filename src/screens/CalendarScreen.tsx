@@ -252,7 +252,7 @@ function CalendarContent() {
           pointerEvents="none"
         >
           <View style={[styles.ghostBlock, { backgroundColor: Colors.card, borderLeftColor: dragEvent.color, height: ghostHeight }]}>
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '35' }]} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '55' }]} />
             <Text style={[styles.ghostTitle, { color: Colors.text }]} numberOfLines={1}>{dragEvent.title}</Text>
           </View>
         </View>
