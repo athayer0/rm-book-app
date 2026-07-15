@@ -5,6 +5,8 @@ import {
 import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
+import { useIsDark } from '../hooks/useIsDark';
+import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { KIIcon } from './KIIcon';
@@ -30,6 +32,7 @@ const N_WEEKS = 6;
 
 export function KIGraphTab({ definitions }: Props) {
   const Colors = useColors();
+  const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { getWeekData } = useWeeklyIndicators();
@@ -120,8 +123,8 @@ export function KIGraphTab({ definitions }: Props) {
           activeOpacity={0.8}
         >
           {selectedDef && (
-            <View style={[styles.dropIconBadge, { backgroundColor: selectedDef.color + '20' }]}>
-              <KIIcon icon={selectedDef.icon} iconFamily={selectedDef.iconFamily} size={16} color={selectedDef.color} />
+            <View style={[styles.dropIconBadge, { backgroundColor: isDark ? selectedDef.color : selectedDef.color + '20' }]}>
+              <KIIcon icon={selectedDef.icon} iconFamily={selectedDef.iconFamily} size={16} color={isDark ? lightenColor(selectedDef.color) : selectedDef.color} />
             </View>
           )}
           <Text style={styles.dropLabel} numberOfLines={1}>
@@ -142,8 +145,8 @@ export function KIGraphTab({ definitions }: Props) {
                 style={[styles.dropItem, def.id === selectedId && styles.dropItemActive]}
                 onPress={() => { setSelectedId(def.id); setDropdownOpen(false); }}
               >
-                <View style={[styles.dropIconBadge, { backgroundColor: def.color + '20' }]}>
-                  <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={15} color={def.color} />
+                <View style={[styles.dropIconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
+                  <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={15} color={isDark ? lightenColor(def.color) : def.color} />
                 </View>
                 <Text style={[styles.dropItemText, def.id === selectedId && { color: Colors.primary, fontWeight: '600' }]}
                   numberOfLines={1}>

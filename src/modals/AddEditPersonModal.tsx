@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
+import { PERSON_STATUSES, STATUS_OPTIONS, statusDisplayName } from '../constants/personStatuses';
+import { StatusIcon } from '../components/StatusIcon';
 
 interface Props {
   visible: boolean;
@@ -16,14 +18,12 @@ interface Props {
   onClose: () => void;
 }
 
-const STATUS_OPTIONS = ['Friend', 'Dating', 'Fellowship Contact', 'Family', 'Other'];
-
 export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const [name, setName] = useState('');
-  const [status, setStatus] = useState('Friend');
+  const [status, setStatus] = useState('Other');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [starred, setStarred] = useState(false);
@@ -38,7 +38,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setStarred(person.starred);
     } else {
       setName('');
-      setStatus('Friend');
+      setStatus('Other');
       setPhone('');
       setNotes('');
       setStarred(false);
@@ -79,23 +79,43 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           <View style={styles.section}>
             <Text style={styles.label}>Status</Text>
             <TouchableOpacity style={styles.picker} onPress={() => setShowStatusPicker(!showStatusPicker)}>
-              <Text style={styles.pickerText}>{status}</Text>
+              {PERSON_STATUSES[status] && (
+                <StatusIcon config={PERSON_STATUSES[status]} size={14} style={{ marginRight: 6 }} />
+              )}
+              <Text style={styles.pickerText}>{statusDisplayName(status)}</Text>
               <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
             </TouchableOpacity>
             {showStatusPicker && (
               <View style={styles.dropdown}>
-                {STATUS_OPTIONS.map(s => (
-                  <TouchableOpacity
-                    key={s}
-                    style={styles.dropdownItem}
-                    onPress={() => { setStatus(s); setShowStatusPicker(false); }}
-                  >
-                    <Text style={styles.dropdownText}>{s}</Text>
-                    {status === s && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                  </TouchableOpacity>
-                ))}
+                {STATUS_OPTIONS.map(s => {
+                  const cfg = PERSON_STATUSES[s];
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      style={styles.dropdownItem}
+                      onPress={() => { setStatus(s); setShowStatusPicker(false); }}
+                    >
+                      <StatusIcon config={cfg} size={14} style={{ marginRight: 8 }} />
+                      <Text style={styles.dropdownText}>{statusDisplayName(s)}</Text>
+                      {status === s && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.starRow} onPress={() => setStarred(!starred)}>
+              <Ionicons
+                name={starred ? 'star' : 'star-outline'}
+                size={20}
+                color={starred ? '#E8980E' : Colors.textLight}
+              />
+              <Text style={styles.starText}>
+                {starred ? 'Favorited' : 'Mark as favorite'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.section}>
@@ -121,19 +141,6 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               multiline
               numberOfLines={4}
             />
-          </View>
-
-          <View style={styles.section}>
-            <TouchableOpacity style={styles.starRow} onPress={() => setStarred(!starred)}>
-              <Ionicons
-                name={starred ? 'star' : 'star-outline'}
-                size={20}
-                color={starred ? '#E8980E' : Colors.textLight}
-              />
-              <Text style={styles.starText}>
-                {starred ? 'Favorited' : 'Mark as favorite'}
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {person && onDelete && (

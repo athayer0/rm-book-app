@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Switch, Alert,
+  SafeAreaView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -173,28 +173,6 @@ export function SettingsScreen() {
                     )}
                   </TouchableOpacity>
                 ))}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Daily Reminder</Text>
-              <Switch
-                value={settings.reminderEnabled}
-                onValueChange={v => updateSettings({ reminderEnabled: v })}
-                trackColor={{ true: Colors.accent }}
-                thumbColor={Colors.white}
-              />
-            </View>
-            {settings.reminderEnabled && (
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Reminder Time</Text>
-                <Text style={styles.rowValue}>{settings.reminderTime}</Text>
               </View>
             )}
           </View>
@@ -407,8 +385,12 @@ function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.primary },
     header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: 10,
+      minHeight: 60,
       backgroundColor: C.primary,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },

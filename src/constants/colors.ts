@@ -21,6 +21,11 @@ export const LightColors = {
   weekStripBgAlt: '#D8D8D8',
   selectedDayBg: '#D4E8F5',
   selectedDayBorder: '#253960',
+  filterDropdownBg: '#FFFFFF',
+  rowPressedBg: 'rgba(160,160,160,0.2)',
+  weekNavChevron: '#000000',
+  kiNumberText: '#000000',
+  statusOtherColor: '#000000',
 };
 
 export const DarkColors: typeof LightColors = {
@@ -46,6 +51,11 @@ export const DarkColors: typeof LightColors = {
   weekStripBgAlt: '#141414',
   selectedDayBg: '#263040',
   selectedDayBorder: '#8AAFC8',
+  filterDropdownBg: '#000000',
+  rowPressedBg: 'rgba(160,160,160,0.2)',
+  weekNavChevron: '#F0F0F0',
+  kiNumberText: '#FFFFFF',
+  statusOtherColor: '#FFFFFF',
 };
 
 export const Colors = LightColors;

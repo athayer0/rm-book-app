@@ -7,6 +7,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { KIIcon } from '../components/KIIcon';
 import { useColors } from '../hooks/useColors';
+import { useIsDark } from '../hooks/useIsDark';
+import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { IndicatorGrid } from '../components/IndicatorGrid';
@@ -18,6 +20,7 @@ import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
 
 export function GoalsScreen() {
   const Colors = useColors();
+  const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
@@ -108,8 +111,8 @@ export function GoalsScreen() {
                       color={def.visible ? Colors.accent : Colors.textLight}
                     />
                   </TouchableOpacity>
-                  <View style={[styles.iconBadge, { backgroundColor: def.color + '20' }]}>
-                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={def.color} />
+                  <View style={[styles.iconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
+                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
                   <Text style={styles.editLabel} numberOfLines={1}>{def.label}</Text>
                   <Text style={styles.editGoalLabel}>Goal:</Text>
@@ -170,7 +173,7 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: 10,
       backgroundColor: C.primary,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },

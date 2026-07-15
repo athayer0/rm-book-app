@@ -447,6 +447,7 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 10,
+      minHeight: 60,
       backgroundColor: C.primary,
     },
     headerLeft: {
@@ -455,7 +456,7 @@ function makeStyles(C: ColorPalette) {
       gap: 6,
     },
     headerDate: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: '700',
       color: C.white,
     },

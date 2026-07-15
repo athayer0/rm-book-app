@@ -20,11 +20,14 @@ export function usePeople() {
   const { user } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
 
-  useEffect(() => {
-    getItem<Person[]>('people').then(stored => {
-      if (stored) setPeople(stored);
-    });
+  const reload = useCallback(async () => {
+    const stored = await getItem<Person[]>('people');
+    if (stored) setPeople(stored);
   }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const addPerson = useCallback(async (person: Omit<Person, 'id' | 'createdAt'>) => {
     const newPerson: Person = {
@@ -62,5 +65,5 @@ export function usePeople() {
     if (user && row) await enqueue({ table: 'people', type: 'upsert', row: { ...row, user_id: user.id, updated_at: new Date().toISOString() } });
   }, [people, user]);
 
-  return { people, addPerson, updatePerson, deletePerson, toggleStar };
+  return { people, addPerson, updatePerson, deletePerson, toggleStar, reload };
 }

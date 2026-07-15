@@ -13,31 +13,39 @@ import { SectionHeader } from '../components/SectionHeader';
 import { PersonCard } from '../components/PersonCard';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
 import { KIWeeklyModal } from '../modals/KIWeeklyModal';
+import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { getWeekKey } from '../utils/dateUtils';
+import { Person } from '../hooks/usePeople';
 
 export function HomeScreen({ navigation }: any) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
+  const { people, updatePerson, deletePerson, reload: reloadPeople } = usePeople();
 
-  useFocusEffect(useCallback(() => { reload(); }, [reload]));
-  const { people, toggleStar } = usePeople();
+  useFocusEffect(useCallback(() => { reload(); reloadPeople(); }, [reload, reloadPeople]));
   const [editVisible, setEditVisible] = useState(false);
   const [planningVisible, setPlanningVisible] = useState(false);
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  const [personModalVisible, setPersonModalVisible] = useState(false);
 
   const weekLabel = getWeekKey();
-  const featuredPeople = people
-    .sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0))
-    .slice(0, 3);
+  const featuredPeople = people.filter(p => p.starred);
+
+  function handlePersonPress(person: Person) {
+    setEditingPerson(person);
+    setPersonModalVisible(true);
+  }
+
+  async function handlePersonSave(personData: Omit<Person, 'id' | 'createdAt'>) {
+    if (editingPerson) await updatePerson(editingPerson.id, personData);
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Home</Text>
-        <View style={styles.headerRight}>
-          <Ionicons name="notifications-outline" size={24} color={Colors.white} />
-        </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -61,27 +69,23 @@ export function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.card}>
-          <SectionHeader
-            title="Progressing People"
-            actionLabel="VIEW ALL"
-            onAction={() => navigation.navigate('People')}
-          />
+          <SectionHeader title="Favorites" />
           {featuredPeople.length === 0 ? (
             <View style={styles.emptyPeople}>
               <Ionicons name="people-outline" size={32} color={Colors.textLight} />
-              <Text style={styles.emptyText}>No people added yet</Text>
+              <Text style={styles.emptyText}>No favorites yet</Text>
               <TouchableOpacity onPress={() => navigation.navigate('People')}>
-                <Text style={styles.emptyAction}>Add someone</Text>
+                <Text style={styles.emptyAction}>Star someone to see them here</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.peopleList}>
-              {featuredPeople.map(person => (
+              {featuredPeople.map((person, index) => (
                 <PersonCard
                   key={person.id}
                   person={person}
-                  onPress={() => navigation.navigate('People')}
-                  onToggleStar={() => toggleStar(person.id)}
+                  onPress={() => handlePersonPress(person)}
+                  isFirst={index === 0}
                 />
               ))}
             </View>
@@ -103,6 +107,14 @@ export function HomeScreen({ navigation }: any) {
         onClose={() => setPlanningVisible(false)}
         definitions={definitions}
       />
+
+      <AddEditPersonModal
+        visible={personModalVisible}
+        person={editingPerson}
+        onSave={handlePersonSave}
+        onDelete={(id) => { deletePerson(id); setPersonModalVisible(false); }}
+        onClose={() => setPersonModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -118,17 +130,14 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: 10,
+      minHeight: 60,
       backgroundColor: C.primary,
     },
     headerTitle: {
       fontSize: 20,
       fontWeight: '700',
       color: C.white,
-    },
-    headerRight: {
-      flexDirection: 'row',
-      gap: 16,
     },
     scroll: {
       flex: 1,

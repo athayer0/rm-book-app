@@ -4,8 +4,6 @@ import { getItem, setItem } from '../utils/storage';
 export interface AppSettings {
   weekStart: 'sunday' | 'monday';
   theme: 'light' | 'dark' | 'system';
-  reminderEnabled: boolean;
-  reminderTime: string;
   eventTypeColors: Record<string, string>;
   eventTypeDefaultMinutes: Record<string, number>;
   gridStartHour: number;
@@ -15,8 +13,6 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   weekStart: 'monday',
   theme: 'light',
-  reminderEnabled: false,
-  reminderTime: '8:00 AM',
   eventTypeColors: {},
   eventTypeDefaultMinutes: {},
   gridStartHour: 6,

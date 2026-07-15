@@ -4,6 +4,8 @@ import {
   StyleSheet, TextInput,
 } from 'react-native';
 import { useColors } from '../hooks/useColors';
+import { useIsDark } from '../hooks/useIsDark';
+import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
@@ -53,6 +55,7 @@ interface Props {
 
 export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDefinitions }: Props) {
   const Colors = useColors();
+  const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const [localDefs, setLocalDefs] = useState<IndicatorDefinition[]>(definitions);
@@ -121,8 +124,8 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
               key={def.id}
               style={[styles.kiRow, index === localDefs.length - 1 && styles.kiRowLast]}
             >
-              <View style={[styles.kiIcon, { backgroundColor: def.color + '20' }]}>
-                <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={def.color} />
+              <View style={[styles.kiIcon, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
+                <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={isDark ? lightenColor(def.color) : def.color} />
               </View>
               <Text style={styles.kiLabel} numberOfLines={1}>{def.label}</Text>
               {def.builtIn ? (
@@ -201,8 +204,8 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
 
           {newName.trim() ? (
             <View style={styles.previewRow}>
-              <View style={[styles.kiIcon, { backgroundColor: selectedColor + '20' }]}>
-                <KIIcon icon={selectedIconOpt.name} iconFamily={selectedIconOpt.family} size={20} color={selectedColor} />
+              <View style={[styles.kiIcon, { backgroundColor: isDark ? selectedColor : selectedColor + '20' }]}>
+                <KIIcon icon={selectedIconOpt.name} iconFamily={selectedIconOpt.family} size={20} color={isDark ? lightenColor(selectedColor) : selectedColor} />
               </View>
               <Text style={[styles.previewLabel, { color: selectedColor }]}>{newName.trim()}</Text>
             </View>

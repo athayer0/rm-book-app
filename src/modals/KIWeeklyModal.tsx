@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
+import { useIsDark } from '../hooks/useIsDark';
+import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
@@ -34,6 +36,7 @@ interface Props {
 
 export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
   const Colors = useColors();
+  const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { getWeekData, saveCountForWeek, saveGoalForWeek } = useWeeklyIndicators();
@@ -179,7 +182,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
               style={[styles.arrowBtn, weekOffset <= MIN_OFFSET && styles.arrowDisabled]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-back" size={20} color={weekOffset <= MIN_OFFSET ? Colors.textLight : Colors.text} />
+              <Ionicons name="chevron-back" size={20} color={weekOffset <= MIN_OFFSET ? Colors.textLight : Colors.weekNavChevron} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleNext}
@@ -187,7 +190,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
               style={[styles.arrowBtn, weekOffset >= MAX_OFFSET && styles.arrowDisabled]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-forward" size={20} color={weekOffset >= MAX_OFFSET ? Colors.textLight : Colors.text} />
+              <Ionicons name="chevron-forward" size={20} color={weekOffset >= MAX_OFFSET ? Colors.textLight : Colors.weekNavChevron} />
             </TouchableOpacity>
           </View>
         </View>
@@ -201,15 +204,14 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           <View style={styles.kiCard}>
             {visibleDefs.map((def, index) => {
               const row = rowData[def.id] ?? { actual: 0, goal: def.goal };
-              const goalReached = row.actual >= row.goal;
 
               return (
                 <View
                   key={def.id}
                   style={[styles.kiRow, index === visibleDefs.length - 1 && styles.kiRowLast]}
                 >
-                  <View style={[styles.iconBadge, { backgroundColor: def.color + '20' }]}>
-                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={def.color} />
+                  <View style={[styles.iconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
+                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
 
                   <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
@@ -220,10 +222,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
                     style={[styles.numBtn, isFuture && styles.numBtnDisabled]}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={[
-                      styles.numText,
-                      { color: isFuture ? Colors.textLight : (goalReached ? Colors.success : Colors.accent) },
-                    ]}>
+                    <Text style={[styles.numText, { color: Colors.kiNumberText }]}>
                       {row.actual}
                     </Text>
                   </TouchableOpacity>
@@ -235,7 +234,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
                     style={styles.numBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={[styles.numText, { color: Colors.textSecondary }]}>
+                    <Text style={[styles.numText, { color: Colors.kiNumberText }]}>
                       {row.goal}
                     </Text>
                   </TouchableOpacity>
@@ -350,8 +349,6 @@ function makeStyles(C: ColorPalette) {
     arrowBtn: {
       width: 36,
       height: 36,
-      borderRadius: 18,
-      backgroundColor: C.background,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -388,7 +385,7 @@ function makeStyles(C: ColorPalette) {
     },
     kiLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: C.text },
     numBtn: {
-      width: 36,
+      width: 26,
       height: 36,
       alignItems: 'center',
       justifyContent: 'center',
@@ -397,7 +394,7 @@ function makeStyles(C: ColorPalette) {
     },
     numBtnDisabled: { opacity: 0.45 },
     numText: { fontSize: 17, fontWeight: '700' },
-    divider: { fontSize: 16, color: C.textLight, width: 12, textAlign: 'center' },
+    divider: { fontSize: 26, color: C.kiNumberText, width: 14, textAlign: 'center', marginHorizontal: -6 },
     futureNote: {
       fontSize: 12,
       color: C.textLight,
