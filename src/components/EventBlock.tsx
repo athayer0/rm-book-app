@@ -53,8 +53,8 @@ export function EventBlock({
 
   const isDraggingRef = useRef(false);
 
-  const dragGesture = Gesture.LongPress()
-    .minDuration(400)
+  const dragPanGesture = Gesture.Pan()
+    .activateAfterLongPress(400)
     .runOnJS(true)
     .onStart((e) => {
       isDraggingRef.current = true;
@@ -62,27 +62,18 @@ export function EventBlock({
       const dragPixelWidth = columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH);
       onDragStart?.(event, e.absoluteX, e.absoluteY, dragPixelWidth, height);
     })
-    .simultaneousWithExternalGesture(Gesture.Pan());
-
-  const panGesture = Gesture.Pan()
-    .runOnJS(true)
     .onUpdate((e) => { if (isBeingDragged) onDragMove?.(e.absoluteX, e.absoluteY); })
     .onEnd((e) => { if (isBeingDragged) onDragEnd?.(e.absoluteX, e.absoluteY); })
     .onFinalize((_e, success) => {
-      if (!success && isDraggingRef.current) {
-        isDraggingRef.current = false;
-        onDragCancel?.();
-      }
+      if (!success && isDraggingRef.current) onDragCancel?.();
+      isDraggingRef.current = false;
     });
 
   const tapGesture = Gesture.Tap()
     .runOnJS(true)
     .onEnd((_e, success) => { if (success) onPress(); });
 
-  const composed = Gesture.Race(
-    Gesture.Simultaneous(dragGesture, panGesture),
-    tapGesture,
-  );
+  const composed = Gesture.Race(dragPanGesture, tapGesture);
 
   const stripeCount = Math.ceil(height / 7) + 4;
 

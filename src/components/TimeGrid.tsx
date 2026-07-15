@@ -1,6 +1,5 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useReducer } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, type View as ViewType } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -12,29 +11,32 @@ import { Svg, Polygon } from 'react-native-svg';
 const SLOT_HEIGHT = 50;
 const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 const TIME_COL_WIDTH = 52;
+const VERTICAL_EDGE_ZONE = 70;
+const AUTOSCROLL_TICK_MS = 30;
+const AUTOSCROLL_MIN_SPEED = 100; // px/sec, right at the zone boundary
+const AUTOSCROLL_MAX_SPEED = 550; // px/sec, at the very edge
 
 interface Props {
   events: CalendarEvent[];
   onEventPress?: (event: CalendarEvent) => void;
   onToggleComplete?: (id: string) => void;
   onTapEmpty: (timeStr: string) => void;
-  onSwipeDay: (dir: 1 | -1) => void;
-  onSwipeProgress?: (x: number) => void;
-  onSwipeCancel?: () => void;
   onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
   dragEventHeight?: number;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (absoluteY: number, gridTopY: number, scrollOffset: number) => void;
   onDragCancel?: () => void;
   dragHoverY?: number | null;
-  dragActive?: boolean;
   gridStartHour?: number;
   gridEndHour?: number;
-  initialScrollY?: number;
-  restoreKey?: string;
-  onScrollChange?: (y: number) => void;
   getStatus?: (eventId: string, dateStr: string) => EventStatus | undefined;
   isToday?: boolean;
+  // Shared vertical scroll: the center page publishes its offset via onScrollSettle;
+  // side pages adopt it via syncScrollY (and initialScrollY on first layout) so every
+  // day stays aligned to the same time-of-day.
+  initialScrollY?: number;
+  onScrollSettle?: (y: number) => void;
+  syncScrollY?: number;
 }
 
 function gridHourLabel(hour: number): string {
@@ -43,7 +45,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onSwipeDay, onSwipeProgress, onSwipeCancel, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragActive, dragEventHeight, gridStartHour = 6, gridEndHour = 22, initialScrollY, restoreKey, onScrollChange, getStatus, isToday = false }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragEventHeight, gridStartHour = 6, gridEndHour = 22, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
@@ -53,13 +55,71 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const scrollViewRef = useRef<ScrollView>(null);
   const gridRef = useRef<ViewType>(null);
   const gridTopAbsoluteRef = useRef(0);
+  const viewportTopRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const dragHoverYRef = useRef<number | null>(null);
+  const [, forceRerender] = useReducer((n) => n + 1, 0);
 
   function measureGridTop() {
     gridRef.current?.measure((_x, _y, _w, _h, _pageX, pageY) => {
       gridTopAbsoluteRef.current = pageY;
     });
   }
+
+  function measureViewport() {
+    (scrollViewRef.current as unknown as ViewType | null)?.measure((_x: number, _y: number, _w: number, h: number, _pageX: number, pageY: number) => {
+      viewportTopRef.current = pageY;
+      viewportHeightRef.current = h;
+    });
+  }
+
+  // Apply the shared vertical offset once, as soon as the ScrollView is laid out.
+  const didInitScrollRef = useRef(false);
+  function handleInitScroll() {
+    if (didInitScrollRef.current) return;
+    didInitScrollRef.current = true;
+    if (initialScrollY != null && initialScrollY > 0) {
+      scrollViewRef.current?.scrollTo({ y: initialScrollY, animated: false });
+    }
+  }
+
+  // Side pages adopt the center page's offset whenever it changes.
+  useEffect(() => {
+    if (syncScrollY == null) return;
+    scrollViewRef.current?.scrollTo({ y: syncScrollY, animated: false });
+  }, [syncScrollY]);
   const [pressedSlot, setPressedSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    dragHoverYRef.current = dragHoverY ?? null;
+  }, [dragHoverY]);
+
+  function getVerticalEdgeZone(): 'top' | 'bottom' | null {
+    if (dragHoverY == null) return null;
+    if (dragHoverY < viewportTopRef.current + VERTICAL_EDGE_ZONE) return 'top';
+    if (dragHoverY > viewportTopRef.current + viewportHeightRef.current - VERTICAL_EDGE_ZONE) return 'bottom';
+    return null;
+  }
+  const verticalEdgeZone = getVerticalEdgeZone();
+
+  useEffect(() => {
+    if (verticalEdgeZone === null) return;
+    const interval = setInterval(() => {
+      const y = dragHoverYRef.current;
+      if (y == null) return;
+      const dir = verticalEdgeZone === 'top' ? -1 : 1;
+      const distanceIntoZone = verticalEdgeZone === 'top'
+        ? VERTICAL_EDGE_ZONE - (y - viewportTopRef.current)
+        : VERTICAL_EDGE_ZONE - (viewportTopRef.current + viewportHeightRef.current - y);
+      const proximity = Math.min(1, Math.max(0, distanceIntoZone / VERTICAL_EDGE_ZONE));
+      const speed = AUTOSCROLL_MIN_SPEED + proximity * (AUTOSCROLL_MAX_SPEED - AUTOSCROLL_MIN_SPEED);
+      const delta = dir * speed * (AUTOSCROLL_TICK_MS / 1000);
+      const target = Math.max(0, scrollOffsetRef.current + delta);
+      scrollViewRef.current?.scrollTo({ y: target, animated: false });
+      forceRerender();
+    }, AUTOSCROLL_TICK_MS);
+    return () => clearInterval(interval);
+  }, [verticalEdgeZone]);
 
   useEffect(() => {
     if (dragHoverY != null) setPressedSlot(null);
@@ -78,14 +138,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     }, 60000);
     return () => clearInterval(interval);
   }, [isToday]);
-
-  useEffect(() => {
-    if (initialScrollY != null && initialScrollY > 0) {
-      requestAnimationFrame(() => {
-        scrollViewRef.current?.scrollTo({ y: initialScrollY, animated: false });
-      });
-    }
-  }, [restoreKey]);
 
   const dragSlot = dragHoverY != null
     ? Math.max(0, Math.floor((dragHoverY - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT))
@@ -119,22 +171,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const HIDE_NEAR_PX = 6;
   const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
-  const swipeGesture = Gesture.Pan()
-    .activeOffsetX([-25, 25])
-    .failOffsetY([-15, 15])
-    .enabled(!dragActive)
-    .runOnJS(true)
-    .onUpdate((e) => {
-      onSwipeProgress?.(e.translationX);
-    })
-    .onEnd((e) => {
-      if (Math.abs(e.translationX) > 60) {
-        onSwipeDay(e.translationX < 0 ? 1 : -1);
-      } else {
-        onSwipeCancel?.();
-      }
-    });
-
   function handleSlotTap(locationY: number) {
     const maxSlot = (gridEndHour - gridStartHour) * 2 - 1;
     const slot = Math.min(maxSlot, Math.max(0, Math.floor((locationY - 16) / SLOT_HEIGHT)));
@@ -145,16 +181,17 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   }
 
   return (
-    <GestureDetector gesture={swipeGesture}>
       <ScrollView
         ref={scrollViewRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
+        onLayout={() => { measureViewport(); handleInitScroll(); }}
         onScroll={(e) => {
           scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
-          onScrollChange?.(e.nativeEvent.contentOffset.y);
         }}
+        onMomentumScrollEnd={(e) => onScrollSettle?.(e.nativeEvent.contentOffset.y)}
+        onScrollEndDrag={(e) => onScrollSettle?.(e.nativeEvent.contentOffset.y)}
       >
         <View style={styles.grid}>
           <Pressable style={styles.timeCol} onPress={(e) => handleSlotTap(e.nativeEvent.locationY)}>
@@ -232,7 +269,6 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
           </Pressable>
         </View>
       </ScrollView>
-    </GestureDetector>
   );
 }
 
