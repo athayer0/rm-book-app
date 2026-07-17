@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
@@ -11,18 +11,26 @@ import { KIIcon } from './KIIcon';
 interface Props {
   definition: IndicatorDefinition;
   count: number;
+  goal: number;
+  onPress?: () => void;
   compact?: boolean;
 }
 
-export function IndicatorCard({ definition, count, compact }: Props) {
+export function IndicatorCard({ definition, count, goal, onPress, compact }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const goalReached = count >= definition.goal;
+  // An unset goal resolves to 0, which every count would otherwise "reach".
+  const goalReached = goal > 0 && count >= goal;
 
   return (
-    <View style={[styles.card, compact && styles.cardCompact]}>
+    <TouchableOpacity
+      style={[styles.card, compact && styles.cardCompact]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.7}
+    >
       <View style={[styles.iconWrapper, { backgroundColor: isDark ? definition.color : definition.color + '20' }]}>
         <KIIcon icon={definition.icon} iconFamily={definition.iconFamily} size={compact ? 20 : 24} color={isDark ? lightenColor(definition.color) : definition.color} />
       </View>
@@ -35,13 +43,13 @@ export function IndicatorCard({ definition, count, compact }: Props) {
           <Text style={[styles.count, { color: goalReached ? Colors.success : Colors.accent }, compact && styles.countCompact]}>
             {count}
           </Text>
-          <Text style={[styles.goal, compact && styles.goalCompact]}>/{definition.goal}</Text>
+          <Text style={[styles.goal, compact && styles.goalCompact]}>/{goal}</Text>
           {goalReached && (
             <Ionicons name="checkmark-circle" size={14} color={Colors.success} style={styles.check} />
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

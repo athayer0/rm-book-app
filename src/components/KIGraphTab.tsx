@@ -10,7 +10,7 @@ import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { KIIcon } from './KIIcon';
-import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
+import { useWeeklyIndicators, resolveGoal } from '../hooks/useWeeklyIndicators';
 import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
 
 interface WeekPoint {
@@ -40,7 +40,7 @@ export function KIGraphTab({ definitions }: Props) {
 
   const [selectedId, setSelectedId] = useState<string>(visibleDefs[0]?.id ?? '');
   const [weekData, setWeekData] = useState<WeekPoint[]>([]);
-  const [nextWeek, setNextWeek] = useState<{ actual: number; goal: number }>({ actual: 0, goal: 0 });
+  const [nextWeek, setNextWeek] = useState<{ actual: number; goal: number | null }>({ actual: 0, goal: null });
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -58,14 +58,15 @@ export function KIGraphTab({ definitions }: Props) {
       points.push({
         weekKey: wk,
         actual: counts[id] ?? 0,
-        goal: goals[id] ?? def.goal,
+        // Never future, so this always resolves to a number the bar maths can use.
+        goal: resolveGoal(goals[id], false) ?? 0,
       });
     }
     setWeekData(points);
 
     const nextWk = getWeekKeyByOffset(1);
     const { counts: nc, goals: ng } = await getWeekData(nextWk);
-    setNextWeek({ actual: nc[id] ?? 0, goal: ng[id] ?? def.goal });
+    setNextWeek({ actual: nc[id] ?? 0, goal: resolveGoal(ng[id], true) });
   }, [definitions, getWeekData]);
 
   useEffect(() => {
@@ -188,7 +189,7 @@ export function KIGraphTab({ definitions }: Props) {
               <Text style={styles.summaryLabel}>Next week</Text>
               <Text style={styles.summaryValue}>
                 <Text style={{ color: Colors.textLight }}>{nextWeek.actual}</Text>
-                <Text style={styles.summaryGoalText}>/{nextWeek.goal}</Text>
+                <Text style={styles.summaryGoalText}>/{nextWeek.goal ?? '—'}</Text>
               </Text>
             </View>
           </View>

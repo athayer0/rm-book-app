@@ -23,7 +23,7 @@ export function GoalsScreen() {
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
+  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyIndicators();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const [editMode, setEditMode] = useState(false);
@@ -135,6 +135,7 @@ export function GoalsScreen() {
             <IndicatorGrid
               definitions={definitions}
               counts={counts}
+              goals={goals}
             />
           )}
         </View>

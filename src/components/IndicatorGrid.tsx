@@ -2,15 +2,17 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { IndicatorCard } from './IndicatorCard';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
-import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
+import { WeeklyCounts, WeeklyGoals, resolveGoal } from '../hooks/useWeeklyIndicators';
 
 interface Props {
   definitions: IndicatorDefinition[];
   counts: WeeklyCounts;
+  goals: WeeklyGoals;
+  onPressKI?: () => void;
   compact?: boolean;
 }
 
-export function IndicatorGrid({ definitions, counts, compact }: Props) {
+export function IndicatorGrid({ definitions, counts, goals, onPressKI, compact }: Props) {
   const visible = definitions.filter(d => d.visible);
   const rows: IndicatorDefinition[][] = [];
   for (let i = 0; i < visible.length; i += 2) {
@@ -26,6 +28,9 @@ export function IndicatorGrid({ definitions, counts, compact }: Props) {
               key={def.id}
               definition={def}
               count={counts[def.id] ?? 0}
+              // The grid only ever shows the current week, which never resolves to null.
+              goal={resolveGoal(goals[def.id], false) ?? 0}
+              onPress={onPressKI}
               compact={compact}
             />
           ))}

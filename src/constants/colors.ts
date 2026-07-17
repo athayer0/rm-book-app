@@ -21,10 +21,11 @@ export const LightColors = {
   weekStripBgAlt: '#D8D8D8',
   selectedDayBg: '#D4E8F5',
   selectedDayBorder: '#253960',
-  filterDropdownBg: '#FFFFFF',
   rowPressedBg: 'rgba(160,160,160,0.2)',
-  weekNavChevron: '#000000',
-  kiNumberText: '#000000',
+  // Navy, for tappable text actions in the KI screens ("Set goals", "Add a Key Indicator +").
+  kiTextAction: '#253960',
+  // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
+  kiActionBg: '#253960',
   statusOtherColor: '#000000',
 };
 
@@ -51,15 +52,38 @@ export const DarkColors: typeof LightColors = {
   weekStripBgAlt: '#141414',
   selectedDayBg: '#263040',
   selectedDayBorder: '#8AAFC8',
-  filterDropdownBg: '#000000',
   rowPressedBg: 'rgba(160,160,160,0.2)',
-  weekNavChevron: '#F0F0F0',
-  kiNumberText: '#FFFFFF',
+  // Navy is unreadable on the dark background; lift it the same way selectedDayBorder does.
+  kiTextAction: '#8AAFC8',
+  // A fill, not text — navy still reads against the dark card and keeps its white label legible.
+  kiActionBg: '#2E4877',
   statusOtherColor: '#FFFFFF',
 };
 
 export const Colors = LightColors;
 export type ColorPalette = typeof LightColors;
+
+// The palette offered by every colour picker (KI icons, event types). Ordered by hue —
+// red through violet — with the low-saturation browns and grey trailing, since they have
+// no place on the spectrum. Rendered as two rows of eight.
+export const SwatchColors: string[] = [
+  '#E74C3C', // red
+  '#E05C6B', // rose
+  '#800000', // maroon
+  '#D2691E', // chocolate
+  '#E8980E', // orange
+  '#E8B820', // yellow
+  '#2ECC71', // green
+  '#27AE60', // deep green
+  '#00B5C8', // cyan
+  '#2979FF', // blue
+  '#1A3A6B', // navy
+  '#A29BFE', // periwinkle
+  '#9B59B6', // violet
+  '#795548', // brown
+  '#4E342E', // dark brown
+  '#9E9E9E', // grey
+];
 
 export const EventColors: Record<string, string> = {
   church:    '#E05C6B',

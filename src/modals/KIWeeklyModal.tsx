@@ -9,13 +9,16 @@ import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
-import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
+import { useWeeklyIndicators, resolveGoal } from '../hooks/useWeeklyIndicators';
 import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
 import { KIGraphTab } from '../components/KIGraphTab';
 import { KIIcon } from '../components/KIIcon';
 
 const MIN_OFFSET = -5;
 const MAX_OFFSET = 3;
+
+// Shared by the number pills and the divider so their glyphs centre on the same line.
+const NUM_ROW_H = 36;
 
 interface EditingField {
   id: string;
@@ -25,7 +28,8 @@ interface EditingField {
 
 interface RowData {
   actual: number;
-  goal: number;
+  // null on a future week whose goal hasn't been set yet.
+  goal: number | null;
 }
 
 interface Props {
@@ -67,7 +71,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
     for (const def of definitions) {
       next[def.id] = {
         actual: counts[def.id] ?? 0,
-        goal: goals[def.id] ?? def.goal,
+        goal: resolveGoal(goals[def.id], offset > 0),
       };
     }
     setRowData(next);
@@ -99,10 +103,11 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
   function openEdit(id: string, field: 'actual' | 'goal') {
     const current = rowData[id];
     if (!current) return;
+    const value = field === 'actual' ? current.actual : current.goal;
     setEditingField({
       id,
       field,
-      tempValue: String(field === 'actual' ? current.actual : current.goal),
+      tempValue: value == null ? '' : String(value),
     });
   }
 
@@ -126,8 +131,14 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
     setEditingField(null);
   }
 
-  function cancelEdit() {
-    setEditingField(null);
+  // Steps the field without opening the keyboard; an empty box counts as 0.
+  function stepValue(delta: number) {
+    setEditingField(prev => {
+      if (!prev) return prev;
+      const parsed = parseInt(prev.tempValue, 10);
+      const base = isNaN(parsed) ? 0 : parsed;
+      return { ...prev, tempValue: String(Math.max(0, base + delta)) };
+    });
   }
 
   const editingDef = editingField ? definitions.find(d => d.id === editingField.id) : null;
@@ -182,7 +193,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
               style={[styles.arrowBtn, weekOffset <= MIN_OFFSET && styles.arrowDisabled]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-back" size={20} color={weekOffset <= MIN_OFFSET ? Colors.textLight : Colors.weekNavChevron} />
+              <Ionicons name="chevron-back" size={20} color={weekOffset <= MIN_OFFSET ? Colors.textLight : Colors.text} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleNext}
@@ -190,7 +201,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
               style={[styles.arrowBtn, weekOffset >= MAX_OFFSET && styles.arrowDisabled]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-forward" size={20} color={weekOffset >= MAX_OFFSET ? Colors.textLight : Colors.weekNavChevron} />
+              <Ionicons name="chevron-forward" size={20} color={weekOffset >= MAX_OFFSET ? Colors.textLight : Colors.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -203,7 +214,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
         >
           <View style={styles.kiCard}>
             {visibleDefs.map((def, index) => {
-              const row = rowData[def.id] ?? { actual: 0, goal: def.goal };
+              const row = rowData[def.id] ?? { actual: 0, goal: resolveGoal(undefined, isFuture) };
 
               return (
                 <View
@@ -216,28 +227,39 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
 
                   <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
 
-                  <TouchableOpacity
-                    onPress={() => !isFuture && openEdit(def.id, 'actual')}
-                    disabled={isFuture}
-                    style={[styles.numBtn, isFuture && styles.numBtnDisabled]}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={[styles.numText, { color: Colors.kiNumberText }]}>
-                      {row.actual}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Grouped so the row's gap applies before the numbers, not between them. */}
+                  <View style={styles.numGroup}>
+                    {/* A future week has no actual to report yet — show the goal alone. */}
+                    {!isFuture && (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => openEdit(def.id, 'actual')}
+                          style={styles.numBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.numText}>
+                            {row.actual}
+                          </Text>
+                        </TouchableOpacity>
 
-                  <Text style={styles.divider}>/</Text>
+                        <Text style={styles.divider}>/</Text>
+                      </>
+                    )}
 
-                  <TouchableOpacity
-                    onPress={() => openEdit(def.id, 'goal')}
-                    style={styles.numBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={[styles.numText, { color: Colors.kiNumberText }]}>
-                      {row.goal}
-                    </Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => openEdit(def.id, 'goal')}
+                      style={row.goal === null ? styles.setGoalBtn : styles.numBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      {row.goal === null ? (
+                        <Text style={styles.setGoalText}>Set goals</Text>
+                      ) : (
+                        <Text style={styles.numText}>
+                          {row.goal}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })}
@@ -252,32 +274,45 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           <View style={{ height: 40 }} />
         </ScrollView>
 
+        {/* Padding rather than a margin, so the dialog re-centres in the space the
+            keyboard leaves instead of being shoved off-centre. */}
         {editingField && (
-          <View style={styles.editOverlay}>
-            <TouchableOpacity style={styles.editOverlayBg} onPress={cancelEdit} activeOpacity={1} />
-            <View style={[styles.editSheet, { marginBottom: keyboardHeight }]}>
+          <View style={[styles.editOverlay, { paddingBottom: keyboardHeight }]}>
+            {/* Dismissing commits — there is no explicit Done. */}
+            <TouchableOpacity style={styles.editOverlayBg} onPress={confirmEdit} activeOpacity={1} />
+            <View style={styles.editSheet}>
                 <Text style={styles.editTitle}>
                   {editingDef?.label ?? ''}
                 </Text>
                 <Text style={styles.editSubtitle}>
                   {editingField.field === 'actual' ? 'Actual achieved this week' : 'Weekly goal'}
                 </Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editingField.tempValue}
-                  onChangeText={v => setEditingField(prev => prev ? { ...prev, tempValue: v } : null)}
-                  keyboardType="number-pad"
-                  autoFocus
-                  selectTextOnFocus
-                  maxLength={4}
-                />
-                <View style={styles.editActions}>
-                  <TouchableOpacity onPress={cancelEdit} style={styles.editCancelBtn}>
-                    <Text style={styles.editCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={confirmEdit} style={styles.editDoneBtn}>
-                    <Text style={styles.editDoneText}>Done</Text>
-                  </TouchableOpacity>
+                <View style={styles.stepperRow}>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editingField.tempValue}
+                    onChangeText={v => setEditingField(prev => prev ? { ...prev, tempValue: v } : null)}
+                    keyboardType="number-pad"
+                    selectTextOnFocus
+                    maxLength={4}
+                  />
+
+                  <View style={styles.stepperCol}>
+                    <TouchableOpacity
+                      onPress={() => stepValue(1)}
+                      style={styles.stepBtn}
+                      hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="add" size={20} color={Colors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => stepValue(-1)}
+                      style={styles.stepBtn}
+                      hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="remove" size={20} color={Colors.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
             </View>
           </View>
@@ -383,18 +418,48 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'center',
       flexShrink: 0,
     },
-    kiLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: C.text },
+    kiLabel: { flex: 1, fontSize: 17, fontWeight: '500', color: C.text },
+    numGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     numBtn: {
-      width: 26,
-      height: 36,
+      minWidth: 28,
+      height: NUM_ROW_H,
+      paddingHorizontal: 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 8,
       backgroundColor: C.background,
     },
-    numBtnDisabled: { opacity: 0.45 },
-    numText: { fontSize: 17, fontWeight: '700' },
-    divider: { fontSize: 26, color: C.kiNumberText, width: 14, textAlign: 'center', marginHorizontal: -6 },
+    // Both share the pill's height as their line box, so the glyphs centre by the same
+    // rule instead of each font size settling to its own metrics.
+    numText: {
+      fontSize: 26,
+      fontWeight: '500',
+      color: C.text,
+      lineHeight: NUM_ROW_H,
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    },
+    // Stands in for the goal on a future week with none set yet: plain text, no chrome.
+    setGoalBtn: {
+      height: 36,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    setGoalText: { fontSize: 15, fontWeight: '700', color: C.kiTextAction },
+    divider: {
+      fontSize: 33,
+      fontWeight: '300',
+      color: C.text,
+      width: 15,
+      textAlign: 'center',
+      height: NUM_ROW_H,
+      lineHeight: NUM_ROW_H,
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    },
     futureNote: {
       fontSize: 12,
       color: C.textLight,
@@ -405,7 +470,8 @@ function makeStyles(C: ColorPalette) {
     },
     editOverlay: {
       ...StyleSheet.absoluteFillObject,
-      justifyContent: 'flex-end',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
     },
     editOverlayBg: {
       ...StyleSheet.absoluteFillObject,
@@ -413,50 +479,48 @@ function makeStyles(C: ColorPalette) {
     },
     editSheet: {
       backgroundColor: C.card,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
+      borderRadius: 20,
       padding: 24,
-      paddingBottom: Platform.OS === 'ios' ? 36 : 24,
       gap: 8,
+      width: '100%',
+      maxWidth: 360,
+      alignSelf: 'center',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: -2 },
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.12,
       shadowRadius: 8,
       elevation: 8,
     },
     editTitle: { fontSize: 16, fontWeight: '700', color: C.text, textAlign: 'center' },
     editSubtitle: { fontSize: 13, color: C.textSecondary, textAlign: 'center', marginBottom: 8 },
+    stepperRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    stepperCol: {
+      gap: 6,
+    },
+    stepBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.background,
+    },
     editInput: {
+      width: 88,
       borderWidth: 1.5,
-      borderColor: C.accent,
+      borderColor: C.border,
       borderRadius: 12,
-      paddingHorizontal: 16,
+      paddingHorizontal: 8,
       paddingVertical: 14,
       fontSize: 28,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
     },
-    editActions: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 8,
-    },
-    editCancelBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
-      backgroundColor: C.background,
-      alignItems: 'center',
-    },
-    editCancelText: { fontSize: 15, fontWeight: '600', color: C.textSecondary },
-    editDoneBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
-      backgroundColor: C.primary,
-      alignItems: 'center',
-    },
-    editDoneText: { fontSize: 15, fontWeight: '700', color: C.white },
   });
 }

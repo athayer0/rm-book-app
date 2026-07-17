@@ -258,7 +258,7 @@ function makeStyles(C: ColorPalette) {
       top: 34,
       right: 0,
       minWidth: 190,
-      backgroundColor: C.filterDropdownBg,
+      backgroundColor: C.card,
       borderRadius: 10,
       borderWidth: 1,
       borderColor: C.border,

@@ -1,50 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, TextInput,
+  StyleSheet, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
+import { SwatchColors } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { IndicatorDefinition } from '../constants/defaultIndicators';
 import { KIIcon } from '../components/KIIcon';
+import { IconPicker, ICON_OPTIONS, IconOption } from '../components/IconPicker';
 
-interface IconOption { name: string; family: string; }
-
-const ICON_OPTIONS: IconOption[] = [
-  { name: 'sunny',               family: 'Ionicons' },
-  { name: 'moon',                family: 'Ionicons' },
-  { name: 'book-outline',        family: 'Ionicons' },
-  { name: 'heart',               family: 'Ionicons' },
-  { name: 'star',                family: 'Ionicons' },
-  { name: 'time-outline',        family: 'Ionicons' },
-  { name: 'people',              family: 'Ionicons' },
-  { name: 'person-outline',      family: 'Ionicons' },
-  { name: 'home',                family: 'Ionicons' },
-  { name: 'barbell-outline',     family: 'Ionicons' },
-  { name: 'bicycle',             family: 'Ionicons' },
-  { name: 'water',               family: 'Ionicons' },
-  { name: 'leaf',                family: 'Ionicons' },
-  { name: 'bulb-outline',        family: 'Ionicons' },
-  { name: 'school',              family: 'Ionicons' },
-  { name: 'trophy',              family: 'Ionicons' },
-  { name: 'restaurant-outline',  family: 'Ionicons' },
-  { name: 'musical-notes',       family: 'Ionicons' },
-  { name: 'compass',             family: 'Ionicons' },
-  { name: 'ribbon',              family: 'Ionicons' },
-  { name: 'color-palette-outline', family: 'Ionicons' },
-  { name: 'synagogue',           family: 'MaterialCommunityIcons' },
-  { name: 'church',              family: 'MaterialCommunityIcons' },
-  { name: 'hands-pray',         family: 'MaterialCommunityIcons' },
-  { name: 'cross',               family: 'MaterialCommunityIcons' },
-];
-
-const COLOR_OPTIONS: string[] = [
-  '#E74C3C', '#E05C6B', '#800000', '#D2691E', '#E8980E', '#E8B820', '#2ECC71', '#27AE60',
-  '#1A3A6B', '#2979FF', '#00B5C8', '#A29BFE', '#9B59B6', '#795548', '#9E9E9E', '#4E342E',
-];
+const COLOR_OPTIONS = SwatchColors;
 
 interface Props {
   visible: boolean;
@@ -62,6 +31,15 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   const [newName, setNewName] = useState('');
   const [selectedIconOpt, setSelectedIconOpt] = useState<IconOption>(ICON_OPTIONS[0]);
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // The add card is the last thing in the list, so scrolling to the end brings all of
+  // it above the keyboard.
+  function revealAddCard() {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }
 
   useEffect(() => {
     if (visible) {
@@ -69,11 +47,25 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
       setNewName('');
       setSelectedIconOpt(ICON_OPTIONS[0]);
       setSelectedColor(COLOR_OPTIONS[0]);
+      setExpandedId(null);
+      setAddOpen(false);
     }
   }, [visible]);
 
+  // Edits are committed when the sheet closes — including an iOS swipe-down dismiss,
+  // which fires onRequestClose for a pageSheet.
+  async function handleClose() {
+    await onUpdateDefinitions(localDefs);
+    onClose();
+  }
+
   function removeKI(id: string) {
     setLocalDefs(prev => prev.filter(d => d.id !== id));
+    setExpandedId(null);
+  }
+
+  function patchKI(id: string, patch: Partial<IndicatorDefinition>) {
+    setLocalDefs(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)));
   }
 
   function addKI() {
@@ -94,24 +86,25 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
     setNewName('');
     setSelectedIconOpt(ICON_OPTIONS[0]);
     setSelectedColor(COLOR_OPTIONS[0]);
-  }
-
-  async function handleSave() {
-    await onUpdateDefinitions(localDefs);
-    onClose();
+    setAddOpen(false);
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={styles.header}>
-        <View style={{ width: 60 }} />
-        <Text style={styles.headerTitle}>Edit KIs</Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit KIs</Text>
+        <View style={{ width: 60 }} />
       </View>
 
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -119,29 +112,120 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
       >
         <Text style={styles.sectionLabel}>KEY INDICATORS</Text>
         <View style={styles.kiList}>
-          {localDefs.map((def, index) => (
-            <View
-              key={def.id}
-              style={[styles.kiRow, index === localDefs.length - 1 && styles.kiRowLast]}
-            >
-              <View style={[styles.kiIcon, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={isDark ? lightenColor(def.color) : def.color} />
-              </View>
-              <Text style={styles.kiLabel} numberOfLines={1}>{def.label}</Text>
-              {def.builtIn ? (
-                <View style={styles.lockIcon}>
-                  <Ionicons name="lock-closed-outline" size={16} color={Colors.textLight} />
-                </View>
-              ) : (
-                <TouchableOpacity onPress={() => removeKI(def.id)} style={styles.deleteIcon}>
-                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+          {localDefs.map((def, index) => {
+            const isExpanded = expandedId === def.id;
+            const isLast = index === localDefs.length - 1;
+            return (
+              <View key={def.id}>
+                <TouchableOpacity
+                  style={[styles.kiRow, isLast && !isExpanded && styles.kiRowLast]}
+                  onPress={() => setExpandedId(isExpanded ? null : def.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.kiIcon, { backgroundColor: isDark ? def.color : def.color + '20' }, !def.visible && styles.hiddenDim]}>
+                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={isDark ? lightenColor(def.color) : def.color} />
+                  </View>
+                  <Text style={[styles.kiLabel, !def.visible && styles.hiddenDim]} numberOfLines={1}>
+                    {def.label}
+                  </Text>
+
+                  {/* Built-ins hide rather than delete, keeping their counts and calendar
+                      wiring intact. Custom KIs have nothing to preserve, so they delete. */}
+                  {def.builtIn ? (
+                    <TouchableOpacity
+                      onPress={() => patchKI(def.id, { visible: !def.visible })}
+                      style={styles.rowAction}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons
+                        name={def.visible ? 'eye-outline' : 'eye-off-outline'}
+                        size={18}
+                        color={def.visible ? Colors.textSecondary : Colors.textLight}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => removeKI(def.id)}
+                      style={styles.rowAction}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                    </TouchableOpacity>
+                  )}
+
+                  <Ionicons
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={Colors.textLight}
+                  />
                 </TouchableOpacity>
-              )}
-            </View>
-          ))}
+
+                {isExpanded && (
+                  <View style={[styles.editPanel, isLast && styles.editPanelLast]}>
+                    {/* Default KIs keep their names; only their look is editable. */}
+                    {!def.builtIn && (
+                      <>
+                        <Text style={styles.pickerLabel}>Name</Text>
+                        <TextInput
+                          style={styles.nameInput}
+                          value={def.label}
+                          onChangeText={text => patchKI(def.id, { label: text })}
+                          placeholder="Indicator name..."
+                          placeholderTextColor={Colors.textLight}
+                          returnKeyType="done"
+                        />
+                      </>
+                    )}
+
+                    <Text style={styles.pickerLabel}>Icon</Text>
+                    <IconPicker
+                      icon={def.icon}
+                      iconFamily={def.iconFamily}
+                      color={def.color}
+                      onSelect={opt => patchKI(def.id, { icon: opt.name, iconFamily: opt.family })}
+                    />
+
+                    <Text style={styles.pickerLabel}>Color</Text>
+                    {[COLOR_OPTIONS.slice(0, 8), COLOR_OPTIONS.slice(8, 16)].map((row, ri) => (
+                      <View key={ri} style={styles.colorRow}>
+                        {row.map(color => (
+                          <TouchableOpacity
+                            key={color}
+                            onPress={() => patchKI(def.id, { color })}
+                            style={[
+                              styles.colorDot,
+                              { backgroundColor: color },
+                              def.color === color && styles.colorDotSelected,
+                            ]}
+                          >
+                            {def.color === color && (
+                              <Ionicons name="checkmark" size={13} color="#fff" />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
 
-        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>ADD KEY INDICATOR</Text>
+        {/* Doubles as the section header once open, so it can collapse the form again. */}
+        <TouchableOpacity
+          onPress={() => { setAddOpen(o => !o); if (!addOpen) revealAddCard(); }}
+          style={styles.addLink}
+        >
+          <Ionicons
+            name={addOpen ? 'close' : 'add'}
+            size={18}
+            color={Colors.kiTextAction}
+          />
+          <Text style={styles.addLinkText}>Add a Key Indicator</Text>
+        </TouchableOpacity>
+
+        {addOpen && <>
         <View style={styles.addCard}>
           <TextInput
             style={styles.nameInput}
@@ -150,36 +234,16 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
             placeholder="Indicator name..."
             placeholderTextColor={Colors.textLight}
             returnKeyType="done"
+            onFocus={revealAddCard}
           />
 
           <Text style={styles.pickerLabel}>Icon</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.iconScroll}
-            contentContainerStyle={styles.iconScrollContent}
-          >
-            {ICON_OPTIONS.map(opt => {
-              const isSelected = selectedIconOpt.name === opt.name && selectedIconOpt.family === opt.family;
-              return (
-                <TouchableOpacity
-                  key={`${opt.family}:${opt.name}`}
-                  onPress={() => setSelectedIconOpt(opt)}
-                  style={[
-                    styles.iconOption,
-                    isSelected && { backgroundColor: selectedColor + '25', borderColor: selectedColor },
-                  ]}
-                >
-                  <KIIcon
-                    icon={opt.name}
-                    iconFamily={opt.family}
-                    size={22}
-                    color={isSelected ? selectedColor : Colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <IconPicker
+            icon={selectedIconOpt.name}
+            iconFamily={selectedIconOpt.family}
+            color={selectedColor}
+            onSelect={setSelectedIconOpt}
+          />
 
           <Text style={styles.pickerLabel}>Color</Text>
           {[COLOR_OPTIONS.slice(0, 8), COLOR_OPTIONS.slice(8, 16)].map((row, ri) => (
@@ -202,15 +266,6 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
             </View>
           ))}
 
-          {newName.trim() ? (
-            <View style={styles.previewRow}>
-              <View style={[styles.kiIcon, { backgroundColor: isDark ? selectedColor : selectedColor + '20' }]}>
-                <KIIcon icon={selectedIconOpt.name} iconFamily={selectedIconOpt.family} size={20} color={isDark ? lightenColor(selectedColor) : selectedColor} />
-              </View>
-              <Text style={[styles.previewLabel, { color: selectedColor }]}>{newName.trim()}</Text>
-            </View>
-          ) : null}
-
           <TouchableOpacity
             style={[styles.addBtn, !newName.trim() && styles.addBtnDisabled]}
             onPress={addKI}
@@ -220,13 +275,11 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
             <Text style={styles.addBtnText}>Add Indicator</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>Save Changes</Text>
-        </TouchableOpacity>
+        </>}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -250,7 +303,10 @@ function makeStyles(C: ColorPalette) {
     },
     closeBtn: {
       width: 60,
-      alignItems: 'flex-end',
+      alignItems: 'flex-start',
+    },
+    flex: {
+      flex: 1,
     },
     scroll: {
       flex: 1,
@@ -301,13 +357,37 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '500',
       color: C.text,
     },
-    lockIcon: {
+    rowAction: {
       width: 28,
       alignItems: 'center',
     },
-    deleteIcon: {
-      width: 28,
+    // Mirrors addBtn's layout and type, minus the fill.
+    addLink: {
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 20,
+      paddingVertical: 10,
+    },
+    addLinkText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.kiTextAction,
+    },
+    hiddenDim: {
+      opacity: 0.4,
+    },
+    // Matches the add card: white panel with the same 16pt padding, so the
+    // C.background icon squares read against it and line up identically.
+    editPanel: {
+      padding: 16,
+      backgroundColor: C.card,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    editPanelLast: {
+      borderBottomWidth: 0,
     },
     addCard: {
       backgroundColor: C.card,
@@ -335,22 +415,6 @@ function makeStyles(C: ColorPalette) {
       color: C.textSecondary,
       marginBottom: 8,
     },
-    iconScroll: {
-      marginBottom: 16,
-    },
-    iconScrollContent: {
-      gap: 6,
-    },
-    iconOption: {
-      width: 44,
-      height: 44,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: C.background,
-      borderWidth: 1.5,
-      borderColor: 'transparent',
-    },
     colorRow: {
       flexDirection: 'row',
       justifyContent: 'center',
@@ -368,29 +432,15 @@ function makeStyles(C: ColorPalette) {
       borderWidth: 2,
       borderColor: C.text,
     },
-    previewRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      backgroundColor: C.background,
-      borderRadius: 8,
-      marginBottom: 14,
-    },
-    previewLabel: {
-      flex: 1,
-      fontSize: 14,
-      fontWeight: '600',
-    },
     addBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      backgroundColor: C.accent,
+      backgroundColor: C.kiActionBg,
       borderRadius: 10,
       paddingVertical: 12,
+      marginTop: 14,
     },
     addBtnDisabled: {
       opacity: 0.4,
@@ -399,19 +449,6 @@ function makeStyles(C: ColorPalette) {
       fontSize: 14,
       fontWeight: '700',
       color: C.white,
-    },
-    saveBtn: {
-      backgroundColor: C.primary,
-      borderRadius: 12,
-      padding: 16,
-      alignItems: 'center',
-      marginTop: 16,
-    },
-    saveBtnText: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: C.white,
-      letterSpacing: 0.5,
     },
   });
 }

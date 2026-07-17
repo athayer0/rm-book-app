@@ -9,7 +9,7 @@ import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
+import { EventColors, EventTypeLabels, EventTypeConfig, SwatchColors } from '../constants/colors';
 import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize } from '../constants/eventSizes';
 import { useSettings } from '../hooks/useSettings';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
@@ -26,10 +26,7 @@ function hourLabel(h: number): string {
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
-const COLOR_SWATCHES = [
-  '#E74C3C', '#E05C6B', '#800000', '#D2691E', '#E8980E', '#E8B820', '#2ECC71', '#27AE60',
-  '#1A3A6B', '#2979FF', '#00B5C8', '#A29BFE', '#9B59B6', '#795548', '#9E9E9E', '#4E342E',
-];
+const COLOR_SWATCHES = SwatchColors;
 
 const EVENT_TYPES = Object.keys(EventColors);
 

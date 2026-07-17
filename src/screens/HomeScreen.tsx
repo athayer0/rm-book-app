@@ -21,7 +21,7 @@ export function HomeScreen({ navigation }: any) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { definitions, counts, updateDefinitions, reload } = useWeeklyIndicators();
+  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyIndicators();
   const { people, updatePerson, deletePerson, reload: reloadPeople } = usePeople();
 
   useFocusEffect(useCallback(() => { reload(); reloadPeople(); }, [reload, reloadPeople]));
@@ -58,6 +58,8 @@ export function HomeScreen({ navigation }: any) {
           <IndicatorGrid
             definitions={definitions}
             counts={counts}
+            goals={goals}
+            onPressKI={() => setPlanningVisible(true)}
           />
           <TouchableOpacity
             style={styles.planBtn}
@@ -104,7 +106,7 @@ export function HomeScreen({ navigation }: any) {
 
       <KIWeeklyModal
         visible={planningVisible}
-        onClose={() => setPlanningVisible(false)}
+        onClose={() => { setPlanningVisible(false); reload(); }}
         definitions={definitions}
       />
 
