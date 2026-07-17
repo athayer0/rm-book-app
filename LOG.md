@@ -17,3 +17,4 @@ BUGS
 
 [x] make it so i can scroll even if my finger starts on an event
 [x] remove swiping animation when moving between apps to see if that removes the glitchiness of it. tapping the arrows is clean and doesn't have errors
+[ ] swiping between pages after making a recurring event causes the times on the left of the events to move out of line? Also add being able to select the days of the week that an event repeats. tapping the 

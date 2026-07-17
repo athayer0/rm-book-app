@@ -1,5 +1,19 @@
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays, addWeeks, addMonths } from 'date-fns';
 import { DEFAULT_SLOT_HEIGHT } from '../constants/eventSizes';
+
+export type RecurringRule = 'daily' | 'weekly' | 'monthly';
+
+// How far a new series runs unless the user picks an end date themselves. Each rule
+// counts in its own unit rather than a shared one.
+const DEFAULT_SPAN: Record<RecurringRule, (start: Date) => Date> = {
+  daily: start => addDays(start, 60),
+  weekly: start => addWeeks(start, 12),
+  monthly: start => addMonths(start, 6),
+};
+
+export function defaultRecurrenceEnd(startDate: string, rule: RecurringRule): string {
+  return format(DEFAULT_SPAN[rule](parseISO(startDate)), 'yyyy-MM-dd');
+}
 
 export type EventStatus = 'completed' | 'failed' | 'pending';
 
@@ -15,7 +29,11 @@ export interface CalendarEvent {
   endTime: string;
   notes?: string;
   recurring: boolean;
-  recurringRule?: 'daily' | 'weekly' | 'monthly';
+  recurringRule?: RecurringRule;
+  /** Last date the series runs, inclusive. Undefined means it never ends. */
+  recurringUntil?: string;
+  /** Occurrences deleted individually, leaving the rest of the series intact. */
+  excludedDates?: string[];
   completed?: boolean;
   backup?: boolean;
 }
@@ -37,6 +55,9 @@ export function getEventsForDate(events: CalendarEvent[], dateStr: string): Cale
     const targetDate = parseISO(dateStr);
 
     if (targetDate < startDate) return;
+    // ISO dates compare correctly as strings.
+    if (event.recurringUntil && dateStr > event.recurringUntil) return;
+    if (event.excludedDates?.includes(dateStr)) return;
 
     switch (event.recurringRule) {
       case 'daily': {

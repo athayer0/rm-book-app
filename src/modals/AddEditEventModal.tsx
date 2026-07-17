@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, KeyboardAvoidingView, Platform, Switch,
+  StyleSheet, KeyboardAvoidingView, Platform, Switch, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd } from '../utils/eventUtils';
+import { InlineDatePicker } from '../components/InlineDatePicker';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 
 const STATUS_OPTIONS: { value: EventStatus; label: string; icon: string; color: string }[] = [
   { value: 'pending',   label: 'Pending',   icon: 'alert-circle',    color: '#E8980E' },
@@ -27,7 +28,8 @@ interface Props {
   currentStatus?: EventStatus;
   onStatusChange?: (status: EventStatus | undefined) => void;
   onSave: (event: Omit<CalendarEvent, 'id'>) => Promise<void>;
-  onDelete?: (id: string) => void;
+  /** 'single' drops just occurrenceDate; 'future' ends the series before it. */
+  onDelete?: (id: string, occurrenceDate: string, mode: 'single' | 'future') => void;
   onClose: () => void;
 }
 
@@ -43,22 +45,6 @@ for (let h = 0; h <= 23; h++) {
   }
 }
 TIME_OPTIONS.push('12:00 AM');
-
-function getMonthGrid(month: Date, weekStart: 'monday' | 'sunday'): (Date | null)[][] {
-  const year = month.getFullYear();
-  const m = month.getMonth();
-  const firstDay = new Date(year, m, 1);
-  const daysInMonth = new Date(year, m + 1, 0).getDate();
-  const weekStartsOn = weekStart === 'monday' ? 1 : 0;
-  let startDow = firstDay.getDay();
-  if (weekStartsOn === 1) startDow = (startDow + 6) % 7;
-  const cells: (Date | null)[] = Array(startDow).fill(null);
-  for (let d = 0; d < daysInMonth; d++) cells.push(addDays(firstDay, d));
-  while (cells.length % 7 !== 0) cells.push(null);
-  const weeks: (Date | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  return weeks;
-}
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
@@ -86,13 +72,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [endTime, setEndTime] = useState('9:30 AM');
   const [notes, setNotes] = useState('');
   const [recurring, setRecurring] = useState(false);
-  const [recurringRule, setRecurringRule] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [recurringRule, setRecurringRule] = useState<RecurringRule>('weekly');
+  const [endsOn, setEndsOn] = useState(() => defaultRecurrenceEnd(defaultDate ?? format(new Date(), 'yyyy-MM-dd'), 'weekly'));
+  const [showEndsOnPicker, setShowEndsOnPicker] = useState(false);
   const [isBackup, setIsBackup] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [pickerMonth, setPickerMonth] = useState(new Date());
   const [error, setError] = useState('');
   const startScrollRef = useRef<ScrollView>(null);
   const endScrollRef = useRef<ScrollView>(null);
@@ -106,27 +93,30 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setStartTime(event.startTime);
       setEndTime(event.endTime);
       setNotes(event.notes ?? '');
+      const rule = event.recurringRule ?? 'weekly';
       setRecurring(event.recurring);
-      setRecurringRule(event.recurringRule ?? 'weekly');
+      setRecurringRule(rule);
+      // Series predating end dates have none stored; offer the default rather than a blank.
+      setEndsOn(event.recurringUntil ?? defaultRecurrenceEnd(event.date, rule));
       setIsBackup(event.backup ?? false);
     } else {
       const initialStart = defaultStartTime ?? '9:00 AM';
+      const initialDate = defaultDate ?? format(new Date(), 'yyyy-MM-dd');
       setTitle('');
       setType('scripture');
-      setDate(defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
+      setDate(initialDate);
       setStartTime(initialStart);
       setEndTime(addMinutesToTimeString(initialStart, resolvedDefaultMinutes('scripture', settings)));
       setNotes('');
       setRecurring(false);
       setRecurringRule('weekly');
+      setEndsOn(defaultRecurrenceEnd(initialDate, 'weekly'));
       setIsBackup(false);
     }
+    setShowEndsOnPicker(false);
     setLocalStatus(currentStatus);
     setError('');
     setShowDatePicker(false);
-    const initialDateStr = event ? event.date : (defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
-    const [py, pm] = initialDateStr.split('-').map(Number);
-    setPickerMonth(new Date(py, pm - 1, 1));
   }, [event, defaultDate, defaultStartTime, visible, currentStatus]);
 
   useEffect(() => {
@@ -170,6 +160,38 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     setShowStartPicker(false);
   }
 
+  // Each rule carries its own default span, so switching rules re-applies it.
+  function changeRule(rule: RecurringRule) {
+    setRecurringRule(rule);
+    setEndsOn(defaultRecurrenceEnd(date, rule));
+  }
+
+  function handleDelete() {
+    if (!event || !onDelete) return;
+    if (!event.recurring) {
+      onDelete(event.id, event.date, 'single');
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Delete Recurring Event',
+      'This event repeats. What would you like to delete?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'This event only',
+          onPress: () => { onDelete(event.id, event.date, 'single'); onClose(); },
+        },
+        {
+          text: 'This and all future',
+          style: 'destructive',
+          onPress: () => { onDelete(event.id, event.date, 'future'); onClose(); },
+        },
+      ],
+      { cancelable: true }
+    );
+  }
+
   async function handleSave() {
     setError('');
     const computedEnd = isFixedType(type)
@@ -186,6 +208,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
         notes: notes.trim(),
         recurring,
         recurringRule: recurring ? recurringRule : undefined,
+        recurringUntil: recurring ? endsOn : undefined,
+        excludedDates: recurring ? event?.excludedDates : undefined,
         backup: isBackup,
       });
       onClose();
@@ -293,48 +317,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           </View>
           {showDatePicker && (
-            <View style={styles.datePickerPanel}>
-              <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={() => setPickerMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} style={styles.pickerNavBtn}>
-                  <Ionicons name="chevron-back" size={20} color={Colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.pickerMonthTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
-                <TouchableOpacity onPress={() => setPickerMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} style={styles.pickerNavBtn}>
-                  <Ionicons name="chevron-forward" size={20} color={Colors.text} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.pickerDayHeaders}>
-                {(settings.weekStart === 'monday'
-                  ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-                  : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-                ).map(day => <Text key={day} style={styles.pickerDayHeader}>{day}</Text>)}
-              </View>
-              {getMonthGrid(pickerMonth, settings.weekStart).map((week, wi) => (
-                <View key={wi} style={styles.pickerWeek}>
-                  {week.map((day, di) => {
-                    if (!day) return <View key={di} style={styles.pickerDayCell} />;
-                    const ds = format(day, 'yyyy-MM-dd');
-                    const isSelected = ds === date;
-                    const isTodayDate = ds === format(new Date(), 'yyyy-MM-dd');
-                    return (
-                      <TouchableOpacity
-                        key={di}
-                        style={[styles.pickerDayCell, isSelected && styles.pickerDayCellSelected]}
-                        onPress={() => { setDate(ds); setShowDatePicker(false); }}
-                      >
-                        <Text style={[
-                          styles.pickerDayText,
-                          isTodayDate && !isSelected && styles.pickerDayTextToday,
-                          isSelected && styles.pickerDayTextSelected,
-                        ]}>
-                          {format(day, 'd')}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
+            <InlineDatePicker
+              value={date}
+              weekStart={settings.weekStart}
+              onChange={ds => { setDate(ds); setShowDatePicker(false); }}
+            />
           )}
 
           <View style={styles.row}>
@@ -405,19 +392,37 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               />
             </View>
             {recurring && (
-              <View style={styles.ruleRow}>
-                {(['daily', 'weekly', 'monthly'] as const).map(rule => (
-                  <TouchableOpacity
-                    key={rule}
-                    style={[styles.ruleChip, recurringRule === rule && styles.ruleChipActive]}
-                    onPress={() => setRecurringRule(rule)}
-                  >
-                    <Text style={[styles.ruleText, recurringRule === rule && styles.ruleTextActive]}>
-                      {rule.charAt(0).toUpperCase() + rule.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <>
+                <View style={styles.ruleRow}>
+                  {(['daily', 'weekly', 'monthly'] as const).map(rule => (
+                    <TouchableOpacity
+                      key={rule}
+                      style={[styles.ruleChip, recurringRule === rule && styles.ruleChipActive]}
+                      onPress={() => changeRule(rule)}
+                    >
+                      <Text style={[styles.ruleText, recurringRule === rule && styles.ruleTextActive]}>
+                        {rule.charAt(0).toUpperCase() + rule.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.label, { marginTop: 12 }]}>Ends</Text>
+                <TouchableOpacity style={styles.picker} onPress={() => setShowEndsOnPicker(v => !v)}>
+                  <Text style={styles.pickerText}>
+                    {format(new Date(endsOn + 'T12:00:00'), 'MMM d, yyyy')}
+                  </Text>
+                  <Ionicons name={showEndsOnPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                </TouchableOpacity>
+                {showEndsOnPicker && (
+                  <InlineDatePicker
+                    value={endsOn}
+                    weekStart={settings.weekStart}
+                    minDate={date}
+                    onChange={ds => { setEndsOn(ds); setShowEndsOnPicker(false); }}
+                  />
+                )}
+              </>
             )}
           </View>
 
@@ -439,7 +444,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           {event && onDelete && (
             <TouchableOpacity
               style={styles.deleteBtn}
-              onPress={() => { onDelete(event.id); onClose(); }}
+              onPress={handleDelete}
             >
               <Ionicons name="trash-outline" size={18} color={Colors.danger} />
               <Text style={styles.deleteText}>Delete Event</Text>
@@ -555,29 +560,5 @@ function makeStyles(C: ColorPalette) {
       gap: 12,
       alignItems: 'center',
     },
-    datePickerPanel: {
-      marginTop: 8,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-      borderRadius: 12,
-      padding: 8,
-      backgroundColor: C.card,
-    },
-    pickerHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-    },
-    pickerNavBtn: { padding: 6 },
-    pickerMonthTitle: { fontSize: 15, fontWeight: '700', color: C.text },
-    pickerDayHeaders: { flexDirection: 'row', marginBottom: 4 },
-    pickerDayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: C.textLight },
-    pickerWeek: { flexDirection: 'row' },
-    pickerDayCell: { flex: 1, height: 36, alignItems: 'center', justifyContent: 'center' },
-    pickerDayCellSelected: { backgroundColor: C.primary, borderRadius: 18 },
-    pickerDayText: { fontSize: 13, color: C.text },
-    pickerDayTextToday: { color: C.primary, fontWeight: '700' },
-    pickerDayTextSelected: { color: C.white, fontWeight: '700' },
   });
 }

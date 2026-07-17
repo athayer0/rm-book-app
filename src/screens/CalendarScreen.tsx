@@ -33,7 +33,7 @@ function CalendarContent() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [defaultStartTime, setDefaultStartTime] = useState<string | undefined>();
-  const { getForDate, addEvent, updateEvent, deleteEvent, toggleComplete } = useCalendarEvents();
+  const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate, toggleComplete } = useCalendarEvents();
   const { settings } = useSettings();
   const { getStatus, setStatus } = useEventStatuses();
   const { adjustCount } = useWeeklyIndicators();
@@ -351,7 +351,9 @@ function CalendarContent() {
         currentStatus={editingEvent ? getStatus(editingEvent.id, editingEvent.date) : undefined}
         onStatusChange={editingEvent ? (s) => handleStatusChange(editingEvent, s) : undefined}
         onSave={handleSaveEvent}
-        onDelete={deleteEvent}
+        onDelete={(id, occurrenceDate, mode) =>
+          mode === 'future' ? deleteFromDate(id, occurrenceDate) : deleteOccurrence(id, occurrenceDate)
+        }
         onClose={() => setShowEventModal(false)}
       />
     </SafeAreaView>
