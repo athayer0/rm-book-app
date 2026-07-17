@@ -12,6 +12,15 @@ import { useDrag } from './DragContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
+const TIME_GAP = 4; // styles.time marginLeft
+
+// Approximate width of a string in the system font. Times are a fixed format so this is
+// dependable for them; titles vary, and over-estimating one only drops the time, which is
+// the precedence we want anyway.
+const AVG_CHAR_WIDTH = 0.55;
+function textWidth(text: string, fontSize: number): number {
+  return text.length * fontSize * AVG_CHAR_WIDTH;
+}
 
 const STATUS_CONFIG: Record<EventStatus, { color: string; icon: string }> = {
   completed: { color: '#1A7A40', icon: 'checkmark-circle' },
@@ -88,6 +97,24 @@ export function EventBlock({
   const badgeInner = Math.round(badge * (2 / 3));
   const badgeInset = Math.round(badge / 6);
 
+  // The title claims the width it needs; the time only appears in what's left over, and
+  // only whole — a half-shown start time is worse than none. Widths are derived from
+  // columnWidth (the same figure the drag ghost uses) rather than measured, so there is
+  // no second layout pass and no flicker.
+  const contentWidth =
+    columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
+    - (isBackup ? 0 : 3)                      // left colour border
+    - (isBackup ? 8 : 9)                      // paddingLeft
+    - (effectiveStatus ? badge + 6 : 6)       // paddingRight
+    - (isFixed ? fontSize + 4 : 0);           // checkbox + its margin
+  const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
+
+  const bothLabel = `${event.startTime} – ${event.endTime}`;
+  const timeLabel =
+    !isFixed && spare >= textWidth(bothLabel, fontSize) ? bothLabel
+    : spare >= textWidth(event.startTime, fontSize) ? event.startTime
+    : null;
+
   return (
     <GestureDetector gesture={composed}>
       <View
@@ -134,9 +161,9 @@ export function EventBlock({
             </GestureDetector>
           )}
           <Text style={[styles.title, { fontSize }]} numberOfLines={1}>{event.title}</Text>
-          <Text style={[styles.time, { fontSize }]} numberOfLines={1}>
-            {isFixed ? event.startTime : `${event.startTime} – ${event.endTime}`}
-          </Text>
+          {timeLabel && (
+            <Text style={[styles.time, { fontSize }]} numberOfLines={1}>{timeLabel}</Text>
+          )}
         </View>
 
         {effectiveStatus && (
