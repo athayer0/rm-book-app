@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns';
+import { DEFAULT_SLOT_HEIGHT } from '../constants/eventSizes';
 
 export type EventStatus = 'completed' | 'failed' | 'pending';
 
@@ -76,18 +77,24 @@ function timeToMinutes(timeStr: string): number {
   return hour * 60 + minute;
 }
 
-export function eventTopOffset(startTime: string, gridStartHour: number = 6): number {
+export function eventTopOffset(startTime: string, gridStartHour: number = 6, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
   const { hour, minute } = parseTime(startTime);
   const totalMinutes = (hour - gridStartHour) * 60 + minute;
-  return (totalMinutes / 30) * 50;
+  return (totalMinutes / 30) * slotHeight;
 }
 
-export function eventHeight(startTime: string, endTime: string): number {
+function eventHeight(startTime: string, endTime: string, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
   let end = timeToMinutes(endTime);
   const start = timeToMinutes(startTime);
   if (end <= start) end += 24 * 60; // midnight end-of-day wrap ("12:00 AM" = 0 → 1440)
   const duration = Math.max(end - start, 15);
-  return (duration / 30) * 50;
+  return (duration / 30) * slotHeight;
+}
+
+// The rendered height of a block, minus the 1px gap that separates neighbours.
+// Floored at a 15-minute row so the shortest events stay tappable at any density.
+export function eventBlockHeight(startTime: string, endTime: string, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
+  return Math.max(eventHeight(startTime, endTime, slotHeight) - 1, slotHeight / 2 - 1);
 }
 
 export function getKIContribution(event: CalendarEvent): { kiId: string; delta: number } | null {

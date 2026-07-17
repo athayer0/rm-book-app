@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { getItem, setItem } from '../utils/storage';
+import { EventSize, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 
 export interface AppSettings {
   weekStart: 'sunday' | 'monday';
@@ -8,6 +9,7 @@ export interface AppSettings {
   eventTypeDefaultMinutes: Record<string, number>;
   gridStartHour: number;
   gridEndHour: number;
+  eventSize: EventSize;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -17,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   eventTypeDefaultMinutes: {},
   gridStartHour: 6,
   gridEndHour: 24,
+  eventSize: DEFAULT_EVENT_SIZE,
 };
 
 type SettingsContextValue = {

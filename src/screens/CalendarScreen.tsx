@@ -14,15 +14,14 @@ import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
-import { CalendarEvent, EventStatus, getKIContribution, eventHeight } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, getKIContribution, eventBlockHeight } from '../utils/eventUtils';
+import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventStatuses } from '../hooks/useEventStatuses';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { isInCurrentWeek } from '../utils/dateUtils';
 import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
 
-const SLOT_HEIGHT = 50;
-const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
 
@@ -38,7 +37,7 @@ function CalendarContent() {
   const { settings } = useSettings();
   const { getStatus, setStatus } = useEventStatuses();
   const { adjustCount } = useWeeklyIndicators();
-  const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, endDrag, startDrag, moveDrag } = useDrag();
+  const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, grabOffsetY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -46,6 +45,9 @@ function CalendarContent() {
   const [headerBottom, setHeaderBottom] = useState(60);
   // Shared vertical scroll offset so every day page stays aligned to the same time-of-day.
   const [syncScrollY, setSyncScrollY] = useState(0);
+
+  const { slotHeight: SLOT_HEIGHT, fontSize: eventFontSize } = EventSizes[resolveEventSize(settings.eventSize)];
+  const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const events = getForDate(dateStr);
@@ -135,10 +137,10 @@ function CalendarContent() {
     }
   }
 
-  function handleDragStart(event: CalendarEvent, x: number, y: number, width: number, height: number) {
+  function handleDragStart(event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffset: number) {
     frozenEventsRef.current = events;
     frozenDateRef.current = dateStr;
-    startDrag(event, x, y, width, height);
+    startDrag(event, x, y, width, height, grabOffset);
   }
 
   function handleDragCancel() {
@@ -151,7 +153,7 @@ function CalendarContent() {
     frozenEventsRef.current = null;
     frozenDateRef.current = null;
     if (!dragEvent) { endDrag(); return; }
-    const relativeY = absoluteY - SLOT_HEIGHT - gridTopY + scrollOffset;
+    const relativeY = absoluteY - grabOffsetY - gridTopY + scrollOffset;
     const fifteenMinSlot = Math.max(0, Math.floor(relativeY / DRAG_SLOT_HEIGHT));
     const hour = Math.floor(fifteenMinSlot / 4) + settings.gridStartHour;
     const minute = (fifteenMinSlot % 4) * 15;
@@ -244,9 +246,12 @@ function CalendarContent() {
                   onDragEnd={handleDragDrop}
                   onDragCancel={handleDragCancel}
                   dragHoverY={dragActive ? ghostY : null}
-                  dragEventHeight={dragActive && dragEvent ? Math.max(eventHeight(dragEvent.startTime, dragEvent.endTime) - 1, 24) : undefined}
+                  dragGrabOffsetY={grabOffsetY}
+                  dragEventHeight={dragActive && dragEvent ? eventBlockHeight(dragEvent.startTime, dragEvent.endTime, SLOT_HEIGHT) : undefined}
                   gridStartHour={settings.gridStartHour}
                   gridEndHour={settings.gridEndHour}
+                  slotHeight={SLOT_HEIGHT}
+                  eventFontSize={eventFontSize}
                   isToday={isToday}
                   initialScrollY={syncScrollY}
                   onScrollSettle={setSyncScrollY}
@@ -260,6 +265,8 @@ function CalendarContent() {
                 onTapEmpty={() => {}}
                 gridStartHour={settings.gridStartHour}
                 gridEndHour={settings.gridEndHour}
+                slotHeight={SLOT_HEIGHT}
+                eventFontSize={eventFontSize}
                 isToday={ds === format(new Date(), 'yyyy-MM-dd')}
                 initialScrollY={syncScrollY}
                 syncScrollY={syncScrollY}
@@ -271,12 +278,12 @@ function CalendarContent() {
 
       {dragActive && dragEvent && (
         <View
-          style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: ghostY, width: ghostWidth }]}
+          style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: ghostY - grabOffsetY, width: ghostWidth }]}
           pointerEvents="none"
         >
           <View style={[styles.ghostBlock, { backgroundColor: Colors.card, borderLeftColor: dragEvent.color, height: ghostHeight }]}>
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '55' }]} />
-            <Text style={[styles.ghostTitle, { color: Colors.text }]} numberOfLines={1}>{dragEvent.title}</Text>
+            <Text style={[styles.ghostTitle, { color: Colors.text, fontSize: eventFontSize }]} numberOfLines={1}>{dragEvent.title}</Text>
           </View>
         </View>
       )}

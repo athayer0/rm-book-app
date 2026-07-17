@@ -7,9 +7,8 @@ import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUt
 import { EventBlock } from './EventBlock';
 import { formatTime } from '../utils/dateUtils';
 import { Svg, Polygon } from 'react-native-svg';
+import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 
-const SLOT_HEIGHT = 50;
-const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 const TIME_COL_WIDTH = 52;
 const VERTICAL_EDGE_ZONE = 70;
 const AUTOSCROLL_TICK_MS = 30;
@@ -21,14 +20,17 @@ interface Props {
   onEventPress?: (event: CalendarEvent) => void;
   onToggleComplete?: (id: string) => void;
   onTapEmpty: (timeStr: string) => void;
-  onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
+  onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) => void;
   dragEventHeight?: number;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (absoluteY: number, gridTopY: number, scrollOffset: number) => void;
   onDragCancel?: () => void;
   dragHoverY?: number | null;
+  dragGrabOffsetY?: number;
   gridStartHour?: number;
   gridEndHour?: number;
+  slotHeight?: number;
+  eventFontSize?: number;
   getStatus?: (eventId: string, dateStr: string) => EventStatus | undefined;
   isToday?: boolean;
   // Shared vertical scroll: the center page publishes its offset via onScrollSettle;
@@ -45,9 +47,12 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragEventHeight, gridStartHour = 6, gridEndHour = 22, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY }: Props) {
   const Colors = useColors();
-  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const styles = useMemo(() => makeStyles(Colors, slotHeight), [Colors, slotHeight]);
+
+  const SLOT_HEIGHT = slotHeight;
+  const DRAG_SLOT_HEIGHT = slotHeight / 2;
 
   const HOURS = Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => gridStartHour + i);
   const totalHeight = (gridEndHour - gridStartHour) * SLOT_HEIGHT * 2;
@@ -60,9 +65,13 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const dragHoverYRef = useRef<number | null>(null);
   const [, forceRerender] = useReducer((n) => n + 1, 0);
 
+  // measure() reports where the grid currently sits on screen, which slides up as the
+  // ScrollView scrolls. Normalise back to the unscrolled position, since the drag math
+  // adds the live scroll offset in itself — otherwise the stored value is only correct
+  // when captured at offset 0.
   function measureGridTop() {
     gridRef.current?.measure((_x, _y, _w, _h, _pageX, pageY) => {
-      gridTopAbsoluteRef.current = pageY;
+      gridTopAbsoluteRef.current = pageY + scrollOffsetRef.current;
     });
   }
 
@@ -139,15 +148,24 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
     return () => clearInterval(interval);
   }, [isToday]);
 
+  // Where the dragged block's top edge sits, in grid content coordinates.
   const dragSlot = dragHoverY != null
-    ? Math.max(0, Math.floor((dragHoverY - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT))
+    ? Math.max(0, Math.floor((dragHoverY - dragGrabOffsetY - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT))
     : null;
 
   const dragSlotHapticRef = useRef<number | null>(null);
 
+  // Re-measure as the drag begins rather than trusting the initial onLayout capture,
+  // which can run before the surrounding layout has settled.
+  function handleDragStart(event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) {
+    measureGridTop();
+    measureViewport();
+    onDragStart?.(event, x, y, width, height, grabOffsetY);
+  }
+
   function handleDragMove(x: number, y: number) {
     const slot = Math.max(0, Math.floor(
-      (y - SLOT_HEIGHT - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT
+      (y - dragGrabOffsetY - gridTopAbsoluteRef.current + scrollOffsetRef.current) / DRAG_SLOT_HEIGHT
     ));
     if (slot !== dragSlotHapticRef.current) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -255,11 +273,13 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
                   event={event}
                   status={getStatus?.(event.id, event.date)}
                   gridStartHour={gridStartHour}
+                  slotHeight={slotHeight}
+                  fontSize={eventFontSize}
                   columnWidth={1 / numCols}
                   columnOffset={col / numCols}
                   onPress={() => onEventPress?.(event)}
                   onToggleComplete={onToggleComplete ? () => onToggleComplete(event.id) : undefined}
-                  onDragStart={onDragStart}
+                  onDragStart={onDragStart ? handleDragStart : undefined}
                   onDragMove={handleDragMove}
                   onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
                   onDragCancel={onDragCancel}
@@ -272,7 +292,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   );
 }
 
-function makeStyles(C: ColorPalette) {
+function makeStyles(C: ColorPalette, SLOT_HEIGHT: number) {
   return StyleSheet.create({
     scroll: {
       flex: 1,

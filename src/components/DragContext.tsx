@@ -7,25 +7,33 @@ type DragState = {
   ghostY: number;
   ghostWidth: number;
   ghostHeight: number;
+  // How far below the block's top edge the finger pressed. Captured once at
+  // gesture start and held for the drag, so the block keeps the grip it was
+  // picked up with instead of snapping its top to the finger.
+  grabOffsetY: number;
   active: boolean;
 };
 
 type DragContextValue = DragState & {
-  startDrag: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
+  startDrag: (event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) => void;
   moveDrag: (x: number, y: number) => void;
   endDrag: () => void;
 };
 
+const IDLE: DragState = {
+  event: null, ghostX: 0, ghostY: 0, ghostWidth: 0, ghostHeight: 0, grabOffsetY: 0, active: false,
+};
+
 const DragContext = createContext<DragContextValue>({
-  event: null, ghostX: 0, ghostY: 0, ghostWidth: 0, ghostHeight: 0, active: false,
+  ...IDLE,
   startDrag: () => {}, moveDrag: () => {}, endDrag: () => {},
 });
 
 export function DragProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<DragState>({ event: null, ghostX: 0, ghostY: 0, ghostWidth: 0, ghostHeight: 0, active: false });
+  const [state, setState] = useState<DragState>(IDLE);
 
-  function startDrag(event: CalendarEvent, x: number, y: number, width: number, height: number) {
-    setState({ event, ghostX: x, ghostY: y, ghostWidth: width, ghostHeight: height, active: true });
+  function startDrag(event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) {
+    setState({ event, ghostX: x, ghostY: y, ghostWidth: width, ghostHeight: height, grabOffsetY, active: true });
   }
 
   function moveDrag(x: number, y: number) {
@@ -33,7 +41,7 @@ export function DragProvider({ children }: { children: React.ReactNode }) {
   }
 
   function endDrag() {
-    setState({ event: null, ghostX: 0, ghostY: 0, ghostWidth: 0, ghostHeight: 0, active: false });
+    setState(IDLE);
   }
 
   return (

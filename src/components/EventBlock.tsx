@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventHeight } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventBlockHeight } from '../utils/eventUtils';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventTypeConfig } from '../constants/colors';
+import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -23,27 +24,30 @@ interface Props {
   status?: EventStatus;
   onPress: () => void;
   onToggleComplete?: () => void;
-  onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number) => void;
+  onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) => void;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (x: number, y: number) => void;
   onDragCancel?: () => void;
   columnWidth?: number;
   columnOffset?: number;
   gridStartHour?: number;
+  slotHeight?: number;
+  fontSize?: number;
 }
 
 export function EventBlock({
   event, status, onPress, onToggleComplete, onDragStart, onDragMove, onDragEnd, onDragCancel,
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
+  slotHeight = DEFAULT_SLOT_HEIGHT, fontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { active, event: draggingEvent } = useDrag();
-  const top = eventTopOffset(event.startTime, gridStartHour) + 1;
+  const top = eventTopOffset(event.startTime, gridStartHour, slotHeight) + 1;
   const config = EventTypeConfig[event.type];
   const isFixed = config?.hasCheckbox ?? false;
-  const height = Math.max(eventHeight(event.startTime, event.endTime) - 1, 24);
+  const height = eventBlockHeight(event.startTime, event.endTime, slotHeight);
   const isBeingDragged = active && draggingEvent?.id === event.id;
 
   const isBackup = !!event.backup;
@@ -60,7 +64,9 @@ export function EventBlock({
       isDraggingRef.current = true;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const dragPixelWidth = columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH);
-      onDragStart?.(event, e.absoluteX, e.absoluteY, dragPixelWidth, height);
+      // e.y is the press position within this block — the real value the drag
+      // math used to approximate with a fixed 50px.
+      onDragStart?.(event, e.absoluteX, e.absoluteY, dragPixelWidth, height, e.y);
     })
     .onUpdate((e) => { if (isBeingDragged) onDragMove?.(e.absoluteX, e.absoluteY); })
     .onEnd((e) => { if (isBeingDragged) onDragEnd?.(e.absoluteX, e.absoluteY); })
@@ -77,6 +83,11 @@ export function EventBlock({
 
   const stripeCount = Math.ceil(height / 7) + 4;
 
+  // Status badge scales with density so it never outgrows a 15-minute block.
+  const badge = Math.round(Math.min(40, Math.max(22, 36 * (slotHeight / DEFAULT_SLOT_HEIGHT))));
+  const badgeInner = Math.round(badge * (2 / 3));
+  const badgeInset = Math.round(badge / 6);
+
   return (
     <GestureDetector gesture={composed}>
       <View
@@ -91,7 +102,8 @@ export function EventBlock({
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
             paddingLeft: isBackup ? 8 : 9,
-            paddingRight: effectiveStatus ? 42 : 6,
+            paddingRight: effectiveStatus ? badge + 6 : 6,
+            paddingVertical: slotHeight <= 40 ? 1 : 3,
           },
         ]}
         onStartShouldSetResponder={() => true}
@@ -114,34 +126,33 @@ export function EventBlock({
               <View hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                 <Ionicons
                   name={event.completed ? 'checkbox' : 'checkbox-outline'}
-                  size={13}
+                  size={fontSize}
                   color={Colors.text}
                   style={styles.checkbox}
                 />
               </View>
             </GestureDetector>
           )}
-          <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-          <Text style={styles.time} numberOfLines={1}>
+          <Text style={[styles.title, { fontSize }]} numberOfLines={1}>{event.title}</Text>
+          <Text style={[styles.time, { fontSize }]} numberOfLines={1}>
             {isFixed ? event.startTime : `${event.startTime} – ${event.endTime}`}
           </Text>
         </View>
 
         {effectiveStatus && (
-          <View style={styles.statusWrap}>
+          <View style={[styles.statusWrap, { width: badge }]}>
             {effectiveStatus === 'failed' ? (
-              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: STATUS_CONFIG.failed.color, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="ban-outline" size={26} color={Colors.white} style={{ transform: [{ scaleX: -1 }] }} />
-              </View>
-            ) : effectiveStatus === 'completed' ? (
-              <View style={{ width: 36, height: 36 }}>
-                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.card, top: 6, left: 6 }} />
-                <Ionicons name="checkmark-circle" size={36} color={STATUS_CONFIG.completed.color} />
+              <View style={{ width: badgeInner + badgeInset, height: badgeInner + badgeInset, borderRadius: (badgeInner + badgeInset) / 2, backgroundColor: STATUS_CONFIG.failed.color, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="ban-outline" size={badge - 10} color={Colors.white} style={{ transform: [{ scaleX: -1 }] }} />
               </View>
             ) : (
-              <View style={{ width: 36, height: 36 }}>
-                <View style={{ position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.card, top: 6, left: 6 }} />
-                <Ionicons name="alert-circle" size={36} color={STATUS_CONFIG.pending.color} />
+              <View style={{ width: badge, height: badge }}>
+                <View style={{ position: 'absolute', width: badgeInner, height: badgeInner, borderRadius: badgeInner / 2, backgroundColor: Colors.card, top: badgeInset, left: badgeInset }} />
+                <Ionicons
+                  name={effectiveStatus === 'completed' ? 'checkmark-circle' : 'alert-circle'}
+                  size={badge}
+                  color={effectiveStatus === 'completed' ? STATUS_CONFIG.completed.color : STATUS_CONFIG.pending.color}
+                />
               </View>
             )}
           </View>
@@ -174,13 +185,11 @@ function makeStyles(C: ColorPalette) {
       marginRight: 4,
     },
     title: {
-      fontSize: 13,
       fontWeight: '700',
       color: C.text,
       flexShrink: 1,
     },
     time: {
-      fontSize: 13,
       color: C.textSecondary,
       marginLeft: 4,
       flexShrink: 0,
@@ -190,7 +199,6 @@ function makeStyles(C: ColorPalette) {
       top: 0,
       bottom: 0,
       right: 6,
-      width: 36,
       alignItems: 'center',
       justifyContent: 'center',
     },

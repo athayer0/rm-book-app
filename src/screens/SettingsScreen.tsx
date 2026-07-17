@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
+import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize } from '../constants/eventSizes';
 import { useSettings } from '../hooks/useSettings';
 import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
@@ -42,6 +43,7 @@ export function SettingsScreen() {
   const { signOut } = useAuth();
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [hourDropdown, setHourDropdown] = useState<'start' | 'end' | null>(null);
+  const selectedEventSize = resolveEventSize(settings.eventSize);
 
   async function handleExport() {
     try {
@@ -178,6 +180,28 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* Event Size */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EVENT SIZE</Text>
+          <View style={styles.card}>
+            {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
+              <TouchableOpacity
+                key={size}
+                style={[styles.row, i === arr.length - 1 && styles.rowLast]}
+                onPress={() => updateSettings({ eventSize: size })}
+              >
+                <Text style={styles.rowLabel}>{EventSizes[size].label}</Text>
+                {selectedEventSize === size && (
+                  <Ionicons name="checkmark" size={18} color={Colors.accent} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.sectionFootnote}>
+            Controls how tall events and time slots appear on the calendar.
+          </Text>
+        </View>
+
         {/* Theme */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>THEME</Text>
@@ -289,7 +313,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset all event colors, default durations, and schedule hours to their original values. Your events will not be affected.',
+                  'This will reset all event colors, default durations, schedule hours, and event size to their original values. Your events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
@@ -300,6 +324,7 @@ export function SettingsScreen() {
                         eventTypeDefaultMinutes: {},
                         gridStartHour: 6,
                         gridEndHour: 24,
+                        eventSize: DEFAULT_EVENT_SIZE,
                       }),
                     },
                   ],
@@ -427,6 +452,12 @@ function makeStyles(C: ColorPalette) {
     },
     rowLabel: { flex: 1, fontSize: 15, color: C.text },
     rowValue: { fontSize: 14, color: C.textSecondary },
+    sectionFootnote: {
+      fontSize: 12,
+      color: C.textLight,
+      marginTop: 8,
+      marginLeft: 4,
+    },
     colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
     durationBadge: {
       fontSize: 12,
