@@ -6,9 +6,7 @@
 /** local field name -> db column name. Fields not listed pass through unchanged. */
 const FIELD_MAPS: Record<string, Record<string, string>> = {
   people: {
-    photoUri: 'photo_url',
     createdAt: 'created_at',
-    lastInteraction: 'last_interaction',
   },
   calendar_events: {
     startTime: 'start_time',
@@ -37,8 +35,8 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
 /** Every column that actually exists on each table. Anything else is dropped. */
 const COLUMNS: Record<string, string[]> = {
   people: [
-    'user_id', 'id', 'name', 'status', 'phone', 'notes', 'photo_url',
-    'starred', 'created_at', 'last_interaction', 'updated_at', 'deleted_at',
+    'user_id', 'id', 'name', 'status', 'phone', 'notes',
+    'starred', 'created_at', 'updated_at', 'deleted_at',
   ],
   calendar_events: [
     'user_id', 'id', 'title', 'type', 'color', 'date', 'start_time', 'end_time',
@@ -46,7 +44,7 @@ const COLUMNS: Record<string, string[]> = {
     'recurring_days', 'backup', 'updated_at', 'deleted_at',
   ],
   goal_definitions: [
-    'user_id', 'id', 'label', 'icon', 'icon_family', 'type', 'color',
+    'user_id', 'id', 'label', 'icon', 'icon_family', 'color',
     'visible', 'built_in', 'updated_at', 'deleted_at',
   ],
   goal_entries: [

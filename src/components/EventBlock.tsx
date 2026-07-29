@@ -76,8 +76,8 @@ export function EventBlock({
       isDraggingRef.current = true;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const dragPixelWidth = columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH);
-      // e.y is the press position within this block — the real value the drag
-      // math used to approximate with a fixed 50px.
+      // e.y is the press position within this block, which the drag math needs
+      // to keep the event anchored under the finger.
       onDragStart?.(event, e.absoluteX, e.absoluteY, dragPixelWidth, height, e.y);
     })
     .onUpdate((e) => { if (isBeingDragged) onDragMove?.(e.absoluteX, e.absoluteY); })

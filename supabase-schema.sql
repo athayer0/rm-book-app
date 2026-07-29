@@ -32,10 +32,8 @@ create table if not exists people (
   status text,
   phone text,
   notes text,
-  photo_url text,
   starred boolean default false,
   created_at timestamptz default now(),
-  last_interaction timestamptz,
   updated_at timestamptz default now(),
   deleted_at timestamptz,
   primary key (user_id, id)
@@ -111,7 +109,6 @@ create table if not exists goal_definitions (
   label text not null,
   icon text,
   icon_family text,
-  type text,
   color text,
   visible boolean default true,
   built_in boolean default false,

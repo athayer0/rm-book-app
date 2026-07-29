@@ -3,7 +3,6 @@ export interface GoalDefinition {
   label: string;
   icon: string;
   iconFamily: string;
-  type: 'daily' | 'weekly' | 'numeric';
   color: string;
   visible: boolean;
   builtIn: boolean;
@@ -15,7 +14,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     label: 'Morning Prayers',
     icon: 'sunny',
     iconFamily: 'Ionicons',
-    type: 'daily',
     color: '#E8980E',
     visible: true,
     builtIn: true,
@@ -25,7 +23,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     label: 'Nightly Prayers',
     icon: 'moon',
     iconFamily: 'Ionicons',
-    type: 'daily',
     color: '#1A3A6B',
     visible: true,
     builtIn: true,
@@ -35,7 +32,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     label: 'Personal Study',
     icon: 'book-outline',
     iconFamily: 'Ionicons',
-    type: 'daily',
     color: '#9B59B6',
     visible: true,
     builtIn: true,
@@ -45,7 +41,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     label: 'Church Hours',
     icon: 'church',
     iconFamily: 'MaterialCommunityIcons',
-    type: 'numeric',
     color: '#8B1A4A',
     visible: true,
     builtIn: true,
@@ -55,7 +50,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     label: 'Times Exercised',
     icon: 'barbell-outline',
     iconFamily: 'Ionicons',
-    type: 'numeric',
     color: '#616161',
     visible: true,
     builtIn: true,
@@ -65,7 +59,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     label: 'Temple Attendance',
     icon: 'church',
     iconFamily: 'MaterialCommunityIcons',
-    type: 'weekly',
     color: '#00B5C8',
     visible: true,
     builtIn: true,

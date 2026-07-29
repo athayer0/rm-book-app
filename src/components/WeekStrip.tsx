@@ -19,8 +19,6 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const weekStartsOn = weekStart === 'monday' ? 1 : 0;
-  const today = new Date();
-  const todayStr = format(today, 'yyyy-MM-dd');
 
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const pendingResetRef = useRef(false);

@@ -14,7 +14,6 @@ import { PersonCard } from '../components/PersonCard';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
 import { GoalWeeklyModal } from '../modals/GoalWeeklyModal';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
-import { getWeekKey } from '../utils/dateUtils';
 import { Person } from '../hooks/usePeople';
 
 export function HomeScreen({ navigation }: any) {
@@ -30,7 +29,6 @@ export function HomeScreen({ navigation }: any) {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [personModalVisible, setPersonModalVisible] = useState(false);
 
-  const weekLabel = getWeekKey();
   const featuredPeople = people.filter(p => p.starred);
 
   function handlePersonPress(person: Person) {

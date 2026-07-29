@@ -1,4 +1,4 @@
-import { getISOWeek, getISOWeekYear, format, startOfISOWeek, addWeeks } from 'date-fns';
+import { getISOWeek, getISOWeekYear, format, addWeeks } from 'date-fns';
 
 export function getWeekKey(date: Date = new Date()): string {
   const year = getISOWeekYear(date);
@@ -11,10 +11,6 @@ export function isNewWeek(lastResetDate: string | null): boolean {
   const last = new Date(lastResetDate);
   const now = new Date();
   return getWeekKey(last) !== getWeekKey(now);
-}
-
-export function getMondayOfWeek(date: Date = new Date()): Date {
-  return startOfISOWeek(date);
 }
 
 export function formatWeekLabel(weekKey: string): string {
@@ -46,10 +42,6 @@ export function parseTimeString(timeStr: string): { hour: number; minute: number
 
 export function timeToMinutes(hour: number, minute: number): number {
   return hour * 60 + minute;
-}
-
-export function addWeeksToDate(date: Date, weeks: number): Date {
-  return addWeeks(date, weeks);
 }
 
 export function getWeekKeyByOffset(offset: number): string {

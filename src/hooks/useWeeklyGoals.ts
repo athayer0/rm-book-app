@@ -40,7 +40,7 @@ export function useWeeklyGoals() {
   const { user } = useAuth();
   // The bare week key is what the DB stores; the storage keys are derived from it.
   // Keeping them under separate names is what stops a storage key from being
-  // written into the `week_key` column, which is what used to happen here.
+  // written into the `week_key` column.
   const weekKey = getWeekKey();
   const countsKey = goalCountsKey(weekKey);
   const targetsKey = goalTargetsKey(weekKey);

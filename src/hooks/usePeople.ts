@@ -11,10 +11,8 @@ export interface Person {
   status: string;
   phone?: string;
   notes?: string;
-  photoUri?: string;
   starred: boolean;
   createdAt: string;
-  lastInteraction?: string;
 }
 
 const EMPTY: Person[] = [];

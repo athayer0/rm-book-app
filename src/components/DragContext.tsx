@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { CalendarEvent } from '../utils/eventUtils';
 
 type DragState = {

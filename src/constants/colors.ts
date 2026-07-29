@@ -1,6 +1,5 @@
 export const LightColors = {
   primary: '#8B1A4A',
-  primaryDark: '#6B1238',
   accent: '#00B5C8',
   background: '#F5F5F5',
   card: '#FFFFFF',
@@ -10,11 +9,8 @@ export const LightColors = {
   border: '#E5E5E5',
   success: '#27AE60',
   danger: '#E74C3C',
-  warning: '#E8980E',
   white: '#FFFFFF',
-  black: '#000000',
   tabBar: '#EFEFEF',
-  tabBarActive: '#8B1A4A',
   tabBarInactive: '#888888',
   shadow: 'rgba(0,0,0,0.08)',
   modalBackdrop: 'rgba(0,0,0,0.35)',
@@ -32,7 +28,6 @@ export const LightColors = {
 
 export const DarkColors: typeof LightColors = {
   primary: '#8B1A4A',
-  primaryDark: '#6B1238',
   accent: '#00B5C8',
   background: '#111111',
   card: '#1E1E1E',
@@ -42,11 +37,8 @@ export const DarkColors: typeof LightColors = {
   border: '#2C2C2C',
   success: '#27AE60',
   danger: '#E74C3C',
-  warning: '#E8980E',
   white: '#FFFFFF',
-  black: '#000000',
   tabBar: '#1A1A1A',
-  tabBarActive: '#8B1A4A',
   tabBarInactive: '#FFFFFF',
   shadow: 'rgba(0,0,0,0.4)',
   modalBackdrop: 'rgba(0,0,0,0.6)',
@@ -62,7 +54,6 @@ export const DarkColors: typeof LightColors = {
   statusOtherColor: '#FFFFFF',
 };
 
-export const Colors = LightColors;
 export type ColorPalette = typeof LightColors;
 
 // The palette offered by every colour picker (goal icons, event types). Ordered by hue —

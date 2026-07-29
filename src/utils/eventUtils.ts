@@ -119,13 +119,13 @@ function eventHeight(startTime: string, endTime: string, slotHeight: number = DE
 
 // The rendered height of a block, minus the 1px gap that separates neighbours.
 // Floored at a 15-minute row so the shortest events stay tappable at any density.
-export function eventBlockHeight(startTime: string, endTime: string, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
+function eventBlockHeight(startTime: string, endTime: string, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
   return Math.max(eventHeight(startTime, endTime, slotHeight) - 1, slotHeight / 2 - 1);
 }
 
 // Checkbox events (task, prayer) render at a fixed compact size — a 30-minute block at the
 // smallest density — no matter the calendar's size setting or the event's own duration.
-export const CHECKBOX_EVENT_HEIGHT = EventSizes.sm.slotHeight - 1;
+const CHECKBOX_EVENT_HEIGHT = EventSizes.sm.slotHeight - 1;
 
 export function isCheckboxType(type: string): boolean {
   return EventTypeConfig[type]?.hasCheckbox ?? false;

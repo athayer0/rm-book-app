@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npx expo start          # start dev server (scan QR with Expo Go)
 npx expo start --ios    # open iOS simulator
 npx expo start --android
-npx tsc --noEmit --skipLibCheck   # type-check (no test suite exists)
+npx tsc --noEmit        # type-check (no test suite exists)
 ```
 
 Supabase credentials are required as env vars: `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 
 ## Architecture
 
-React Native (Expo SDK 54) app with the new architecture enabled. No tests exist. TypeScript strict mode is off; `--skipLibCheck` is needed for tsc.
+React Native (Expo SDK 54) app with the new architecture enabled. No tests exist. TypeScript runs with `strict: true` (`tsconfig.json`) and the tree currently type-checks clean without `--skipLibCheck`.
 
 ### Data flow
 
@@ -39,7 +39,7 @@ No Redux or Zustand. Each feature has its own hook that owns AsyncStorage reads/
 | `useEventStatuses` | `event_statuses` | Per-occurrence status, keyed `eventId::date` |
 | `useSettings` | `settings` | App-wide settings |
 
-**Every key name lives in `src/constants/storageKeys.ts`.** Never build one inline — an inline template literal is what let `indicators_${key}` survive the last rename in `GoalsScreen`.
+**Every key name lives in `src/constants/storageKeys.ts`.** Never build one inline — an inline template literal is what let `indicators_${key}` survive the last rename unnoticed.
 
 Hooks are built on `useStoredState` (`src/hooks/useStoredState.ts`), which subscribes to the key. `setItem` in `src/utils/storage.ts` notifies subscribers, so a write from anywhere — including `pullAll` writing AsyncStorage directly — reaches every live screen. Writes resolve against a ref rather than closed-over state, so two writes in the same tick don't clobber each other.
 
@@ -47,9 +47,9 @@ Settings are provided globally via `SettingsContext` (created in `useSettings.ts
 
 ### Theming
 
-Colors are entirely dynamic — **never use the static `Colors` export in new UI code**.
+Colors are entirely dynamic — **every component resolves its palette at render time**. There is no static palette export to reach for.
 
-- `src/constants/colors.ts` exports `LightColors`, `DarkColors`, `ColorPalette` type. `Colors = LightColors` exists only as a static fallback.
+- `src/constants/colors.ts` exports `LightColors`, `DarkColors`, and the `ColorPalette` type.
 - `src/hooks/useColors.ts` — call `const Colors = useColors()` inside every component. It reads `settings.theme` ('light' | 'dark' | 'system') and React Native's `useColorScheme()` for system detection.
 - Styles must be computed inside the component: `const styles = useMemo(() => makeStyles(Colors), [Colors])` with a module-level `function makeStyles(C: ColorPalette) { return StyleSheet.create({...}); }`.
 
@@ -64,7 +64,7 @@ Colors are entirely dynamic — **never use the static `Colors` export in new UI
 
 ### Navigation
 
-Bottom tab navigator (`@react-navigation/bottom-tabs`) with 4 tabs: Home, Calendar, People, Settings. Defined in `src/navigation.tsx`. `GoalsScreen` exists but is not currently wired into the tab bar.
+Bottom tab navigator (`@react-navigation/bottom-tabs`) with 4 tabs: Home, Calendar, People, Settings. Defined in `src/navigation.tsx`. Goals have no screen or tab of their own — they surface on `HomeScreen` through `GoalGrid` plus the `WeeklyPlanningModal` and `GoalWeeklyModal` sheets.
 
 ### Calendar
 

@@ -26,12 +26,6 @@ export const PERSON_STATUSES: Record<string, StatusConfig> = {
 
 export const STATUS_OPTIONS = Object.keys(PERSON_STATUSES);
 
-const ICON_SIZE: Record<StatusShape, number> = { circle: 10, dot: 8, star: 11, diamond: 10 };
-
-export function statusIconSize(shape: StatusShape): number {
-  return ICON_SIZE[shape];
-}
-
 // The stored status stays plural for consistency across the app, but reads
 // more naturally singular when picking a status for one specific person.
 const STATUS_SINGULAR_DISPLAY: Record<string, string> = {

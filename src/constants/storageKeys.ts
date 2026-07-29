@@ -48,9 +48,3 @@ export function goalTargetsKey(wk: string): string {
 export function statusKey(eventId: string, dateStr: string): string {
   return `${eventId}::${dateStr}`;
 }
-
-export function parseStatusKey(key: string): { eventId: string; dateStr: string } | null {
-  const at = key.lastIndexOf('::');
-  if (at === -1) return null;
-  return { eventId: key.slice(0, at), dateStr: key.slice(at + 2) };
-}
