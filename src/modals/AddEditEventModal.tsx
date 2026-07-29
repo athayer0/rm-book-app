@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Switch, Alert,
+  StyleSheet, Switch, Alert, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
@@ -66,6 +66,8 @@ function weekdayOf(dateStr: string): number {
   return new Date(dateStr + 'T12:00:00').getDay();
 }
 
+type PickerId = 'type' | 'date' | 'start' | 'end' | 'rule' | 'endsOn';
+
 export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -80,14 +82,17 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [recurring, setRecurring] = useState(false);
   const [recurringRule, setRecurringRule] = useState<RecurringRule>('weekly');
   const [endsOn, setEndsOn] = useState(() => defaultRecurrenceEnd(defaultDate ?? format(new Date(), 'yyyy-MM-dd'), 'weekly'));
-  const [showEndsOnPicker, setShowEndsOnPicker] = useState(false);
-  const [showRulePicker, setShowRulePicker] = useState(false);
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [isBackup, setIsBackup] = useState(false);
-  const [showTypePicker, setShowTypePicker] = useState(false);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  // One picker open at a time — a single value makes that structural instead of
+  // something six separate booleans have to agree on.
+  const [openPicker, setOpenPicker] = useState<PickerId | null>(null);
+  const showTypePicker = openPicker === 'type';
+  const showDatePicker = openPicker === 'date';
+  const showStartPicker = openPicker === 'start';
+  const showEndPicker = openPicker === 'end';
+  const showRulePicker = openPicker === 'rule';
+  const showEndsOnPicker = openPicker === 'endsOn';
   const [error, setError] = useState('');
   const startScrollRef = useRef<ScrollView>(null);
   const endScrollRef = useRef<ScrollView>(null);
@@ -127,11 +132,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setRecurringDays([]);
       setIsBackup(false);
     }
-    setShowEndsOnPicker(false);
-    setShowRulePicker(false);
+    setOpenPicker(null);
     setLocalStatus(currentStatus);
     setError('');
-    setShowDatePicker(false);
   }, [event, defaultDate, defaultStartTime, visible, currentStatus]);
 
   useEffect(() => {
@@ -172,13 +175,13 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     setType(newType);
     if (!title) setTitle(EventTypeLabels[newType] ?? '');
     setEndTime(addMinutesToTimeString(startTime, resolvedDefaultMinutes(newType, settings)));
-    setShowTypePicker(false);
+    closePickers();
   }
 
   function handleStartTimeChange(t: string) {
     setStartTime(t);
     setEndTime(addMinutesToTimeString(t, resolvedDefaultMinutes(type, settings)));
-    setShowStartPicker(false);
+    closePickers();
   }
 
   // Each rule carries its own default span, so switching rules re-applies it.
@@ -190,6 +193,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   }
 
   function handleRecurringToggle(val: boolean) {
+    // This control sits above the dismiss backdrop (its section has to, for the
+    // Frequency/Ends triggers), so it closes any open picker itself.
+    closePickers();
     setRecurring(val);
     if (val && recurringRule === 'weekly') {
       setRecurringDays(prev => (prev.length ? prev : [weekdayOf(date)]));
@@ -198,6 +204,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
   // Weekly repeats on the tapped days; keep at least one selected.
   function toggleDay(day: number) {
+    closePickers();
     setRecurringDays(prev => {
       if (prev.includes(day)) {
         return prev.length === 1 ? prev : prev.filter(d => d !== day);
@@ -262,6 +269,15 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   }
 
   const fixed = isCheckboxType(type);
+  const anyPickerOpen = openPicker !== null;
+
+  function closePickers() {
+    setOpenPicker(null);
+  }
+
+  function togglePicker(which: PickerId) {
+    setOpenPicker(cur => (cur === which ? null : which));
+  }
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
@@ -277,6 +293,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
+          {anyPickerOpen && (
+            <Pressable style={styles.pickerBackdrop} onPress={closePickers} />
+          )}
           {event && !isBackup && isCheckboxType(type) && (
             <View style={styles.section}>
               <View style={styles.statusRow}>
@@ -336,88 +355,96 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          <View style={styles.row}>
+          <View style={[styles.row, styles.pickerRow, showTypePicker && styles.openPickerRow]}>
             <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
               <Text style={styles.label}>Event Type</Text>
-              <TouchableOpacity style={styles.picker} onPress={() => setShowTypePicker(!showTypePicker)}>
-                <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
-                <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
-                <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-              </TouchableOpacity>
-              {showTypePicker && (
-                <View style={styles.dropdown}>
-                  <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                    {EVENT_TYPES.map(t => (
-                      <TouchableOpacity
-                        key={t}
-                        style={styles.dropdownItem}
-                        onPress={() => handleTypeChange(t)}
-                      >
-                        <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
-                        <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
-                        {type === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+              <View>
+                <TouchableOpacity style={styles.picker} onPress={() => togglePicker('type')}>
+                  <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
+                  <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
+                  <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
+                </TouchableOpacity>
+                {showTypePicker && (
+                  <View style={[styles.dropdown, styles.dropdownFloating]}>
+                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled bounces={false} overScrollMode="never">
+                      {EVENT_TYPES.map(t => (
+                        <TouchableOpacity
+                          key={t}
+                          style={styles.dropdownItem}
+                          onPress={() => handleTypeChange(t)}
+                        >
+                          <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
+                          <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
+                          {type === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
             </View>
             <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
               <Text style={styles.label}>Date</Text>
-              <TouchableOpacity style={styles.picker} onPress={() => setShowDatePicker(v => !v)}>
+              <TouchableOpacity style={styles.picker} onPress={() => togglePicker('date')}>
                 <Text style={styles.pickerText}>{format(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</Text>
                 <Ionicons name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
               </TouchableOpacity>
             </View>
           </View>
           {showDatePicker && (
-            <InlineDatePicker
-              value={date}
-              weekStart={settings.weekStart}
-              onChange={ds => { setDate(ds); setShowDatePicker(false); }}
-            />
+            <View style={[styles.section, { paddingTop: 4 }, styles.openPickerRow]}>
+              <InlineDatePicker
+                value={date}
+                weekStart={settings.weekStart}
+                onChange={ds => { setDate(ds); closePickers(); }}
+              />
+            </View>
           )}
 
-          <View style={styles.row}>
+          <View style={[styles.row, styles.pickerRow, (showStartPicker || showEndPicker) && styles.openPickerRow]}>
             <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
               <Text style={styles.label}>Start Time</Text>
-              <TouchableOpacity style={styles.picker} onPress={() => setShowStartPicker(!showStartPicker)}>
-                <Text style={styles.pickerText}>{startTime}</Text>
-                <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-              </TouchableOpacity>
-              {showStartPicker && (
-                <View style={styles.dropdown}>
-                  <ScrollView ref={startScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled>
-                    {TIME_OPTIONS.map((t, i) => (
-                      <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
-                        <Text style={styles.dropdownText}>{t}</Text>
-                        {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            {!fixed && (
-              <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
-                <Text style={styles.label}>End Time</Text>
-                <TouchableOpacity style={styles.picker} onPress={() => setShowEndPicker(!showEndPicker)}>
-                  <Text style={styles.pickerText}>{endTime}</Text>
+              <View>
+                <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
+                  <Text style={styles.pickerText}>{startTime}</Text>
                   <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
                 </TouchableOpacity>
-                {showEndPicker && (
-                  <View style={styles.dropdown}>
-                    <ScrollView ref={endScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled>
+                {showStartPicker && (
+                  <View style={[styles.dropdown, styles.dropdownFloating]}>
+                    <ScrollView ref={startScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled bounces={false} overScrollMode="never">
                       {TIME_OPTIONS.map((t, i) => (
-                        <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => { setEndTime(t); setShowEndPicker(false); }}>
+                        <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
                           <Text style={styles.dropdownText}>{t}</Text>
-                          {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                          {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
                   </View>
                 )}
+              </View>
+            </View>
+
+            {!fixed && (
+              <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
+                <Text style={styles.label}>End Time</Text>
+                <View>
+                  <TouchableOpacity style={styles.picker} onPress={() => togglePicker('end')}>
+                    <Text style={styles.pickerText}>{endTime}</Text>
+                    <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
+                  </TouchableOpacity>
+                  {showEndPicker && (
+                    <View style={[styles.dropdown, styles.dropdownFloating]}>
+                      <ScrollView ref={endScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled bounces={false} overScrollMode="never">
+                        {TIME_OPTIONS.map((t, i) => (
+                          <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => { setEndTime(t); closePickers(); }}>
+                            <Text style={styles.dropdownText}>{t}</Text>
+                            {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -435,7 +462,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          <View style={styles.section}>
+          <View style={[styles.section, styles.pickerRow, (showRulePicker || showEndsOnPicker) && styles.openPickerRow]}>
             <View style={styles.switchRow}>
               <Text style={styles.label}>Recurring</Text>
               <Switch
@@ -447,36 +474,38 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
             {recurring && (
               <>
-                <View style={[styles.row, { marginTop: 12 }]}>
+                <View style={[styles.row, { marginTop: 12 }, showRulePicker && styles.openPickerRow]}>
                   <View style={{ flex: 1, marginRight: 4 }}>
                     <Text style={styles.label}>Frequency</Text>
-                    <TouchableOpacity style={styles.picker} onPress={() => setShowRulePicker(v => !v)}>
-                      <Text style={styles.pickerText}>
-                        {recurringRule.charAt(0).toUpperCase() + recurringRule.slice(1)}
-                      </Text>
-                      <Ionicons name={showRulePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
-                    </TouchableOpacity>
-                    {showRulePicker && (
-                      <View style={styles.dropdown}>
-                        {(['daily', 'weekly', 'monthly'] as const).map(rule => (
-                          <TouchableOpacity
-                            key={rule}
-                            style={styles.dropdownItem}
-                            onPress={() => { changeRule(rule); setShowRulePicker(false); }}
-                          >
-                            <Text style={styles.dropdownText}>
-                              {rule.charAt(0).toUpperCase() + rule.slice(1)}
-                            </Text>
-                            {recurringRule === rule && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
+                    <View>
+                      <TouchableOpacity style={styles.picker} onPress={() => togglePicker('rule')}>
+                        <Text style={styles.pickerText}>
+                          {recurringRule.charAt(0).toUpperCase() + recurringRule.slice(1)}
+                        </Text>
+                        <Ionicons name={showRulePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                      </TouchableOpacity>
+                      {showRulePicker && (
+                        <View style={[styles.dropdown, styles.dropdownFloating]}>
+                          {(['daily', 'weekly', 'monthly'] as const).map(rule => (
+                            <TouchableOpacity
+                              key={rule}
+                              style={styles.dropdownItem}
+                              onPress={() => { changeRule(rule); closePickers(); }}
+                            >
+                              <Text style={styles.dropdownText}>
+                                {rule.charAt(0).toUpperCase() + rule.slice(1)}
+                              </Text>
+                              {recurringRule === rule && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   <View style={{ flex: 1, marginLeft: 4 }}>
                     <Text style={styles.label}>Ends</Text>
-                    <TouchableOpacity style={styles.picker} onPress={() => setShowEndsOnPicker(v => !v)}>
+                    <TouchableOpacity style={styles.picker} onPress={() => togglePicker('endsOn')}>
                       <Text style={styles.pickerText}>
                         {format(new Date(endsOn + 'T12:00:00'), 'MMM d, yyyy')}
                       </Text>
@@ -490,7 +519,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     value={endsOn}
                     weekStart={settings.weekStart}
                     minDate={date}
-                    onChange={ds => { setEndsOn(ds); setShowEndsOnPicker(false); }}
+                    onChange={ds => { setEndsOn(ds); closePickers(); }}
                   />
                 )}
 
@@ -571,6 +600,12 @@ function makeStyles(C: ColorPalette) {
       padding: 12,
     },
     row: { flexDirection: 'row', marginHorizontal: 0 },
+    // Layers, low to high: plain form content (auto) < backdrop (10) < any row holding a
+    // picker trigger (20) < the row whose picker is open (30). Keeping every trigger above
+    // the backdrop is what lets one tap switch dropdowns instead of just dismissing.
+    // zIndex only, no elevation — elevation would paint an Android shadow on the card rows.
+    pickerRow: { zIndex: 20 },
+    openPickerRow: { zIndex: 30 },
     label: {
       fontSize: 12,
       fontWeight: '600',
@@ -603,6 +638,28 @@ function makeStyles(C: ColorPalette) {
       borderWidth: 1,
       borderColor: C.border,
       overflow: 'hidden',
+    },
+    pickerBackdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'transparent',
+      zIndex: 10,
+    },
+    dropdownFloating: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      backgroundColor: C.card,
+      shadowColor: C.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 10,
+      elevation: 12,
+      zIndex: 21,
     },
     dropdownItem: {
       flexDirection: 'row',
