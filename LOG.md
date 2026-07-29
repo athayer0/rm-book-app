@@ -2,7 +2,8 @@ TO DO
 
 [ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts, make a call and maybe whatsapp shortcut icon next to their phone number, messenger?
 [ ]  Also swiping right from the page or swiping left from the person page should take you to the calendar page but you shouldn't be able to swipe from the calendar page to either of those two pages Swiping from the calendar page should obviously just move you through the calendar as it currently does There should also be the ability to swipe left from the settings page and right from People page in order to reach those respective pages
-[ ] add a curcular arrow icon to repeating events
+[ ] add a circular arrow icon to repeating events
+[ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review
 [x] be able to pinch, or add small, medium, large options in terms of zoom
@@ -10,6 +11,7 @@ TO DO
 [ ] unreported events button to view all and mass report them
 [ ] make friends and districts, be able to view each others KIs
 [ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
+[ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
 [ ] security audit
 [ ] dont get sued
 [ ] deploy to google play store
