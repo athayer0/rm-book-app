@@ -1,4 +1,4 @@
-export interface IndicatorDefinition {
+export interface GoalDefinition {
   id: string;
   label: string;
   icon: string;
@@ -10,7 +10,7 @@ export interface IndicatorDefinition {
   builtIn: boolean;
 }
 
-export const DEFAULT_INDICATORS: IndicatorDefinition[] = [
+export const DEFAULT_GOALS: GoalDefinition[] = [
   {
     id: 'morning_prayer',
     label: 'Morning Prayers',
@@ -62,7 +62,7 @@ export const DEFAULT_INDICATORS: IndicatorDefinition[] = [
     iconFamily: 'Ionicons',
     goal: 3,
     type: 'numeric',
-    color: '#27AE60',
+    color: '#616161',
     visible: true,
     builtIn: true,
   },

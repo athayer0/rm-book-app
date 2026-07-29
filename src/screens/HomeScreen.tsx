@@ -6,13 +6,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
+import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { usePeople } from '../hooks/usePeople';
-import { IndicatorGrid } from '../components/IndicatorGrid';
+import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { PersonCard } from '../components/PersonCard';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
-import { KIWeeklyModal } from '../modals/KIWeeklyModal';
+import { GoalWeeklyModal } from '../modals/GoalWeeklyModal';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { getWeekKey } from '../utils/dateUtils';
 import { Person } from '../hooks/usePeople';
@@ -21,7 +21,7 @@ export function HomeScreen({ navigation }: any) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyIndicators();
+  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
   const { people, updatePerson, deletePerson, reload: reloadPeople } = usePeople();
 
   useFocusEffect(useCallback(() => { reload(); reloadPeople(); }, [reload, reloadPeople]));
@@ -51,15 +51,15 @@ export function HomeScreen({ navigation }: any) {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <SectionHeader
-            title="Weekly Key Indicators"
+            title="Weekly Goals"
             actionLabel="EDIT"
             onAction={() => setEditVisible(true)}
           />
-          <IndicatorGrid
+          <GoalGrid
             definitions={definitions}
             counts={counts}
             goals={goals}
-            onPressKI={() => setPlanningVisible(true)}
+            onPressGoal={() => setPlanningVisible(true)}
           />
           <TouchableOpacity
             style={styles.planBtn}
@@ -104,7 +104,7 @@ export function HomeScreen({ navigation }: any) {
         onUpdateDefinitions={updateDefinitions}
       />
 
-      <KIWeeklyModal
+      <GoalWeeklyModal
         visible={planningVisible}
         onClose={() => { setPlanningVisible(false); reload(); }}
         definitions={definitions}

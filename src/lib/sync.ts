@@ -34,8 +34,8 @@ export async function drainQueue(): Promise<void> {
 export async function pullAll(userId: string): Promise<{
   people: Record<string, unknown>[];
   calendarEvents: Record<string, unknown>[];
-  indicatorDefinitions: Record<string, unknown>[];
-  indicatorEntries: Record<string, unknown>[];
+  goalDefinitions: Record<string, unknown>[];
+  goalEntries: Record<string, unknown>[];
   settings: Record<string, unknown> | null;
 }> {
   const lastSynced = await getItem<string>(LAST_SYNCED_KEY);
@@ -52,7 +52,8 @@ export async function pullAll(userId: string): Promise<{
     return data ?? [];
   }
 
-  const [people, calendarEvents, indicatorDefinitions, indicatorEntries] =
+  // Table names keep their legacy "indicator" wording — renaming them would need a migration.
+  const [people, calendarEvents, goalDefinitions, goalEntries] =
     await Promise.all([
       pull('people'),
       pull('calendar_events'),
@@ -70,5 +71,5 @@ export async function pullAll(userId: string): Promise<{
 
   await setItem(LAST_SYNCED_KEY, new Date().toISOString());
 
-  return { people, calendarEvents, indicatorDefinitions, indicatorEntries, settings };
+  return { people, calendarEvents, goalDefinitions, goalEntries, settings };
 }

@@ -5,25 +5,25 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { KIIcon } from '../components/KIIcon';
+import { GoalIcon } from '../components/GoalIcon';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
-import { IndicatorGrid } from '../components/IndicatorGrid';
+import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
+import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
-import { IndicatorDefinition } from '../constants/defaultIndicators';
+import { GoalDefinition } from '../constants/defaultGoals';
 import { getPastWeekKeys, formatWeekLabel } from '../utils/dateUtils';
 import { getItem } from '../utils/storage';
-import { WeeklyCounts } from '../hooks/useWeeklyIndicators';
+import { WeeklyCounts } from '../hooks/useWeeklyGoals';
 
 export function GoalsScreen() {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyIndicators();
+  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const [editMode, setEditMode] = useState(false);
@@ -63,7 +63,7 @@ export function GoalsScreen() {
   function handleDeleteCustom(id: string) {
     const def = definitions.find(d => d.id === id);
     if (def?.builtIn) return;
-    Alert.alert('Delete Indicator', `Remove "${def?.label}"?`, [
+    Alert.alert('Delete Goal', `Remove "${def?.label}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -98,7 +98,7 @@ export function GoalsScreen() {
         onScrollBeginDrag={loadPastData}
       >
         <View style={styles.card}>
-          <SectionHeader title="This Week's Indicators" />
+          <SectionHeader title="This Week's Goals" />
 
           {editMode ? (
             <View style={styles.editList}>
@@ -112,7 +112,7 @@ export function GoalsScreen() {
                     />
                   </TouchableOpacity>
                   <View style={[styles.iconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(def.color) : def.color} />
+                    <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
                   <Text style={styles.editLabel} numberOfLines={1}>{def.label}</Text>
                   <Text style={styles.editGoalLabel}>Goal:</Text>
@@ -132,7 +132,7 @@ export function GoalsScreen() {
               ))}
             </View>
           ) : (
-            <IndicatorGrid
+            <GoalGrid
               definitions={definitions}
               counts={counts}
               goals={goals}

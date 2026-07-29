@@ -5,18 +5,18 @@ import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { IndicatorDefinition } from '../constants/defaultIndicators';
-import { KIIcon } from './KIIcon';
+import { GoalDefinition } from '../constants/defaultGoals';
+import { GoalIcon } from './GoalIcon';
 
 interface Props {
-  definition: IndicatorDefinition;
+  definition: GoalDefinition;
   count: number;
   goal: number;
   onPress?: () => void;
   compact?: boolean;
 }
 
-export function IndicatorCard({ definition, count, goal, onPress, compact }: Props) {
+export function GoalCard({ definition, count, goal, onPress, compact }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -32,7 +32,7 @@ export function IndicatorCard({ definition, count, goal, onPress, compact }: Pro
       activeOpacity={0.7}
     >
       <View style={[styles.iconWrapper, { backgroundColor: isDark ? definition.color : definition.color + '20' }]}>
-        <KIIcon icon={definition.icon} iconFamily={definition.iconFamily} size={compact ? 20 : 24} color={isDark ? lightenColor(definition.color) : definition.color} />
+        <GoalIcon icon={definition.icon} iconFamily={definition.iconFamily} size={compact ? 20 : 24} color={isDark ? lightenColor(definition.color) : definition.color} />
       </View>
 
       <View style={styles.textCol}>

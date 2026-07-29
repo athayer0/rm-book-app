@@ -1,47 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getItem, setItem } from '../utils/storage';
-import { getIndicatorStorageKey, isNewWeek, getWeekKeyByOffset, getWeekKey } from '../utils/dateUtils';
-import { DEFAULT_INDICATORS, IndicatorDefinition } from '../constants/defaultIndicators';
+import { getGoalStorageKey, isNewWeek, getWeekKeyByOffset, getWeekKey } from '../utils/dateUtils';
+import { DEFAULT_GOALS, GoalDefinition } from '../constants/defaultGoals';
 import { enqueue } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
 export type WeeklyCounts = Record<string, number>;
 export type WeeklyGoals = Record<string, number>;
 
-// Goals are stored per week. A week at or before the current one treats an unset goal
-// as 0; a future week stays unset so the UI can prompt for one.
+// Each goal's weekly target is stored per week. A week at or before the current one treats
+// an unset target as 0; a future week stays unset so the UI can prompt for one.
 export function resolveGoal(stored: number | undefined, isFuture: boolean): number | null {
   return stored ?? (isFuture ? null : 0);
 }
 
+// Storage keys and Supabase table/column names keep their original "indicator" wording so
+// data written by earlier versions of the app still loads.
 function goalsKeyFor(wk: string) {
   return `indicator_goals_${wk}`;
 }
 
-function mergeWithDefaults(storedDefs: IndicatorDefinition[]): IndicatorDefinition[] {
-  const builtIns = DEFAULT_INDICATORS.map(def => {
+function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {
+  const builtIns = DEFAULT_GOALS.map(def => {
     const stored = storedDefs.find(d => d.id === def.id);
     // Stored wins so renames, icons, colours and visibility persist; def supplies any
     // field added to the defaults since the user's copy was written.
     return stored ? { ...def, ...stored, builtIn: true } : def;
   });
-  // Keep custom (non-builtIn) KIs from stored
+  // Keep custom (non-builtIn) goals from stored
   const customs = storedDefs.filter(d => !d.builtIn);
   return [...builtIns, ...customs];
 }
 
-export function useWeeklyIndicators() {
+export function useWeeklyGoals() {
   const { user } = useAuth();
-  const [definitions, setDefinitions] = useState<IndicatorDefinition[]>(DEFAULT_INDICATORS);
+  const [definitions, setDefinitions] = useState<GoalDefinition[]>(DEFAULT_GOALS);
   const [counts, setCounts] = useState<WeeklyCounts>({});
   const [goals, setGoals] = useState<WeeklyGoals>({});
-  const weekKey = getIndicatorStorageKey();
+  const weekKey = getGoalStorageKey();
   const currentGoalsKey = goalsKeyFor(getWeekKey());
 
   useEffect(() => {
     async function load() {
       const [storedDefs, storedCounts, storedGoals, lastReset] = await Promise.all([
-        getItem<IndicatorDefinition[]>('indicator_definitions'),
+        getItem<GoalDefinition[]>('indicator_definitions'),
         getItem<WeeklyCounts>(weekKey),
         getItem<WeeklyGoals>(currentGoalsKey),
         getItem<string>('last_reset_date'),
@@ -65,12 +67,12 @@ export function useWeeklyIndicators() {
     load();
   }, []);
 
-  const syncEntry = useCallback(async (indicatorId: string, count: number) => {
+  const syncEntry = useCallback(async (goalId: string, count: number) => {
     if (!user) return;
     await enqueue({
       table: 'indicator_entries',
       type: 'upsert',
-      row: { user_id: user.id, indicator_id: indicatorId, week_key: weekKey, count, updated_at: new Date().toISOString() },
+      row: { user_id: user.id, indicator_id: goalId, week_key: weekKey, count, updated_at: new Date().toISOString() },
     });
   }, [user, weekKey]);
 
@@ -106,7 +108,7 @@ export function useWeeklyIndicators() {
     for (const def of definitions) await syncEntry(def.id, 0);
   }, [weekKey, definitions, syncEntry]);
 
-  const updateDefinitions = useCallback(async (defs: IndicatorDefinition[]) => {
+  const updateDefinitions = useCallback(async (defs: GoalDefinition[]) => {
     setDefinitions(defs);
     await setItem('indicator_definitions', defs);
     if (user) {
@@ -115,6 +117,13 @@ export function useWeeklyIndicators() {
       }
     }
   }, [user]);
+
+  // Restore every built-in goal's fields (label, icon, colour, target, …) to the shipped
+  // defaults. Custom goals are left untouched, and counts/targets live elsewhere so they persist.
+  const resetBuiltInDefinitions = useCallback(async () => {
+    const customs = definitions.filter(d => !d.builtIn);
+    await updateDefinitions([...DEFAULT_GOALS.map(d => ({ ...d })), ...customs]);
+  }, [definitions, updateDefinitions]);
 
   const adjustCount = useCallback(async (id: string, delta: number) => {
     if (delta === 0) return;
@@ -128,7 +137,7 @@ export function useWeeklyIndicators() {
 
   const reload = useCallback(async () => {
     const [storedDefs, storedCounts, storedGoals] = await Promise.all([
-      getItem<IndicatorDefinition[]>('indicator_definitions'),
+      getItem<GoalDefinition[]>('indicator_definitions'),
       getItem<WeeklyCounts>(weekKey),
       getItem<WeeklyGoals>(currentGoalsKey),
     ]);
@@ -176,5 +185,5 @@ export function useWeeklyIndicators() {
     }
   }, []);
 
-  return { definitions, counts, goals, increment, decrement, reset, resetAll, updateDefinitions, adjustCount, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
+  return { definitions, counts, goals, increment, decrement, reset, resetAll, updateDefinitions, resetBuiltInDefinitions, adjustCount, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
 }

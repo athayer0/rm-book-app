@@ -3,7 +3,7 @@ import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Svg, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { KIIcon } from './KIIcon';
+import { GoalIcon } from './GoalIcon';
 
 export interface IconOption { name: string; family: string; }
 
@@ -74,7 +74,7 @@ export function IconPicker({ icon, iconFamily, color, onSelect }: Props) {
                 isSelected && { backgroundColor: color + '25', borderColor: color },
               ]}
             >
-              <KIIcon
+              <GoalIcon
                 icon={opt.name}
                 iconFamily={opt.family}
                 size={22}

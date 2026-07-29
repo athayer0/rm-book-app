@@ -3,12 +3,12 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, eventBlockHeight } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventTypeConfig } from '../constants/colors';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
+import { StatusCheckbox } from './StatusCheckbox';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
@@ -32,7 +32,7 @@ interface Props {
   event: CalendarEvent;
   status?: EventStatus;
   onPress: () => void;
-  onToggleComplete?: () => void;
+  onToggleStatus?: () => void;
   onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) => void;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (x: number, y: number) => void;
@@ -45,7 +45,7 @@ interface Props {
 }
 
 export function EventBlock({
-  event, status, onPress, onToggleComplete, onDragStart, onDragMove, onDragEnd, onDragCancel,
+  event, status, onPress, onToggleStatus, onDragStart, onDragMove, onDragEnd, onDragCancel,
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
   slotHeight = DEFAULT_SLOT_HEIGHT, fontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize,
 }: Props) {
@@ -54,15 +54,18 @@ export function EventBlock({
 
   const { active, event: draggingEvent } = useDrag();
   const top = eventTopOffset(event.startTime, gridStartHour, slotHeight) + 1;
-  const config = EventTypeConfig[event.type];
-  const isFixed = config?.hasCheckbox ?? false;
-  const height = eventBlockHeight(event.startTime, event.endTime, slotHeight);
+  const height = renderedEventHeight(event, slotHeight);
   const isBeingDragged = active && draggingEvent?.id === event.id;
 
   const isBackup = !!event.backup;
-  const effectiveStatus: EventStatus | undefined = isBackup ? undefined : (
+  // Checkbox types (task, prayer) carry a binary checked/unchecked status instead of the
+  // three-state badge, and only when they aren't a backup.
+  const isCheckbox = !isBackup && isCheckboxType(event.type);
+  const isChecked = status === 'completed';
+  const effectiveStatus: EventStatus | undefined = isBackup || isCheckbox ? undefined : (
     status ?? (TRACKABLE_TYPES.has(event.type) && hasEventStartPassed(event) ? 'pending' : undefined)
   );
+  const showBadge = isCheckbox || !!effectiveStatus;
 
   const isDraggingRef = useRef(false);
 
@@ -92,8 +95,10 @@ export function EventBlock({
 
   const stripeCount = Math.ceil(height / 7) + 4;
 
-  // Status badge scales with density so it never outgrows a 15-minute block.
-  const badge = Math.round(Math.min(40, Math.max(22, 36 * (slotHeight / DEFAULT_SLOT_HEIGHT))));
+  // Status badge scales with density so it never outgrows a 15-minute block. Checkbox
+  // events render at a fixed small size, so their badge follows that density, not the grid's.
+  const badgeSlot = isCheckbox ? EventSizes.sm.slotHeight : slotHeight;
+  const badge = Math.round(Math.min(40, Math.max(22, 36 * (badgeSlot / DEFAULT_SLOT_HEIGHT))));
   const badgeInner = Math.round(badge * (2 / 3));
   const badgeInset = Math.round(badge / 6);
 
@@ -105,13 +110,13 @@ export function EventBlock({
     columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
     - (isBackup ? 0 : 3)                      // left colour border
     - (isBackup ? 8 : 9)                      // paddingLeft
-    - (effectiveStatus ? badge + 6 : 6)       // paddingRight
-    - (isFixed ? fontSize + 4 : 0);           // checkbox + its margin
+    - (showBadge ? badge + 6 : 6);            // paddingRight
   const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
 
+  // Checkbox events have only a start time; everything else can show a start–end range.
   const bothLabel = `${event.startTime} – ${event.endTime}`;
   const timeLabel =
-    !isFixed && spare >= textWidth(bothLabel, fontSize) ? bothLabel
+    !isCheckbox && spare >= textWidth(bothLabel, fontSize) ? bothLabel
     : spare >= textWidth(event.startTime, fontSize) ? event.startTime
     : null;
 
@@ -129,8 +134,8 @@ export function EventBlock({
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
             paddingLeft: isBackup ? 8 : 9,
-            paddingRight: effectiveStatus ? badge + 6 : 6,
-            paddingVertical: slotHeight <= 40 ? 1 : 3,
+            paddingRight: showBadge ? badge + 6 : 6,
+            paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
           },
         ]}
         onStartShouldSetResponder={() => true}
@@ -148,23 +153,19 @@ export function EventBlock({
         )}
 
         <View style={styles.row}>
-          {isFixed && (
-            <GestureDetector gesture={Gesture.Tap().runOnJS(true).onEnd(() => onToggleComplete?.())}>
-              <View hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Ionicons
-                  name={event.completed ? 'checkbox' : 'checkbox-outline'}
-                  size={fontSize}
-                  color={Colors.text}
-                  style={styles.checkbox}
-                />
-              </View>
-            </GestureDetector>
-          )}
           <Text style={[styles.title, { fontSize }]} numberOfLines={1}>{event.title}</Text>
           {timeLabel && (
             <Text style={[styles.time, { fontSize }]} numberOfLines={1}>{timeLabel}</Text>
           )}
         </View>
+
+        {isCheckbox && (
+          <GestureDetector gesture={Gesture.Tap().runOnJS(true).onEnd(() => onToggleStatus?.())}>
+            <View style={[styles.statusWrap, { width: badge }]} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <StatusCheckbox checked={isChecked} size={badge - 2} color={event.color} />
+            </View>
+          </GestureDetector>
+        )}
 
         {effectiveStatus && (
           <View style={[styles.statusWrap, { width: badge }]}>

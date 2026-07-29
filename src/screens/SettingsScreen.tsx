@@ -12,8 +12,9 @@ import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig, SwatchColors } from '../constants/colors';
 import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize } from '../constants/eventSizes';
 import { useSettings } from '../hooks/useSettings';
-import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
+import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
+import { isCheckboxType } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
@@ -35,7 +36,7 @@ export function SettingsScreen() {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { settings, updateSettings } = useSettings();
-  const { resetAll } = useWeeklyIndicators();
+  const { resetAll, resetBuiltInDefinitions } = useWeeklyGoals();
   const { deleteAllEvents } = useCalendarEvents();
   const { signOut } = useAuth();
   const [expandedType, setExpandedType] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export function SettingsScreen() {
   }
 
   function handleResetWeek() {
-    Alert.alert('Reset Week', 'This will clear all indicator counts for the current week. Continue?', [
+    Alert.alert('Reset Week', 'This will clear all goal counts for the current week. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reset', style: 'destructive', onPress: resetAll },
     ]);
@@ -69,7 +70,7 @@ export function SettingsScreen() {
   }
 
   function effectiveMinutes(type: string): number | null {
-    if (EventTypeConfig[type]?.defaultMinutes === 0) return null;
+    if (isCheckboxType(type)) return null;
     return settings.eventTypeDefaultMinutes[type] ?? EventTypeConfig[type]?.defaultMinutes ?? 30;
   }
 
@@ -310,19 +311,22 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset all event colors, default durations, schedule hours, and event size to their original values. Your events will not be affected.',
+                  'This will reset all event colors, default durations, schedule hours, event size, and the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
                       text: 'Reset',
                       style: 'destructive',
-                      onPress: () => updateSettings({
-                        eventTypeColors: {},
-                        eventTypeDefaultMinutes: {},
-                        gridStartHour: 6,
-                        gridEndHour: 24,
-                        eventSize: DEFAULT_EVENT_SIZE,
-                      }),
+                      onPress: () => {
+                        updateSettings({
+                          eventTypeColors: {},
+                          eventTypeDefaultMinutes: {},
+                          gridStartHour: 6,
+                          gridEndHour: 24,
+                          eventSize: DEFAULT_EVENT_SIZE,
+                        });
+                        resetBuiltInDefinitions();
+                      },
                     },
                   ],
                   { cancelable: true }

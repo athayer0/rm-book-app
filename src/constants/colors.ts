@@ -17,15 +17,16 @@ export const LightColors = {
   tabBarActive: '#8B1A4A',
   tabBarInactive: '#888888',
   shadow: 'rgba(0,0,0,0.08)',
+  modalBackdrop: 'rgba(0,0,0,0.35)',
   weekStripBg: '#E8E8E8',
   weekStripBgAlt: '#D8D8D8',
   selectedDayBg: '#D4E8F5',
   selectedDayBorder: '#253960',
   rowPressedBg: 'rgba(160,160,160,0.2)',
-  // Navy, for tappable text actions in the KI screens ("Set goals", "Add a Key Indicator +").
-  kiTextAction: '#253960',
+  // Navy, for tappable text actions in the goal screens ("Set goals", "Add a Goal +").
+  goalTextAction: '#253960',
   // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
-  kiActionBg: '#253960',
+  goalActionBg: '#253960',
   statusOtherColor: '#000000',
 };
 
@@ -48,22 +49,23 @@ export const DarkColors: typeof LightColors = {
   tabBarActive: '#8B1A4A',
   tabBarInactive: '#FFFFFF',
   shadow: 'rgba(0,0,0,0.4)',
+  modalBackdrop: 'rgba(0,0,0,0.6)',
   weekStripBg: '#1A1A1A',
   weekStripBgAlt: '#141414',
   selectedDayBg: '#263040',
   selectedDayBorder: '#8AAFC8',
   rowPressedBg: 'rgba(160,160,160,0.2)',
   // Navy is unreadable on the dark background; lift it the same way selectedDayBorder does.
-  kiTextAction: '#8AAFC8',
+  goalTextAction: '#8AAFC8',
   // A fill, not text — navy still reads against the dark card and keeps its white label legible.
-  kiActionBg: '#2E4877',
+  goalActionBg: '#2E4877',
   statusOtherColor: '#FFFFFF',
 };
 
 export const Colors = LightColors;
 export type ColorPalette = typeof LightColors;
 
-// The palette offered by every colour picker (KI icons, event types). Ordered by hue —
+// The palette offered by every colour picker (goal icons, event types). Ordered by hue —
 // red through violet — with the low-saturation browns and grey trailing, since they have
 // no place on the spectrum. Rendered as two rows of eight.
 export const SwatchColors: string[] = [
@@ -81,8 +83,8 @@ export const SwatchColors: string[] = [
   '#A29BFE', // periwinkle
   '#9B59B6', // violet
   '#795548', // brown
-  '#4E342E', // dark brown
-  '#9E9E9E', // grey
+  '#616161', // dark grey
+  '#BDBDBD', // light grey
 ];
 
 export const EventColors: Record<string, string> = {
@@ -96,9 +98,9 @@ export const EventColors: Record<string, string> = {
   temple:    '#00B5C8',
   prayer:    '#A29BFE',
   scripture: '#9B59B6',
-  exercise:  '#795548',
-  other:     '#9E9E9E',
-  task:      '#4E342E',
+  exercise:  '#616161',
+  other:     '#BDBDBD',
+  task:      '#795548',
 };
 
 export const EventTypeLabels: Record<string, string> = {
@@ -126,9 +128,9 @@ export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckb
   service:   { defaultMinutes: 30, hasCheckbox: false },
   school:    { defaultMinutes: 30, hasCheckbox: false },
   temple:    { defaultMinutes: 30, hasCheckbox: false },
-  prayer:    { defaultMinutes: 15, hasCheckbox: false },
+  prayer:    { defaultMinutes: 0, hasCheckbox: true },
   scripture: { defaultMinutes: 30, hasCheckbox: false },
   exercise:  { defaultMinutes: 30, hasCheckbox: false },
   other:     { defaultMinutes: 30, hasCheckbox: false },
-  task:      { defaultMinutes: 15, hasCheckbox: false },
+  task:      { defaultMinutes: 0, hasCheckbox: true },
 };

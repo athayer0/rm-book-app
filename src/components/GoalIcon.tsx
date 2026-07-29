@@ -9,7 +9,7 @@ interface Props {
   color: string;
 }
 
-export function KIIcon({ icon, iconFamily, size, color }: Props) {
+export function GoalIcon({ icon, iconFamily, size, color }: Props) {
   if (iconFamily === 'MaterialCommunityIcons') {
     return <MaterialCommunityIcons name={icon as any} size={size} color={color} />;
   }

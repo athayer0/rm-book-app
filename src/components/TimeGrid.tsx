@@ -18,7 +18,7 @@ const AUTOSCROLL_MAX_SPEED = 550; // px/sec, at the very edge
 interface Props {
   events: CalendarEvent[];
   onEventPress?: (event: CalendarEvent) => void;
-  onToggleComplete?: (id: string) => void;
+  onToggleStatus?: (event: CalendarEvent) => void;
   onTapEmpty: (timeStr: string) => void;
   onDragStart?: (event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffsetY: number) => void;
   dragEventHeight?: number;
@@ -47,7 +47,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors, slotHeight), [Colors, slotHeight]);
 
@@ -187,7 +187,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
   const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
   const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
   const HIDE_NEAR_PX = 6;
-  const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
+  const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')} ${nowH < 12 ? 'AM' : 'PM'}`;
 
   function handleSlotTap(locationY: number) {
     const maxSlot = (gridEndHour - gridStartHour) * 2 - 1;
@@ -278,7 +278,7 @@ export function TimeGrid({ events, onEventPress, onToggleComplete, onTapEmpty, o
                   columnWidth={1 / numCols}
                   columnOffset={col / numCols}
                   onPress={() => onEventPress?.(event)}
-                  onToggleComplete={onToggleComplete ? () => onToggleComplete(event.id) : undefined}
+                  onToggleStatus={onToggleStatus ? () => onToggleStatus(event) : undefined}
                   onDragStart={onDragStart ? handleDragStart : undefined}
                   onDragMove={handleDragMove}
                   onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
@@ -353,7 +353,7 @@ function makeStyles(C: ColorPalette, SLOT_HEIGHT: number) {
     nowLabel: {
       position: 'absolute',
       top: -15,
-      left: 6,
+      left: 7,
       fontSize: 11,
       fontWeight: '500',
       color: C.primary,

@@ -14,11 +14,11 @@ import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
-import { CalendarEvent, EventStatus, getKIContribution, eventBlockHeight } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, getGoalContribution, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventStatuses } from '../hooks/useEventStatuses';
-import { useWeeklyIndicators } from '../hooks/useWeeklyIndicators';
+import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { isInCurrentWeek } from '../utils/dateUtils';
 import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
 
@@ -33,10 +33,10 @@ function CalendarContent() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [defaultStartTime, setDefaultStartTime] = useState<string | undefined>();
-  const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate, toggleComplete } = useCalendarEvents();
+  const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
   const { getStatus, setStatus } = useEventStatuses();
-  const { adjustCount } = useWeeklyIndicators();
+  const { adjustCount } = useWeeklyGoals();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, grabOffsetY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
@@ -120,10 +120,10 @@ function CalendarContent() {
   async function handleStatusChange(event: CalendarEvent, newStatus: EventStatus | undefined) {
     const prevStatus = getStatus(event.id, event.date);
     if (isInCurrentWeek(event.date)) {
-      const contrib = getKIContribution(event);
+      const contrib = getGoalContribution(event);
       if (contrib) {
-        if (prevStatus === 'completed') await adjustCount(contrib.kiId, -contrib.delta);
-        if (newStatus === 'completed')  await adjustCount(contrib.kiId, +contrib.delta);
+        if (prevStatus === 'completed') await adjustCount(contrib.goalId, -contrib.delta);
+        if (newStatus === 'completed')  await adjustCount(contrib.goalId, +contrib.delta);
       }
     }
     await setStatus(event.id, event.date, newStatus);
@@ -158,12 +158,16 @@ function CalendarContent() {
     const hour = Math.floor(fifteenMinSlot / 4) + settings.gridStartHour;
     const minute = (fifteenMinSlot % 4) * 15;
     const newStart = formatTime(Math.min(hour, 23), minute);
-    const { hour: sh, minute: sm } = parseTimeString(dragEvent.startTime);
-    const { hour: eh, minute: em } = parseTimeString(dragEvent.endTime);
-    const startMins = sh * 60 + sm;
-    const endMins = eh * 60 + em;
-    const durationMins = Math.max(endMins > startMins ? endMins - startMins : endMins + 1440 - startMins, 15);
-    const newEnd = addMinutesToTimeString(newStart, durationMins);
+    // Checkbox events (task, prayer) carry no duration; keep end equal to the new start.
+    let newEnd = newStart;
+    if (!isCheckboxType(dragEvent.type)) {
+      const { hour: sh, minute: sm } = parseTimeString(dragEvent.startTime);
+      const { hour: eh, minute: em } = parseTimeString(dragEvent.endTime);
+      const startMins = sh * 60 + sm;
+      const endMins = eh * 60 + em;
+      const durationMins = Math.max(endMins > startMins ? endMins - startMins : endMins + 1440 - startMins, 15);
+      newEnd = addMinutesToTimeString(newStart, durationMins);
+    }
     updateEvent(dragEvent.id, { startTime: newStart, endTime: newEnd, date: dateStr });
     endDrag();
   }
@@ -239,7 +243,7 @@ function CalendarContent() {
                   events={frozenEventsRef.current ?? events}
                   getStatus={getStatus}
                   onEventPress={handleEventPress}
-                  onToggleComplete={toggleComplete}
+                  onToggleStatus={(ev) => handleStatusChange(ev, getStatus(ev.id, ev.date) === 'completed' ? undefined : 'completed')}
                   onTapEmpty={handleTapEmpty}
                   onDragStart={handleDragStart}
                   onDragMove={moveDrag}
@@ -247,7 +251,7 @@ function CalendarContent() {
                   onDragCancel={handleDragCancel}
                   dragHoverY={dragActive ? ghostY : null}
                   dragGrabOffsetY={grabOffsetY}
-                  dragEventHeight={dragActive && dragEvent ? eventBlockHeight(dragEvent.startTime, dragEvent.endTime, SLOT_HEIGHT) : undefined}
+                  dragEventHeight={dragActive && dragEvent ? renderedEventHeight(dragEvent, SLOT_HEIGHT) : undefined}
                   gridStartHour={settings.gridStartHour}
                   gridEndHour={settings.gridEndHour}
                   slotHeight={SLOT_HEIGHT}

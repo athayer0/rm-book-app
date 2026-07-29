@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Modal, View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, KeyboardAvoidingView, Platform, Switch, Alert,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  StyleSheet, Switch, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd, isCheckboxType } from '../utils/eventUtils';
 import { InlineDatePicker } from '../components/InlineDatePicker';
+import { StatusCheckbox } from '../components/StatusCheckbox';
+import { SheetModal } from '../components/SheetModal';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
 import { format } from 'date-fns';
@@ -50,14 +52,18 @@ function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
 }
 
+// Checkbox events (task, prayer) have no duration, so they contribute no minutes; every
+// other type falls back to its configured default. No type is treated as a 15-minute event.
 function resolvedDefaultMinutes(type: string, settings: AppSettings): number {
-  const config = EventTypeConfig[type];
-  if (config?.defaultMinutes === 0) return 15;
-  return settings.eventTypeDefaultMinutes[type] ?? config?.defaultMinutes ?? 30;
+  if (isCheckboxType(type)) return 0;
+  return settings.eventTypeDefaultMinutes[type] ?? EventTypeConfig[type]?.defaultMinutes ?? 30;
 }
 
-function isFixedType(type: string): boolean {
-  return EventTypeConfig[type]?.defaultMinutes === 0;
+// Single-letter labels indexed by JS weekday (0 = Sunday … 6 = Saturday).
+const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+function weekdayOf(dateStr: string): number {
+  return new Date(dateStr + 'T12:00:00').getDay();
 }
 
 export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
@@ -75,6 +81,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [recurringRule, setRecurringRule] = useState<RecurringRule>('weekly');
   const [endsOn, setEndsOn] = useState(() => defaultRecurrenceEnd(defaultDate ?? format(new Date(), 'yyyy-MM-dd'), 'weekly'));
   const [showEndsOnPicker, setShowEndsOnPicker] = useState(false);
+  const [showRulePicker, setShowRulePicker] = useState(false);
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [isBackup, setIsBackup] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -98,6 +106,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setRecurringRule(rule);
       // Series predating end dates have none stored; offer the default rather than a blank.
       setEndsOn(event.recurringUntil ?? defaultRecurrenceEnd(event.date, rule));
+      // Weekly series predating per-day selection repeated on the start weekday, so default to it.
+      setRecurringDays(
+        event.recurringDays ??
+        (event.recurring && rule === 'weekly' ? [weekdayOf(event.date)] : [])
+      );
       setIsBackup(event.backup ?? false);
     } else {
       const initialStart = defaultStartTime ?? '9:00 AM';
@@ -111,9 +124,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setRecurring(false);
       setRecurringRule('weekly');
       setEndsOn(defaultRecurrenceEnd(initialDate, 'weekly'));
+      setRecurringDays([]);
       setIsBackup(false);
     }
     setShowEndsOnPicker(false);
+    setShowRulePicker(false);
     setLocalStatus(currentStatus);
     setError('');
     setShowDatePicker(false);
@@ -147,6 +162,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     onStatusChange?.(next);
   }
 
+  function handleCheckboxToggle() {
+    const next: EventStatus | undefined = localStatus === 'completed' ? undefined : 'completed';
+    setLocalStatus(next);
+    onStatusChange?.(next);
+  }
+
   function handleTypeChange(newType: string) {
     setType(newType);
     if (!title) setTitle(EventTypeLabels[newType] ?? '');
@@ -164,6 +185,25 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   function changeRule(rule: RecurringRule) {
     setRecurringRule(rule);
     setEndsOn(defaultRecurrenceEnd(date, rule));
+    // Weekly needs at least one day; seed with the start weekday if none are chosen yet.
+    if (rule === 'weekly') setRecurringDays(prev => (prev.length ? prev : [weekdayOf(date)]));
+  }
+
+  function handleRecurringToggle(val: boolean) {
+    setRecurring(val);
+    if (val && recurringRule === 'weekly') {
+      setRecurringDays(prev => (prev.length ? prev : [weekdayOf(date)]));
+    }
+  }
+
+  // Weekly repeats on the tapped days; keep at least one selected.
+  function toggleDay(day: number) {
+    setRecurringDays(prev => {
+      if (prev.includes(day)) {
+        return prev.length === 1 ? prev : prev.filter(d => d !== day);
+      }
+      return [...prev, day].sort((a, b) => a - b);
+    });
   }
 
   function handleDelete() {
@@ -194,9 +234,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
   async function handleSave() {
     setError('');
-    const computedEnd = isFixedType(type)
-      ? addMinutesToTimeString(startTime, 15)
-      : endTime;
+    // Checkbox events have only a start time; store the end equal to it (a 0-minute event).
+    const computedEnd = isCheckboxType(type) ? startTime : endTime;
     try {
       await onSave({
         title: title.trim() || (EventTypeLabels[type] ?? type),
@@ -209,6 +248,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
         recurring,
         recurringRule: recurring ? recurringRule : undefined,
         recurringUntil: recurring ? endsOn : undefined,
+        recurringDays: recurring && recurringRule === 'weekly'
+          ? (recurringDays.length ? recurringDays : [weekdayOf(date)])
+          : undefined,
         excludedDates: recurring ? event?.excludedDates : undefined,
         backup: isBackup,
       });
@@ -219,11 +261,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
   }
 
-  const fixed = isFixedType(type);
+  const fixed = isCheckboxType(type);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+    <SheetModal visible={visible} onClose={onClose}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.cancel}>Cancel</Text>
@@ -235,8 +276,21 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
         </View>
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
-          {event && !isBackup && TRACKABLE_TYPES.has(type) && (
+        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
+          {event && !isBackup && isCheckboxType(type) && (
+            <View style={styles.section}>
+              <View style={styles.statusRow}>
+                <Text style={[styles.label, { marginBottom: 0, paddingLeft: 6, fontSize: 16 }]}>
+                  {localStatus === 'completed' ? 'Completed' : 'Not completed'}
+                </Text>
+                <TouchableOpacity onPress={handleCheckboxToggle} style={styles.statusIcons} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <StatusCheckbox checked={localStatus === 'completed'} size={40} color={resolvedColor(type, settings)} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {event && !isBackup && !isCheckboxType(type) && TRACKABLE_TYPES.has(type) && (
             <View style={styles.section}>
               <View style={styles.statusRow}>
                 <Text style={[styles.label, { marginBottom: 0, paddingLeft: 6, fontSize: 16 }]}>
@@ -369,7 +423,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Notes (optional)</Text>
+            <Text style={styles.label}>Notes</Text>
             <TextInput
               style={[styles.input, styles.notesInput]}
               value={notes}
@@ -383,37 +437,54 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={styles.section}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>Recurring</Text>
+              <Text style={styles.label}>Repeat Event</Text>
               <Switch
                 value={recurring}
-                onValueChange={setRecurring}
+                onValueChange={handleRecurringToggle}
                 trackColor={{ true: Colors.accent }}
                 thumbColor={Colors.white}
               />
             </View>
             {recurring && (
               <>
-                <View style={styles.ruleRow}>
-                  {(['daily', 'weekly', 'monthly'] as const).map(rule => (
-                    <TouchableOpacity
-                      key={rule}
-                      style={[styles.ruleChip, recurringRule === rule && styles.ruleChipActive]}
-                      onPress={() => changeRule(rule)}
-                    >
-                      <Text style={[styles.ruleText, recurringRule === rule && styles.ruleTextActive]}>
-                        {rule.charAt(0).toUpperCase() + rule.slice(1)}
+                <View style={[styles.row, { marginTop: 12 }]}>
+                  <View style={{ flex: 1, marginRight: 4 }}>
+                    <Text style={styles.label}>Frequency</Text>
+                    <TouchableOpacity style={styles.picker} onPress={() => setShowRulePicker(v => !v)}>
+                      <Text style={styles.pickerText}>
+                        {recurringRule.charAt(0).toUpperCase() + recurringRule.slice(1)}
                       </Text>
+                      <Ionicons name={showRulePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                     </TouchableOpacity>
-                  ))}
+                    {showRulePicker && (
+                      <View style={styles.dropdown}>
+                        {(['daily', 'weekly', 'monthly'] as const).map(rule => (
+                          <TouchableOpacity
+                            key={rule}
+                            style={styles.dropdownItem}
+                            onPress={() => { changeRule(rule); setShowRulePicker(false); }}
+                          >
+                            <Text style={styles.dropdownText}>
+                              {rule.charAt(0).toUpperCase() + rule.slice(1)}
+                            </Text>
+                            {recurringRule === rule && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={{ flex: 1, marginLeft: 4 }}>
+                    <Text style={styles.label}>Ends</Text>
+                    <TouchableOpacity style={styles.picker} onPress={() => setShowEndsOnPicker(v => !v)}>
+                      <Text style={styles.pickerText}>
+                        {format(new Date(endsOn + 'T12:00:00'), 'MMM d, yyyy')}
+                      </Text>
+                      <Ionicons name={showEndsOnPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-                <Text style={[styles.label, { marginTop: 12 }]}>Ends</Text>
-                <TouchableOpacity style={styles.picker} onPress={() => setShowEndsOnPicker(v => !v)}>
-                  <Text style={styles.pickerText}>
-                    {format(new Date(endsOn + 'T12:00:00'), 'MMM d, yyyy')}
-                  </Text>
-                  <Ionicons name={showEndsOnPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
-                </TouchableOpacity>
                 {showEndsOnPicker && (
                   <InlineDatePicker
                     value={endsOn}
@@ -422,16 +493,35 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     onChange={ds => { setEndsOn(ds); setShowEndsOnPicker(false); }}
                   />
                 )}
+
+                {recurringRule === 'weekly' && (
+                  <View style={styles.dayRow}>
+                    {(settings.weekStart === 'monday'
+                      ? [1, 2, 3, 4, 5, 6, 0]
+                      : [0, 1, 2, 3, 4, 5, 6]
+                    ).map(day => {
+                      const selected = recurringDays.includes(day);
+                      return (
+                        <TouchableOpacity
+                          key={day}
+                          style={[styles.dayCircle, selected && styles.dayCircleActive]}
+                          onPress={() => toggleDay(day)}
+                        >
+                          <Text style={[styles.dayCircleText, selected && styles.dayCircleTextActive]}>
+                            {DAY_LETTERS[day]}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </>
             )}
           </View>
 
           <View style={styles.section}>
             <View style={styles.switchRow}>
-              <View>
-                <Text style={styles.label}>Backup Event</Text>
-                <Text style={styles.switchHint}>No status tracking, shown rightmost when overlapping</Text>
-              </View>
+              <Text style={styles.label}>Backup Event</Text>
               <Switch
                 value={isBackup}
                 onValueChange={setIsBackup}
@@ -453,8 +543,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={{ height: 40 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
+    </SheetModal>
   );
 }
 
@@ -497,7 +586,7 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       paddingVertical: 4,
     },
-    notesInput: { minHeight: 72, textAlignVertical: 'top', paddingTop: 4 },
+    notesInput: { minHeight: 56, textAlignVertical: 'top', paddingTop: 4 },
     picker: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -525,18 +614,32 @@ function makeStyles(C: ColorPalette) {
     },
     dropdownText: { flex: 1, fontSize: 15, color: C.text },
     switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    switchHint: { fontSize: 11, color: C.textLight, marginTop: 2, maxWidth: 220 },
-    ruleRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
-    ruleChip: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 20,
+    dayRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 14,
+    },
+    dayCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       borderWidth: 1,
       borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    ruleChipActive: { borderColor: C.accent, backgroundColor: C.accent + '20' },
-    ruleText: { fontSize: 13, color: C.textSecondary },
-    ruleTextActive: { color: C.accent, fontWeight: '600' },
+    dayCircleActive: {
+      backgroundColor: C.accent,
+      borderColor: C.accent,
+    },
+    dayCircleText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.textSecondary,
+    },
+    dayCircleTextActive: {
+      color: C.white,
+    },
     deleteBtn: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -1,6 +1,8 @@
 TO DO
 
-[ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts
+[ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts, make a call and maybe whatsapp shortcut icon next to their phone number, messenger?
+[ ]  Also swiping right from the page or swiping left from the person page should take you to the calendar page but you shouldn't be able to swipe from the calendar page to either of those two pages Swiping from the calendar page should obviously just move you through the calendar as it currently does There should also be the ability to swipe left from the settings page and right from People page in order to reach those respective pages
+[ ] add a curcular arrow icon to repeating events
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review
 [x] be able to pinch, or add small, medium, large options in terms of zoom
@@ -17,4 +19,4 @@ BUGS
 
 [x] make it so i can scroll even if my finger starts on an event
 [x] remove swiping animation when moving between apps to see if that removes the glitchiness of it. tapping the arrows is clean and doesn't have errors
-[ ] swiping between pages after making a recurring event causes the times on the left of the events to move out of line? Also add being able to select the days of the week that an event repeats. tapping the 
+[ ] swiping between pages after making a recurring event causes the times on the left of the events to move out of line? Also add being able to select the days of the week that an event repeats. tapping the daily weekly and monthly buttons when focussed on the text entry title box should unfocus

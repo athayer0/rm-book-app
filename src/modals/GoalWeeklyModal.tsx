@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Modal, View, Text, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView,
   StyleSheet, TextInput, Keyboard, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,11 +8,12 @@ import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { IndicatorDefinition } from '../constants/defaultIndicators';
-import { useWeeklyIndicators, resolveGoal } from '../hooks/useWeeklyIndicators';
+import { GoalDefinition } from '../constants/defaultGoals';
+import { useWeeklyGoals, resolveGoal } from '../hooks/useWeeklyGoals';
 import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
-import { KIGraphTab } from '../components/KIGraphTab';
-import { KIIcon } from '../components/KIIcon';
+import { GoalGraphTab } from '../components/GoalGraphTab';
+import { GoalIcon } from '../components/GoalIcon';
+import { SheetModal } from '../components/SheetModal';
 
 const MIN_OFFSET = -5;
 const MAX_OFFSET = 3;
@@ -35,15 +36,15 @@ interface RowData {
 interface Props {
   visible: boolean;
   onClose: () => void;
-  definitions: IndicatorDefinition[];
+  definitions: GoalDefinition[];
 }
 
-export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
+export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { getWeekData, saveCountForWeek, saveGoalForWeek } = useWeeklyIndicators();
+  const { getWeekData, saveCountForWeek, saveGoalForWeek } = useWeeklyGoals();
 
   const [activeTab, setActiveTab] = useState<'graph' | 'goals'>('goals');
   const [weekOffset, setWeekOffset] = useState(0);
@@ -144,12 +145,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
   const editingDef = editingField ? definitions.find(d => d.id === editingField.id) : null;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <SheetModal visible={visible} onClose={onClose}>
       <View style={styles.flex}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -176,7 +172,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
         </View>
 
         {activeTab === 'graph' && (
-          <KIGraphTab definitions={definitions} />
+          <GoalGraphTab definitions={definitions} />
         )}
 
         {activeTab === 'goals' && <>
@@ -211,8 +207,10 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
+          overScrollMode="never"
         >
-          <View style={styles.kiCard}>
+          <View style={styles.goalCard}>
             {visibleDefs.map((def, index) => {
               const row = rowData[def.id] ?? { actual: 0, goal: resolveGoal(undefined, isFuture) };
 
@@ -222,7 +220,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
                   style={[styles.kiRow, index === visibleDefs.length - 1 && styles.kiRowLast]}
                 >
                   <View style={[styles.iconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={isDark ? lightenColor(def.color) : def.color} />
+                    <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
 
                   <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
@@ -274,8 +272,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Padding rather than a margin, so the dialog re-centres in the space the
-            keyboard leaves instead of being shoved off-centre. */}
+        {/* The sheet itself stays put; only this dialog re-centres above the keyboard. */}
         {editingField && (
           <View style={[styles.editOverlay, { paddingBottom: keyboardHeight }]}>
             {/* Dismissing commits — there is no explicit Done. */}
@@ -320,7 +317,7 @@ export function KIWeeklyModal({ visible, onClose, definitions }: Props) {
 
         </>}
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 
@@ -390,7 +387,7 @@ function makeStyles(C: ColorPalette) {
     arrowDisabled: { opacity: 0.35 },
     scroll: { flex: 1 },
     listContent: { paddingHorizontal: 12, paddingTop: 12 },
-    kiCard: {
+    goalCard: {
       backgroundColor: C.card,
       borderRadius: 12,
       overflow: 'hidden',
@@ -448,7 +445,7 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'flex-end',
       justifyContent: 'center',
     },
-    setGoalText: { fontSize: 15, fontWeight: '700', color: C.kiTextAction },
+    setGoalText: { fontSize: 15, fontWeight: '700', color: C.goalTextAction },
     divider: {
       fontSize: 33,
       fontWeight: '300',

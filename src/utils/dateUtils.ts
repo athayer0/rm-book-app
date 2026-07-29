@@ -6,7 +6,8 @@ export function getWeekKey(date: Date = new Date()): string {
   return `${year}-W${String(week).padStart(2, '0')}`;
 }
 
-export function getIndicatorStorageKey(date: Date = new Date()): string {
+// The key keeps its legacy "indicators_" prefix so weeks saved by earlier versions still load.
+export function getGoalStorageKey(date: Date = new Date()): string {
   return `indicators_${getWeekKey(date)}`;
 }
 

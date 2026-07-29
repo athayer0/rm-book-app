@@ -36,11 +36,34 @@ create table if not exists calendar_events (
   notes text,
   recurring boolean default false,
   recurring_rule text,
+  recurring_until date,
+  excluded_dates jsonb,
+  recurring_days jsonb,
+  completed boolean default false,
+  backup boolean default false,
   updated_at timestamptz default now(),
   deleted_at timestamptz
 );
 alter table calendar_events
   enable row level security;
+-- Columns added after the table first shipped.
+-- Kept as separate alters so re-runs on an
+-- existing table pick them up too.
+alter table calendar_events
+  add column if not exists
+  recurring_until date;
+alter table calendar_events
+  add column if not exists
+  excluded_dates jsonb;
+alter table calendar_events
+  add column if not exists
+  recurring_days jsonb;
+alter table calendar_events
+  add column if not exists
+  completed boolean default false;
+alter table calendar_events
+  add column if not exists
+  backup boolean default false;
 drop policy if exists "users own their events"
   on calendar_events;
 create policy "users own their events"

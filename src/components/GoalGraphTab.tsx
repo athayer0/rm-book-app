@@ -8,9 +8,9 @@ import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { IndicatorDefinition } from '../constants/defaultIndicators';
-import { KIIcon } from './KIIcon';
-import { useWeeklyIndicators, resolveGoal } from '../hooks/useWeeklyIndicators';
+import { GoalDefinition } from '../constants/defaultGoals';
+import { GoalIcon } from './GoalIcon';
+import { useWeeklyGoals, resolveGoal } from '../hooks/useWeeklyGoals';
 import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
 
 interface WeekPoint {
@@ -20,7 +20,7 @@ interface WeekPoint {
 }
 
 interface Props {
-  definitions: IndicatorDefinition[];
+  definitions: GoalDefinition[];
 }
 
 const LEFT_PAD = 32;
@@ -30,12 +30,12 @@ const BOTTOM_PAD = 44;
 const CHART_H = 180;
 const N_WEEKS = 6;
 
-export function KIGraphTab({ definitions }: Props) {
+export function GoalGraphTab({ definitions }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { getWeekData } = useWeeklyIndicators();
+  const { getWeekData } = useWeeklyGoals();
   const visibleDefs = definitions.filter(d => d.visible);
 
   const [selectedId, setSelectedId] = useState<string>(visibleDefs[0]?.id ?? '');
@@ -125,11 +125,11 @@ export function KIGraphTab({ definitions }: Props) {
         >
           {selectedDef && (
             <View style={[styles.dropIconBadge, { backgroundColor: isDark ? selectedDef.color : selectedDef.color + '20' }]}>
-              <KIIcon icon={selectedDef.icon} iconFamily={selectedDef.iconFamily} size={16} color={isDark ? lightenColor(selectedDef.color) : selectedDef.color} />
+              <GoalIcon icon={selectedDef.icon} iconFamily={selectedDef.iconFamily} size={16} color={isDark ? lightenColor(selectedDef.color) : selectedDef.color} />
             </View>
           )}
           <Text style={styles.dropLabel} numberOfLines={1}>
-            {selectedDef?.label ?? 'Select indicator'}
+            {selectedDef?.label ?? 'Select goal'}
           </Text>
           <Ionicons
             name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
@@ -147,7 +147,7 @@ export function KIGraphTab({ definitions }: Props) {
                 onPress={() => { setSelectedId(def.id); setDropdownOpen(false); }}
               >
                 <View style={[styles.dropIconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                  <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={15} color={isDark ? lightenColor(def.color) : def.color} />
+                  <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={15} color={isDark ? lightenColor(def.color) : def.color} />
                 </View>
                 <Text style={[styles.dropItemText, def.id === selectedId && { color: Colors.primary, fontWeight: '600' }]}
                   numberOfLines={1}>

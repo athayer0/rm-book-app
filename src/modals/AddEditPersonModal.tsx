@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Modal, View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
@@ -9,6 +9,7 @@ import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
 import { PERSON_STATUSES, STATUS_OPTIONS, statusDisplayName } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
+import { SheetModal } from '../components/SheetModal';
 
 interface Props {
   visible: boolean;
@@ -52,8 +53,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+    <SheetModal visible={visible} onClose={onClose}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.cancel}>Cancel</Text>
@@ -64,7 +64,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
           <View style={styles.section}>
             <Text style={styles.label}>Name</Text>
             <TextInput
@@ -119,7 +119,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Phone (optional)</Text>
+            <Text style={styles.label}>Phone</Text>
             <TextInput
               style={styles.input}
               value={phone}
@@ -131,7 +131,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Notes (optional)</Text>
+            <Text style={styles.label}>Notes</Text>
             <TextInput
               style={[styles.input, styles.notesInput]}
               value={notes}
@@ -155,8 +155,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
 
           <View style={{ height: 40 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
+    </SheetModal>
   );
 }
 
@@ -203,7 +202,7 @@ function makeStyles(C: ColorPalette) {
       paddingVertical: 4,
     },
     notesInput: {
-      minHeight: 80,
+      minHeight: 56,
       textAlignVertical: 'top',
       paddingTop: 4,
     },

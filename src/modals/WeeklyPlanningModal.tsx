@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Modal, View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, TextInput, KeyboardAvoidingView, Platform,
+  View, Text, TouchableOpacity, ScrollView,
+  StyleSheet, TextInput,
 } from 'react-native';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
@@ -9,17 +9,18 @@ import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { SwatchColors } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { IndicatorDefinition } from '../constants/defaultIndicators';
-import { KIIcon } from '../components/KIIcon';
+import { GoalDefinition } from '../constants/defaultGoals';
+import { GoalIcon } from '../components/GoalIcon';
 import { IconPicker, ICON_OPTIONS, IconOption } from '../components/IconPicker';
+import { SheetModal } from '../components/SheetModal';
 
 const COLOR_OPTIONS = SwatchColors;
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  definitions: IndicatorDefinition[];
-  onUpdateDefinitions: (defs: IndicatorDefinition[]) => Promise<void>;
+  definitions: GoalDefinition[];
+  onUpdateDefinitions: (defs: GoalDefinition[]) => Promise<void>;
 }
 
 export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDefinitions }: Props) {
@@ -27,7 +28,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const [localDefs, setLocalDefs] = useState<IndicatorDefinition[]>(definitions);
+  const [localDefs, setLocalDefs] = useState<GoalDefinition[]>(definitions);
   const [newName, setNewName] = useState('');
   const [selectedIconOpt, setSelectedIconOpt] = useState<IconOption>(ICON_OPTIONS[0]);
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
@@ -59,19 +60,19 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
     onClose();
   }
 
-  function removeKI(id: string) {
+  function removeGoal(id: string) {
     setLocalDefs(prev => prev.filter(d => d.id !== id));
     setExpandedId(null);
   }
 
-  function patchKI(id: string, patch: Partial<IndicatorDefinition>) {
+  function patchGoal(id: string, patch: Partial<GoalDefinition>) {
     setLocalDefs(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)));
   }
 
-  function addKI() {
+  function addGoal() {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    const newDef: IndicatorDefinition = {
+    const newDef: GoalDefinition = {
       id: `custom_${Date.now()}`,
       label: trimmed,
       icon: selectedIconOpt.name,
@@ -90,50 +91,49 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+    <SheetModal visible={visible} onClose={handleClose}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit KIs</Text>
+        <Text style={styles.headerTitle}>Edit Goals</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        bounces={false}
+        overScrollMode="never"
       >
-        <Text style={styles.sectionLabel}>KEY INDICATORS</Text>
-        <View style={styles.kiList}>
+        <Text style={styles.sectionLabel}>GOALS</Text>
+        <View style={styles.goalList}>
           {localDefs.map((def, index) => {
             const isExpanded = expandedId === def.id;
             const isLast = index === localDefs.length - 1;
             return (
               <View key={def.id}>
                 <TouchableOpacity
-                  style={[styles.kiRow, isLast && !isExpanded && styles.kiRowLast]}
+                  style={[styles.goalRow, isLast && !isExpanded && styles.goalRowLast]}
                   onPress={() => setExpandedId(isExpanded ? null : def.id)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.kiIcon, { backgroundColor: isDark ? def.color : def.color + '20' }, !def.visible && styles.hiddenDim]}>
-                    <KIIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={isDark ? lightenColor(def.color) : def.color} />
+                  <View style={[styles.goalIcon, { backgroundColor: isDark ? def.color : def.color + '20' }, !def.visible && styles.hiddenDim]}>
+                    <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={20} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
-                  <Text style={[styles.kiLabel, !def.visible && styles.hiddenDim]} numberOfLines={1}>
+                  <Text style={[styles.goalLabel, !def.visible && styles.hiddenDim]} numberOfLines={1}>
                     {def.label}
                   </Text>
 
                   {/* Built-ins hide rather than delete, keeping their counts and calendar
-                      wiring intact. Custom KIs have nothing to preserve, so they delete. */}
+                      wiring intact. Custom goals have nothing to preserve, so they delete. */}
                   {def.builtIn ? (
                     <TouchableOpacity
-                      onPress={() => patchKI(def.id, { visible: !def.visible })}
+                      onPress={() => patchGoal(def.id, { visible: !def.visible })}
                       style={styles.rowAction}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -145,7 +145,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      onPress={() => removeKI(def.id)}
+                      onPress={() => removeGoal(def.id)}
                       style={styles.rowAction}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -162,15 +162,15 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
 
                 {isExpanded && (
                   <View style={[styles.editPanel, isLast && styles.editPanelLast]}>
-                    {/* Default KIs keep their names; only their look is editable. */}
+                    {/* Default goals keep their names; only their look is editable. */}
                     {!def.builtIn && (
                       <>
                         <Text style={styles.pickerLabel}>Name</Text>
                         <TextInput
                           style={styles.nameInput}
                           value={def.label}
-                          onChangeText={text => patchKI(def.id, { label: text })}
-                          placeholder="Indicator name..."
+                          onChangeText={text => patchGoal(def.id, { label: text })}
+                          placeholder="Goal name..."
                           placeholderTextColor={Colors.textLight}
                           returnKeyType="done"
                         />
@@ -182,7 +182,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
                       icon={def.icon}
                       iconFamily={def.iconFamily}
                       color={def.color}
-                      onSelect={opt => patchKI(def.id, { icon: opt.name, iconFamily: opt.family })}
+                      onSelect={opt => patchGoal(def.id, { icon: opt.name, iconFamily: opt.family })}
                     />
 
                     <Text style={styles.pickerLabel}>Color</Text>
@@ -191,7 +191,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
                         {row.map(color => (
                           <TouchableOpacity
                             key={color}
-                            onPress={() => patchKI(def.id, { color })}
+                            onPress={() => patchGoal(def.id, { color })}
                             style={[
                               styles.colorDot,
                               { backgroundColor: color },
@@ -220,9 +220,9 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
           <Ionicons
             name={addOpen ? 'close' : 'add'}
             size={18}
-            color={Colors.kiTextAction}
+            color={Colors.goalTextAction}
           />
-          <Text style={styles.addLinkText}>Add a Key Indicator</Text>
+          <Text style={styles.addLinkText}>Add a Goal</Text>
         </TouchableOpacity>
 
         {addOpen && <>
@@ -231,7 +231,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
             style={styles.nameInput}
             value={newName}
             onChangeText={setNewName}
-            placeholder="Indicator name..."
+            placeholder="Goal name..."
             placeholderTextColor={Colors.textLight}
             returnKeyType="done"
             onFocus={revealAddCard}
@@ -268,19 +268,18 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
 
           <TouchableOpacity
             style={[styles.addBtn, !newName.trim() && styles.addBtnDisabled]}
-            onPress={addKI}
+            onPress={addGoal}
             disabled={!newName.trim()}
           >
             <Ionicons name="add" size={18} color={Colors.white} />
-            <Text style={styles.addBtnText}>Add Indicator</Text>
+            <Text style={styles.addBtnText}>Add Goal</Text>
           </TouchableOpacity>
         </View>
         </>}
 
         <View style={{ height: 40 }} />
       </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
+    </SheetModal>
   );
 }
 
@@ -322,7 +321,7 @@ function makeStyles(C: ColorPalette) {
       letterSpacing: 1,
       marginBottom: 8,
     },
-    kiList: {
+    goalList: {
       backgroundColor: C.card,
       borderRadius: 12,
       overflow: 'hidden',
@@ -332,7 +331,7 @@ function makeStyles(C: ColorPalette) {
       shadowRadius: 3,
       elevation: 1,
     },
-    kiRow: {
+    goalRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 12,
@@ -341,17 +340,17 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       gap: 10,
     },
-    kiRowLast: {
+    goalRowLast: {
       borderBottomWidth: 0,
     },
-    kiIcon: {
+    goalIcon: {
       width: 34,
       height: 34,
       borderRadius: 17,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    kiLabel: {
+    goalLabel: {
       flex: 1,
       fontSize: 14,
       fontWeight: '500',
@@ -373,7 +372,7 @@ function makeStyles(C: ColorPalette) {
     addLinkText: {
       fontSize: 14,
       fontWeight: '700',
-      color: C.kiTextAction,
+      color: C.goalTextAction,
     },
     hiddenDim: {
       opacity: 0.4,
@@ -437,7 +436,7 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      backgroundColor: C.kiActionBg,
+      backgroundColor: C.goalActionBg,
       borderRadius: 10,
       paddingVertical: 12,
       marginTop: 14,
