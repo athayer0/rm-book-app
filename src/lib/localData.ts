@@ -1,0 +1,42 @@
+import { getAllKeys, multiRemove } from '../utils/storage';
+import { LAST_RESET_KEY, LAST_SYNCED_KEY, isAppDataKey } from '../constants/storageKeys';
+import { peekQueue } from './syncQueue';
+import { drainQueue } from './sync';
+
+/**
+ * Wipe this device's copy of the user's data.
+ *
+ * Nothing here is namespaced per account, so without this a second user signing
+ * in on the same device would see the first user's rows — and, worse, push them
+ * back up under their own user_id the moment they edited anything.
+ *
+ * `last_synced_at` goes too: leaving it would make the next account's first pull
+ * run incrementally against a watermark from someone else's session and return
+ * nothing. `schema_version` deliberately stays, so the legacy-key migration
+ * doesn't re-run and copy the old data straight back in.
+ */
+export async function clearLocalData(): Promise<void> {
+  const keys = (await getAllKeys()).filter(isAppDataKey);
+  await multiRemove([...keys, LAST_SYNCED_KEY, LAST_RESET_KEY]);
+}
+
+export type ClearResult = { cleared: boolean; pending: number };
+
+/**
+ * Push everything outstanding, then clear — but only if the push fully
+ * succeeded. Clearing with ops still queued would destroy work that exists
+ * nowhere else, and losing the user's data is worse than the bleed this is
+ * meant to prevent.
+ */
+export async function drainThenClear(): Promise<ClearResult> {
+  try {
+    await drainQueue();
+  } catch {
+    // Offline, or the drain threw. Fall through to the queue check below.
+  }
+  const pending = (await peekQueue()).length;
+  if (pending > 0) return { cleared: false, pending };
+
+  await clearLocalData();
+  return { cleared: true, pending: 0 };
+}

@@ -215,7 +215,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
     Alert.alert(
       'Delete Recurring Event',
-      'This event repeats. What would you like to delete?',
+      'This event is recurring. What would you like to delete?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -437,7 +437,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={styles.section}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>Repeat Event</Text>
+              <Text style={styles.label}>Recurring</Text>
               <Switch
                 value={recurring}
                 onValueChange={handleRecurringToggle}

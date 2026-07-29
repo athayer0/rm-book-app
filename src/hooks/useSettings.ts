@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import { getItem, setItem } from '../utils/storage';
+import { useCallback, createContext, useContext } from 'react';
 import { EventSize, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
+import { SETTINGS_KEY } from '../constants/storageKeys';
+import { useStoredState } from './useStoredState';
+import { enqueueUpsert } from '../lib/syncQueue';
+import { useAuth } from '../lib/AuthContext';
 
 export interface AppSettings {
   weekStart: 'sunday' | 'monday';
@@ -35,21 +38,27 @@ export const SettingsContext = createContext<SettingsContextValue>({
 });
 
 export function useSettingsState(): SettingsContextValue {
-  const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [loaded, setLoaded] = useState(false);
+  const { user } = useAuth();
+  const { value, write, loaded } = useStoredState<AppSettings>(SETTINGS_KEY, DEFAULT_SETTINGS);
 
-  useEffect(() => {
-    getItem<AppSettings>('settings').then(stored => {
-      if (stored) setSettingsState({ ...DEFAULT_SETTINGS, ...stored });
-      setLoaded(true);
-    });
-  }, []);
+  // Stored settings predate any field added since they were written, so the
+  // defaults fill the gaps rather than the stored object being used raw.
+  const settings = { ...DEFAULT_SETTINGS, ...value };
 
-  const updateSettings = useCallback(async (partial: Partial<AppSettings>) => {
-    const updated = { ...settings, ...partial };
-    setSettingsState(updated);
-    await setItem('settings', updated);
-  }, [settings]);
+  const updateSettings = useCallback(
+    async (partial: Partial<AppSettings>) => {
+      const next = await write(current => ({ ...DEFAULT_SETTINGS, ...current, ...partial }));
+
+      // The only write path the settings table has ever had. Guarded on `loaded`
+      // so a tap landing before the initial read can't push DEFAULT_SETTINGS
+      // over a real server row. Coalesced, because every colour swatch and
+      // duration pill in SettingsScreen calls straight through to here.
+      if (user && loaded) {
+        await enqueueUpsert('settings', user.id, { ...next, user_id: user.id });
+      }
+    },
+    [user, loaded, write],
+  );
 
   return { settings, updateSettings, loaded };
 }

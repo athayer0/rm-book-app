@@ -16,6 +16,8 @@ import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { isCheckboxType } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
+import { drainThenClear } from '../lib/localData';
+import { pullAll } from '../lib/sync';
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
@@ -31,6 +33,15 @@ const COLOR_SWATCHES = SwatchColors;
 
 const EVENT_TYPES = Object.keys(EventColors);
 
+/** Keys that are safe to hand to the share sheet: user data, no credentials. */
+const EXPORT_PREFIXES = ['goal_counts_', 'goal_targets_'];
+const EXPORT_KEYS = ['people', 'calendar_events', 'goal_definitions', 'event_statuses', 'settings'];
+
+function isExportable(key: string): boolean {
+  if (EXPORT_KEYS.includes(key)) return true;
+  return EXPORT_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
 export function SettingsScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -38,14 +49,54 @@ export function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
   const { resetAll, resetBuiltInDefinitions } = useWeeklyGoals();
   const { deleteAllEvents } = useCalendarEvents();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const [resetting, setResetting] = useState(false);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [hourDropdown, setHourDropdown] = useState<'start' | 'end' | null>(null);
   const selectedEventSize = resolveEventSize(settings.eventSize);
 
+  async function handleSignOut() {
+    const { cleared, pending } = await signOut();
+    // Unsynced work is kept rather than discarded. It will push on the next
+    // sign-in — but until then the next account to use this device sees it.
+    if (!cleared) {
+      Alert.alert(
+        'Signed out — local data kept',
+        `${pending} change${pending === 1 ? '' : 's'} could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.`,
+      );
+    }
+  }
+
+  async function handleResetLocal() {
+    if (!user) return;
+    setResetting(true);
+    try {
+      // Push first. Clearing with ops still queued would discard work that
+      // exists nowhere else — and if the push failed we are almost certainly
+      // offline, in which case the re-download would come back empty anyway.
+      const { cleared, pending } = await drainThenClear();
+      if (!cleared) {
+        Alert.alert(
+          'Nothing was cleared',
+          `${pending} change${pending === 1 ? '' : 's'} still need${pending === 1 ? 's' : ''} to sync, so your data was left alone. Reconnect and try again.`,
+        );
+        return;
+      }
+      await pullAll(user.id);
+    } catch (e) {
+      Alert.alert('Re-download failed', 'Local data was cleared but the download failed. Check your connection and relaunch the app.');
+      console.log('[reset] failed:', e);
+    } finally {
+      setResetting(false);
+    }
+  }
+
   async function handleExport() {
     try {
-      const keys = await AsyncStorage.getAllKeys();
+      // Allowlisted: a blanket dump includes the `sb-<ref>-auth-token` key,
+      // which holds the access AND refresh tokens — anyone receiving the shared
+      // file would own the account until the refresh token is revoked.
+      const keys = (await AsyncStorage.getAllKeys()).filter(isExportable);
       const pairs = await AsyncStorage.multiGet(keys as string[]);
       const data: Record<string, unknown> = {};
       pairs.forEach(([k, v]) => { if (v) data[k] = JSON.parse(v); });
@@ -356,6 +407,37 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* Sync */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>SYNC</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={resetting}
+              onPress={() =>
+                Alert.alert(
+                  'Re-download From Server',
+                  "Uploads anything still pending, then clears this device's copy and downloads everything again from your account.",
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Re-download', style: 'destructive', onPress: handleResetLocal },
+                  ],
+                  { cancelable: true }
+                )
+              }
+            >
+              <Text style={[styles.rowLabel, { color: resetting ? Colors.textLight : Colors.danger }]}>
+                {resetting ? 'Re-downloading…' : 'Re-download From Server'}
+              </Text>
+              <Ionicons
+                name="cloud-download-outline"
+                size={18}
+                color={resetting ? Colors.textLight : Colors.danger}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Account */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ACCOUNT</Text>
@@ -368,7 +450,7 @@ export function SettingsScreen() {
                   'Are you sure you want to sign out?',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Sign Out', style: 'destructive', onPress: signOut },
+                    { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
                   ],
                   { cancelable: true }
                 )

@@ -1,23 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getItem, setItem } from '../utils/storage';
-import { getGoalStorageKey, isNewWeek, getWeekKeyByOffset, getWeekKey } from '../utils/dateUtils';
+import { isNewWeek, getWeekKey, getWeekKeyByOffset } from '../utils/dateUtils';
 import { DEFAULT_GOALS, GoalDefinition } from '../constants/defaultGoals';
-import { enqueue } from '../lib/syncQueue';
+import {
+  GOAL_DEFINITIONS_KEY,
+  LAST_RESET_KEY,
+  goalCountsKey,
+  goalTargetsKey,
+} from '../constants/storageKeys';
+import { useStoredState } from './useStoredState';
+import { enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
 export type WeeklyCounts = Record<string, number>;
 export type WeeklyGoals = Record<string, number>;
 
+const EMPTY: Record<string, number> = {};
+const EMPTY_DEFS: GoalDefinition[] = [];
+
 // Each goal's weekly target is stored per week. A week at or before the current one treats
 // an unset target as 0; a future week stays unset so the UI can prompt for one.
 export function resolveGoal(stored: number | undefined, isFuture: boolean): number | null {
   return stored ?? (isFuture ? null : 0);
-}
-
-// Storage keys and Supabase table/column names keep their original "indicator" wording so
-// data written by earlier versions of the app still loads.
-function goalsKeyFor(wk: string) {
-  return `indicator_goals_${wk}`;
 }
 
 function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {
@@ -34,89 +38,78 @@ function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {
 
 export function useWeeklyGoals() {
   const { user } = useAuth();
-  const [definitions, setDefinitions] = useState<GoalDefinition[]>(DEFAULT_GOALS);
-  const [counts, setCounts] = useState<WeeklyCounts>({});
-  const [goals, setGoals] = useState<WeeklyGoals>({});
-  const weekKey = getGoalStorageKey();
-  const currentGoalsKey = goalsKeyFor(getWeekKey());
+  // The bare week key is what the DB stores; the storage keys are derived from it.
+  // Keeping them under separate names is what stops a storage key from being
+  // written into the `week_key` column, which is what used to happen here.
+  const weekKey = getWeekKey();
+  const countsKey = goalCountsKey(weekKey);
+  const targetsKey = goalTargetsKey(weekKey);
 
+  const defsState = useStoredState<GoalDefinition[]>(GOAL_DEFINITIONS_KEY, EMPTY_DEFS);
+  const countsState = useStoredState<WeeklyCounts>(countsKey, EMPTY);
+  const targetsState = useStoredState<WeeklyGoals>(targetsKey, EMPTY);
+
+  const definitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_GOALS;
+  const counts = countsState.value;
+  const goals = targetsState.value;
+
+  const [resetChecked, setResetChecked] = useState(false);
   useEffect(() => {
-    async function load() {
-      const [storedDefs, storedCounts, storedGoals, lastReset] = await Promise.all([
-        getItem<GoalDefinition[]>('indicator_definitions'),
-        getItem<WeeklyCounts>(weekKey),
-        getItem<WeeklyGoals>(currentGoalsKey),
-        getItem<string>('last_reset_date'),
-      ]);
-
-      if (storedDefs) {
-        setDefinitions(mergeWithDefaults(storedDefs));
-      }
-
-      // Goals are keyed per week, so a new week starts empty without needing a reset.
-      setGoals(storedGoals ?? {});
-
-      if (isNewWeek(lastReset)) {
-        setCounts({});
-        await setItem(weekKey, {});
-        await setItem('last_reset_date', new Date().toISOString());
-      } else if (storedCounts) {
-        setCounts(storedCounts);
-      }
-    }
-    load();
-  }, []);
-
-  const syncEntry = useCallback(async (goalId: string, count: number) => {
-    if (!user) return;
-    await enqueue({
-      table: 'indicator_entries',
-      type: 'upsert',
-      row: { user_id: user.id, indicator_id: goalId, week_key: weekKey, count, updated_at: new Date().toISOString() },
+    if (resetChecked) return;
+    getItem<string>(LAST_RESET_KEY).then(async lastReset => {
+      // Counts are keyed per week, so a rollover only needs the bookkeeping stamp;
+      // the new week's key starts empty on its own.
+      if (isNewWeek(lastReset)) await setItem(LAST_RESET_KEY, new Date().toISOString());
+      setResetChecked(true);
     });
-  }, [user, weekKey]);
+  }, [resetChecked]);
 
-  const increment = useCallback(async (id: string) => {
-    const current = counts[id] ?? 0;
-    const next = current + 1;
-    const updated = { ...counts, [id]: next };
-    setCounts(updated);
-    await setItem(weekKey, updated);
-    await syncEntry(id, next);
-  }, [counts, weekKey, syncEntry]);
+  const syncCount = useCallback(async (goalId: string, wk: string, count: number) => {
+    if (!user) return;
+    // Only the count column is sent — PostgREST builds the conflict update from
+    // the keys present, so this cannot null out a target set for the same week.
+    await enqueueUpsert('goal_entries', `${goalId}|${wk}|count`, {
+      user_id: user.id, goal_id: goalId, week_key: wk, count,
+    });
+  }, [user]);
+
+  const adjustBy = useCallback(async (id: string, delta: number, floorAtZero = true) => {
+    const updated = await countsState.write(current => {
+      const next = (current[id] ?? 0) + delta;
+      return { ...current, [id]: floorAtZero ? Math.max(0, next) : next };
+    });
+    await syncCount(id, weekKey, updated[id]);
+  }, [countsState, syncCount, weekKey]);
+
+  const increment = useCallback((id: string) => adjustBy(id, 1), [adjustBy]);
 
   const decrement = useCallback(async (id: string) => {
-    const current = counts[id] ?? 0;
-    if (current <= 0) return;
-    const next = current - 1;
-    const updated = { ...counts, [id]: next };
-    setCounts(updated);
-    await setItem(weekKey, updated);
-    await syncEntry(id, next);
-  }, [counts, weekKey, syncEntry]);
+    if ((countsState.current.current[id] ?? 0) <= 0) return;
+    await adjustBy(id, -1);
+  }, [countsState, adjustBy]);
 
   const reset = useCallback(async (id: string) => {
-    const updated = { ...counts, [id]: 0 };
-    setCounts(updated);
-    await setItem(weekKey, updated);
-    await syncEntry(id, 0);
-  }, [counts, weekKey, syncEntry]);
+    await countsState.write(current => ({ ...current, [id]: 0 }));
+    await syncCount(id, weekKey, 0);
+  }, [countsState, syncCount, weekKey]);
 
   const resetAll = useCallback(async () => {
-    setCounts({});
-    await setItem(weekKey, {});
-    for (const def of definitions) await syncEntry(def.id, 0);
-  }, [weekKey, definitions, syncEntry]);
+    await countsState.write(() => ({}));
+    for (const def of definitions) await syncCount(def.id, weekKey, 0);
+  }, [countsState, definitions, syncCount, weekKey]);
+
+  const adjustCount = useCallback(async (id: string, delta: number) => {
+    if (delta === 0) return;
+    await adjustBy(id, delta);
+  }, [adjustBy]);
 
   const updateDefinitions = useCallback(async (defs: GoalDefinition[]) => {
-    setDefinitions(defs);
-    await setItem('indicator_definitions', defs);
-    if (user) {
-      for (const def of defs) {
-        await enqueue({ table: 'indicator_definitions', type: 'upsert', row: { ...def, user_id: user.id, updated_at: new Date().toISOString() } });
-      }
+    await defsState.write(() => defs);
+    if (!user) return;
+    for (const def of defs) {
+      await enqueueUpsert('goal_definitions', def.id, { ...def, user_id: user.id });
     }
-  }, [user]);
+  }, [defsState, user]);
 
   // Restore every built-in goal's fields (label, icon, colour, target, …) to the shipped
   // defaults. Custom goals are left untouched, and counts/targets live elsewhere so they persist.
@@ -125,26 +118,9 @@ export function useWeeklyGoals() {
     await updateDefinitions([...DEFAULT_GOALS.map(d => ({ ...d })), ...customs]);
   }, [definitions, updateDefinitions]);
 
-  const adjustCount = useCallback(async (id: string, delta: number) => {
-    if (delta === 0) return;
-    const current = counts[id] ?? 0;
-    const next = Math.max(0, current + delta);
-    const updated = { ...counts, [id]: next };
-    setCounts(updated);
-    await setItem(weekKey, updated);
-    await syncEntry(id, next);
-  }, [counts, weekKey, syncEntry]);
-
   const reload = useCallback(async () => {
-    const [storedDefs, storedCounts, storedGoals] = await Promise.all([
-      getItem<GoalDefinition[]>('indicator_definitions'),
-      getItem<WeeklyCounts>(weekKey),
-      getItem<WeeklyGoals>(currentGoalsKey),
-    ]);
-    if (storedDefs) setDefinitions(mergeWithDefaults(storedDefs));
-    setCounts(storedCounts ?? {});
-    setGoals(storedGoals ?? {});
-  }, [weekKey, currentGoalsKey]);
+    await Promise.all([defsState.reload(), countsState.reload(), targetsState.reload()]);
+  }, [defsState, countsState, targetsState]);
 
   const getCount = useCallback((id: string) => counts[id] ?? 0, [counts]);
 
@@ -152,38 +128,37 @@ export function useWeeklyGoals() {
 
   const getWeekData = useCallback(async (wk: string): Promise<{ counts: WeeklyCounts; goals: Record<string, number> }> => {
     const [wkCounts, wkGoals] = await Promise.all([
-      getItem<WeeklyCounts>(`indicators_${wk}`),
-      getItem<Record<string, number>>(`indicator_goals_${wk}`),
+      getItem<WeeklyCounts>(goalCountsKey(wk)),
+      getItem<Record<string, number>>(goalTargetsKey(wk)),
     ]);
     return { counts: wkCounts ?? {}, goals: wkGoals ?? {} };
   }, []);
 
   const saveCountForWeek = useCallback(async (id: string, wk: string, value: number) => {
-    const stored = await getItem<WeeklyCounts>(`indicators_${wk}`) ?? {};
-    const updated = { ...stored, [id]: value };
-    await setItem(`indicators_${wk}`, updated);
-    // If this is the current week, keep React state in sync
     if (wk === getWeekKeyByOffset(0)) {
-      setCounts(updated);
+      await countsState.write(current => ({ ...current, [id]: value }));
+    } else {
+      const key = goalCountsKey(wk);
+      const stored = (await getItem<WeeklyCounts>(key)) ?? {};
+      await setItem(key, { ...stored, [id]: value });
     }
-    if (user) {
-      await enqueue({
-        table: 'indicator_entries',
-        type: 'upsert',
-        row: { user_id: user.id, indicator_id: id, week_key: wk, count: value, updated_at: new Date().toISOString() },
-      });
-    }
-  }, [user]);
+    await syncCount(id, wk, value);
+  }, [countsState, syncCount]);
 
   const saveGoalForWeek = useCallback(async (id: string, wk: string, value: number) => {
-    const stored = await getItem<WeeklyGoals>(goalsKeyFor(wk)) ?? {};
-    const updated = { ...stored, [id]: value };
-    await setItem(goalsKeyFor(wk), updated);
-    // If this is the current week, keep React state in sync
     if (wk === getWeekKeyByOffset(0)) {
-      setGoals(updated);
+      await targetsState.write(current => ({ ...current, [id]: value }));
+    } else {
+      const key = goalTargetsKey(wk);
+      const stored = (await getItem<WeeklyGoals>(key)) ?? {};
+      await setItem(key, { ...stored, [id]: value });
     }
-  }, []);
+    if (!user) return;
+    // Target-only, for the same reason syncCount is count-only.
+    await enqueueUpsert('goal_entries', `${id}|${wk}|target`, {
+      user_id: user.id, goal_id: id, week_key: wk, target: value,
+    });
+  }, [targetsState, user]);
 
   return { definitions, counts, goals, increment, decrement, reset, resetAll, updateDefinitions, resetBuiltInDefinitions, adjustCount, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
 }

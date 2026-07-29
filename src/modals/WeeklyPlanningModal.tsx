@@ -77,7 +77,6 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
       label: trimmed,
       icon: selectedIconOpt.name,
       iconFamily: selectedIconOpt.family,
-      goal: 1,
       type: 'numeric',
       color: selectedColor,
       visible: true,

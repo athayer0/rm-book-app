@@ -1,14 +1,9 @@
-import { getISOWeek, getISOWeekYear, format, startOfISOWeek, addWeeks, subWeeks } from 'date-fns';
+import { getISOWeek, getISOWeekYear, format, startOfISOWeek, addWeeks } from 'date-fns';
 
 export function getWeekKey(date: Date = new Date()): string {
   const year = getISOWeekYear(date);
   const week = getISOWeek(date);
   return `${year}-W${String(week).padStart(2, '0')}`;
-}
-
-// The key keeps its legacy "indicators_" prefix so weeks saved by earlier versions still load.
-export function getGoalStorageKey(date: Date = new Date()): string {
-  return `indicators_${getWeekKey(date)}`;
 }
 
 export function isNewWeek(lastResetDate: string | null): boolean {
@@ -20,16 +15,6 @@ export function isNewWeek(lastResetDate: string | null): boolean {
 
 export function getMondayOfWeek(date: Date = new Date()): Date {
   return startOfISOWeek(date);
-}
-
-export function getPastWeekKeys(count: number): string[] {
-  const keys: string[] = [];
-  const now = new Date();
-  for (let i = 0; i < count; i++) {
-    const d = subWeeks(now, i);
-    keys.push(getWeekKey(d));
-  }
-  return keys;
 }
 
 export function formatWeekLabel(weekKey: string): string {

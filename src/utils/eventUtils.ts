@@ -38,7 +38,6 @@ export interface CalendarEvent {
   /** For weekly series: weekdays (0=Sun … 6=Sat) it repeats on. Falls back to the start
    *  date's weekday when unset. */
   recurringDays?: number[];
-  completed?: boolean;
   backup?: boolean;
 }
 

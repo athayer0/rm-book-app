@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getItem, setItem } from '../utils/storage';
+import { useCallback } from 'react';
 import { generateId } from '../utils/eventUtils';
-import { enqueue } from '../lib/syncQueue';
+import { PEOPLE_KEY } from '../constants/storageKeys';
+import { useStoredState } from './useStoredState';
+import { enqueueDelete, enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
 export interface Person {
@@ -16,18 +17,19 @@ export interface Person {
   lastInteraction?: string;
 }
 
+const EMPTY: Person[] = [];
+
 export function usePeople() {
   const { user } = useAuth();
-  const [people, setPeople] = useState<Person[]>([]);
+  const { value: people, write, reload } = useStoredState<Person[]>(PEOPLE_KEY, EMPTY);
 
-  const reload = useCallback(async () => {
-    const stored = await getItem<Person[]>('people');
-    if (stored) setPeople(stored);
-  }, []);
-
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  const push = useCallback(
+    async (row: Person | undefined) => {
+      if (!user || !row) return;
+      await enqueueUpsert('people', row.id, { ...row, user_id: user.id });
+    },
+    [user],
+  );
 
   const addPerson = useCallback(async (person: Omit<Person, 'id' | 'createdAt'>) => {
     const newPerson: Person = {
@@ -35,35 +37,25 @@ export function usePeople() {
       id: generateId(),
       createdAt: new Date().toISOString(),
     };
-    const updated = [...people, newPerson];
-    setPeople(updated);
-    await setItem('people', updated);
-    if (user) await enqueue({ table: 'people', type: 'upsert', row: { ...newPerson, user_id: user.id, updated_at: new Date().toISOString() } });
+    await write(current => [...current, newPerson]);
+    await push(newPerson);
     return newPerson;
-  }, [people, user]);
+  }, [write, push]);
 
   const updatePerson = useCallback(async (id: string, changes: Partial<Person>) => {
-    const updated = people.map(p => p.id === id ? { ...p, ...changes } : p);
-    setPeople(updated);
-    await setItem('people', updated);
-    const row = updated.find(p => p.id === id);
-    if (user && row) await enqueue({ table: 'people', type: 'upsert', row: { ...row, user_id: user.id, updated_at: new Date().toISOString() } });
-  }, [people, user]);
+    const updated = await write(current => current.map(p => p.id === id ? { ...p, ...changes } : p));
+    await push(updated.find(p => p.id === id));
+  }, [write, push]);
 
   const deletePerson = useCallback(async (id: string) => {
-    const updated = people.filter(p => p.id !== id);
-    setPeople(updated);
-    await setItem('people', updated);
-    if (user) await enqueue({ table: 'people', type: 'delete', row: { id, user_id: user.id } });
-  }, [people, user]);
+    await write(current => current.filter(p => p.id !== id));
+    if (user) await enqueueDelete('people', id, { user_id: user.id, id });
+  }, [write, user]);
 
   const toggleStar = useCallback(async (id: string) => {
-    const updated = people.map(p => p.id === id ? { ...p, starred: !p.starred } : p);
-    setPeople(updated);
-    await setItem('people', updated);
-    const row = updated.find(p => p.id === id);
-    if (user && row) await enqueue({ table: 'people', type: 'upsert', row: { ...row, user_id: user.id, updated_at: new Date().toISOString() } });
-  }, [people, user]);
+    const updated = await write(current => current.map(p => p.id === id ? { ...p, starred: !p.starred } : p));
+    await push(updated.find(p => p.id === id));
+  }, [write, push]);
 
   return { people, addPerson, updatePerson, deletePerson, toggleStar, reload };
 }
