@@ -1,6 +1,6 @@
 // Every AsyncStorage key the app owns, in one place. Screens and hooks must go
-// through these rather than building key strings inline — an inline template
-// literal is what let `indicators_${key}` survive a previous rename unnoticed.
+// through these rather than building key strings inline — a key assembled at the
+// call site is invisible to a rename, and silently reads the wrong bucket.
 
 export const PEOPLE_KEY = 'people';
 export const CALENDAR_EVENTS_KEY = 'calendar_events';
@@ -11,13 +11,11 @@ export const SETTINGS_KEY = 'settings';
 /** Device-local: which week the counts were last rolled over for. Never synced. */
 export const LAST_RESET_KEY = 'last_reset_date';
 export const LAST_SYNCED_KEY = 'last_synced_at';
-export const SCHEMA_VERSION_KEY = 'schema_version';
 
 /**
  * The user's own data — everything that is safe to export and must be cleared
  * when a different account signs in. Deliberately excludes the Supabase auth
- * token, the sync bookkeeping keys, and `schema_version` (clearing that would
- * re-run the migration and resurrect the legacy backup keys).
+ * token and the sync bookkeeping keys.
  */
 const APP_DATA_KEYS = [
   PEOPLE_KEY,

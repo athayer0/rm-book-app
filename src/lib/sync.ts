@@ -2,7 +2,6 @@ import { supabase } from './supabase';
 import { peekQueue, removeOps, SyncOperation } from './syncQueue';
 import { getAllKeys, getItem, setItem, subscribe } from '../utils/storage';
 import { toRow, fromRow, PK_COLUMNS } from './rowMappers';
-import { migrationsReady } from './migrations';
 import {
   CALENDAR_EVENTS_KEY,
   EVENT_STATUSES_KEY,
@@ -40,10 +39,6 @@ export function drainQueue(): Promise<void> {
 }
 
 async function runDrain(): Promise<void> {
-  // Not just component nesting — a drain that beats the migration would push ops
-  // naming tables that no longer exist.
-  await migrationsReady;
-
   const ops = await peekQueue();
   if (ops.length === 0) return;
 
@@ -144,8 +139,6 @@ export function pullAll(userId: string): Promise<void> {
 let pullInFlight: Promise<void> | null = null;
 
 async function runPull(userId: string): Promise<void> {
-  await migrationsReady;
-
   const lastSynced = await getItem<string>(LAST_SYNCED_KEY);
   // The watermark is the newest updated_at actually seen, not the client clock:
   // updated_at is stamped by a server-side trigger, so comparing against a local

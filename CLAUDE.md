@@ -39,7 +39,7 @@ No Redux or Zustand. Each feature has its own hook that owns AsyncStorage reads/
 | `useEventStatuses` | `event_statuses` | Per-occurrence status, keyed `eventId::date` |
 | `useSettings` | `settings` | App-wide settings |
 
-**Every key name lives in `src/constants/storageKeys.ts`.** Never build one inline — an inline template literal is what let `indicators_${key}` survive the last rename unnoticed.
+**Every key name lives in `src/constants/storageKeys.ts`.** Never build one inline — a key assembled at the call site is invisible to a rename, and fails by silently reading the wrong bucket rather than by erroring.
 
 Hooks are built on `useStoredState` (`src/hooks/useStoredState.ts`), which subscribes to the key. `setItem` in `src/utils/storage.ts` notifies subscribers, so a write from anywhere — including `pullAll` writing AsyncStorage directly — reaches every live screen. Writes resolve against a ref rather than closed-over state, so two writes in the same tick don't clobber each other.
 
@@ -76,7 +76,7 @@ Event layout (overlapping events rendered in columns) is computed by `computeEve
 
 Goals are weekly counts tracked against a target (the `goal` field on `GoalDefinition`). Definitions are stored in `useWeeklyGoals`. Certain calendar event types auto-increment goal counts when marked completed (mapping defined in `getGoalContribution()` in `eventUtils.ts`): prayer → morning/nightly prayer goal, scripture → personal study, church → church hours (by duration), temple/exercise → their respective goals.
 
-**The legacy "indicator" naming is gone.** Storage keys and Supabase tables now use "goal" wording throughout. `src/lib/migrations.ts` copies any pre-rename key forward on first launch (`indicator_definitions` → `goal_definitions`, `indicators_<wk>` → `goal_counts_<wk>`, `indicator_goals_<wk>` → `goal_targets_<wk>`) and leaves the originals in place. That migration is version-stamped and never overwrites an existing destination, so it is safe to re-run.
+**There is no migration layer, and no legacy key names.** Storage keys and Supabase tables use "goal" wording throughout, and the only names the app knows are the ones in `storageKeys.ts`. The pre-rename `indicator_*` keys, the copy-forward migration, and the `schema_version` stamp were all removed once the last device holding old data was wiped — so a hook may assume the key it asks for is the only spelling that has ever existed. If a persisted shape ever needs to change again, add the version stamp back at that point rather than leaving one in place for a rename that already happened.
 
 Per-week counts and targets share one `goal_entries` row per `(user, goal, week)`. Both columns are nullable and each writer sends **only its own column** — PostgREST builds the conflict update from the keys present, so a count write must not include `target` or it will clobber it.
 

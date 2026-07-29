@@ -8,7 +8,6 @@ import { AppNavigation } from './src/navigation';
 import { AuthProvider, useAuth } from './src/lib/AuthContext';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { supabase } from './src/lib/supabase';
-import { migrationsReady } from './src/lib/migrations';
 import { drainQueue, pullAll, startAutoDrain } from './src/lib/sync';
 import { peekQueue } from './src/lib/syncQueue';
 import { SettingsContext, useSettingsState } from './src/hooks/useSettings';
@@ -119,33 +118,16 @@ function SettingsProvider({ children }: { children: React.ReactNode }) {
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
-/**
- * Holds everything back until the legacy-key migration has run. Nothing below
- * this may read AsyncStorage first — a hook that mounted early would read the
- * old key names, and a pull that ran early would create the new ones and cause
- * the migration to skip.
- */
-function MigrationGate({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    migrationsReady.then(() => setReady(true));
-  }, []);
-  if (!ready) return <Splash />;
-  return <>{children}</>;
-}
-
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <MigrationGate>
-          <AuthProvider>
-            <SettingsProvider>
-              <AppRoot />
-            </SettingsProvider>
-          </AuthProvider>
-        </MigrationGate>
+        <AuthProvider>
+          <SettingsProvider>
+            <AppRoot />
+          </SettingsProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

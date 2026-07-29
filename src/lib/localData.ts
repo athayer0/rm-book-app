@@ -12,8 +12,7 @@ import { drainQueue } from './sync';
  *
  * `last_synced_at` goes too: leaving it would make the next account's first pull
  * run incrementally against a watermark from someone else's session and return
- * nothing. `schema_version` deliberately stays, so the legacy-key migration
- * doesn't re-run and copy the old data straight back in.
+ * nothing.
  */
 export async function clearLocalData(): Promise<void> {
   const keys = (await getAllKeys()).filter(isAppDataKey);
