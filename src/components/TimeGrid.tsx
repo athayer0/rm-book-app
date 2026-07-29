@@ -187,7 +187,7 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
   const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
   const HIDE_NEAR_PX = 6;
-  const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')} ${nowH < 12 ? 'AM' : 'PM'}`;
+  const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
   function handleSlotTap(locationY: number) {
     const maxSlot = (gridEndHour - gridStartHour) * 2 - 1;
@@ -353,7 +353,7 @@ function makeStyles(C: ColorPalette, SLOT_HEIGHT: number) {
     nowLabel: {
       position: 'absolute',
       top: -15,
-      left: 7,
+      left: 6,
       fontSize: 11,
       fontWeight: '500',
       color: C.primary,
