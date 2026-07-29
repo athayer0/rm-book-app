@@ -6,7 +6,8 @@ TO DO
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review
 [x] be able to pinch, or add small, medium, large options in terms of zoom
-[ ] tasks with the checkbox and get crossed out
+[x] tasks with the checkbox and get crossed out
+[ ] unreported events button to view all and mass report them
 [ ] make friends and districts, be able to view each others KIs
 [ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
 [ ] security audit
@@ -19,4 +20,3 @@ BUGS
 
 [x] make it so i can scroll even if my finger starts on an event
 [x] remove swiping animation when moving between apps to see if that removes the glitchiness of it. tapping the arrows is clean and doesn't have errors
-[ ] swiping between pages after making a recurring event causes the times on the left of the events to move out of line? Also add being able to select the days of the week that an event repeats. tapping the daily weekly and monthly buttons when focussed on the text entry title box should unfocus
