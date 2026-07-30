@@ -13,6 +13,8 @@ export interface AppSettings {
   gridStartHour: number;
   gridEndHour: number;
   eventSize: EventSize;
+  /** Prepended to local numbers when building a WhatsApp link. */
+  defaultCountryCode: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -23,6 +25,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   gridStartHour: 6,
   gridEndHour: 24,
   eventSize: DEFAULT_EVENT_SIZE,
+  defaultCountryCode: '+1',
 };
 
 type SettingsContextValue = {

@@ -31,6 +31,15 @@ create table if not exists people (
   name text not null,
   status text,
   phone text,
+  -- Optional contact methods. NULL means the
+  -- person has no such section in the editor;
+  -- '' means the section exists but is empty.
+  whatsapp text,
+  -- Whatever identifies the Facebook profile:
+  -- an m.me/facebook.com link or a username.
+  -- Parsed into an m.me handle client-side by
+  -- toMessengerHandle() in phoneUtils.ts.
+  messenger text,
   notes text,
   starred boolean default false,
   created_at timestamptz default now(),
@@ -38,6 +47,13 @@ create table if not exists people (
   deleted_at timestamptz,
   primary key (user_id, id)
 );
+-- create-if-not-exists skips an existing table
+-- outright, so columns added after the first
+-- run need their own alter.
+alter table people
+  add column if not exists whatsapp text;
+alter table people
+  add column if not exists messenger text;
 alter table people enable row level security;
 drop policy if exists "users own their people"
   on people;
@@ -248,8 +264,12 @@ create table if not exists settings (
     default '{}'::jsonb,
   event_type_default_minutes jsonb
     default '{}'::jsonb,
+  default_country_code text default '+1',
   updated_at timestamptz default now()
 );
+alter table settings
+  add column if not exists
+  default_country_code text default '+1';
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

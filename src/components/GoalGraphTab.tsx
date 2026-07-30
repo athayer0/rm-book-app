@@ -26,7 +26,11 @@ interface Props {
 const LEFT_PAD = 32;
 const RIGHT_PAD = 8;
 const TOP_PAD = 22;
-const BOTTOM_PAD = 44;
+// Room for the single x-axis label; was 44 when each column carried two lines.
+// Only feeds svgH — the labels sit at a fixed offset from the top of the plot,
+// so trimming this raises the bottom of the card without moving anything in it.
+// The label baseline is at +22, so anything under ~26 starts clipping descenders.
+const BOTTOM_PAD = 27;
 const CHART_H = 180;
 const N_WEEKS = 6;
 
@@ -104,10 +108,11 @@ export function GoalGraphTab({ definitions }: Props) {
     .map((p, i) => `${dotX(i)},${yFor(p.actual)}`)
     .join(' ');
 
-  function xLabels(wk: string): [string, string] {
-    const full = formatWeekLabel(wk);
-    const parts = full.split(' – ');
-    return [parts[0] ?? '', parts[1] ?? ''];
+  // The axis only needs to say which week a column is, so it carries the start
+  // date alone — formatWeekLabel's full "MMM d – MMM d" range is more than six
+  // columns have room for.
+  function xLabel(wk: string): string {
+    return formatWeekLabel(wk).split(' – ')[0] ?? '';
   }
 
   const lastWeek = weekData[N_WEEKS - 2] ?? { actual: 0, goal: 0 };
@@ -166,6 +171,8 @@ export function GoalGraphTab({ definitions }: Props) {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
       >
         {selectedDef && (
           <View style={styles.summaryRow}>
@@ -280,21 +287,18 @@ export function GoalGraphTab({ definitions }: Props) {
                 );
               })}
 
-              {weekData.map((p, i) => {
-                const [line1, line2] = xLabels(p.weekKey);
-                const cx = dotX(i);
-                const baseY = TOP_PAD + CHART_H + 14;
-                return (
-                  <React.Fragment key={`xlabel-${i}`}>
-                    <SvgText x={cx} y={baseY} fontSize={9} fill={Colors.textSecondary} textAnchor="middle">
-                      {line1}
-                    </SvgText>
-                    <SvgText x={cx} y={baseY + 13} fontSize={9} fill={Colors.textSecondary} textAnchor="middle">
-                      {line2}
-                    </SvgText>
-                  </React.Fragment>
-                );
-              })}
+              {weekData.map((p, i) => (
+                <SvgText
+                  key={`xlabel-${i}`}
+                  x={dotX(i)}
+                  y={TOP_PAD + CHART_H + 22}
+                  fontSize={9}
+                  fill={Colors.textSecondary}
+                  textAnchor="middle"
+                >
+                  {xLabel(p.weekKey)}
+                </SvgText>
+              ))}
             </Svg>
           )}
         </View>

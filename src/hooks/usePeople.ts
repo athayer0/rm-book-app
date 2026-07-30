@@ -10,6 +10,14 @@ export interface Person {
   name: string;
   status: string;
   phone?: string;
+  // The optional contact methods the editor adds and removes. `undefined` means
+  // the person has no such section at all; a string — including '' — means the
+  // section exists and is simply empty. Removing a section writes `undefined`,
+  // which toRow turns into a null column, so the removal syncs.
+  /** WhatsApp number, seeded from `phone` when added but edited independently. */
+  whatsapp?: string;
+  /** Whatever identifies the Facebook profile — see toMessengerHandle(). */
+  messenger?: string;
   notes?: string;
   starred: boolean;
   createdAt: string;

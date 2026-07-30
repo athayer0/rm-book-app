@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert,
+  SafeAreaView, Alert, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -53,6 +53,22 @@ export function SettingsScreen() {
   const [resetting, setResetting] = useState(false);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [hourDropdown, setHourDropdown] = useState<'start' | 'end' | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // Content-relative y of the country-code section, from its onLayout.
+  const codeSectionY = useRef(0);
+
+  /**
+   * Put the country-code section a fixed distance below the top of the viewport
+   * instead of leaving the destination to the platform's scroll-to-focus, which
+   * overshoots on a list this long. Runs after the keyboard animation so it has
+   * the last word, and scrollTo clamps to the content, so the section cannot end
+   * up off screen however far down the list it sits.
+   */
+  function revealCodeField() {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, codeSectionY.current - 60), animated: true });
+    }, 250);
+  }
   const selectedEventSize = resolveEventSize(settings.eventSize);
 
   async function handleSignOut() {
@@ -139,7 +155,17 @@ export function SettingsScreen() {
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      {/* automaticallyAdjustKeyboardInsets, as on every other scroll in the app,
+          so focused content can clear the keyboard. Where it lands is decided by
+          revealCodeField() rather than by the platform. */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
+      >
         {/* Week Start */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>WEEK START</Text>
@@ -248,6 +274,36 @@ export function SettingsScreen() {
           </View>
           <Text style={styles.sectionFootnote}>
             Controls how tall events and time slots appear on the calendar.
+          </Text>
+        </View>
+
+        {/* Default Country Code */}
+        <View
+          style={styles.section}
+          onLayout={e => { codeSectionY.current = e.nativeEvent.layout.y; }}
+        >
+          <Text style={styles.sectionTitle}>DEFAULT COUNTRY CODE</Text>
+          <View style={styles.card}>
+            <View style={[styles.row, styles.rowLast]}>
+              <TextInput
+                style={styles.codeInput}
+                value={settings.defaultCountryCode}
+                onChangeText={text => {
+                  // Normalised on the way in so the stored value is always the
+                  // '+NN' the hint in the person editor claims it is.
+                  const digits = text.replace(/\D/g, '').slice(0, 4);
+                  updateSettings({ defaultCountryCode: digits ? `+${digits}` : '' });
+                }}
+                placeholder="+1"
+                placeholderTextColor={Colors.textLight}
+                keyboardType="phone-pad"
+                maxLength={5}
+                onFocus={revealCodeField}
+              />
+            </View>
+          </View>
+          <Text style={styles.sectionFootnote}>
+            Used for WhatsApp numbers saved without a + code.
           </Text>
         </View>
 
@@ -535,6 +591,12 @@ function makeStyles(C: ColorPalette) {
     },
     rowLabel: { flex: 1, fontSize: 15, color: C.text },
     rowValue: { fontSize: 14, color: C.textSecondary },
+    codeInput: {
+      flex: 1,
+      fontSize: 15,
+      color: C.text,
+      paddingVertical: 0,
+    },
     sectionFootnote: {
       fontSize: 12,
       color: C.textLight,

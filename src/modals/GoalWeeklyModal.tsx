@@ -263,12 +263,6 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
             })}
           </View>
 
-          {isFuture && (
-            <Text style={styles.futureNote}>
-              Goals only — actual values will be tracked once the week begins.
-            </Text>
-          )}
-
           <View style={{ height: 40 }} />
         </ScrollView>
 
@@ -456,14 +450,6 @@ function makeStyles(C: ColorPalette) {
       lineHeight: NUM_ROW_H,
       includeFontPadding: false,
       textAlignVertical: 'center',
-    },
-    futureNote: {
-      fontSize: 12,
-      color: C.textLight,
-      textAlign: 'center',
-      marginTop: 16,
-      paddingHorizontal: 24,
-      fontStyle: 'italic',
     },
     editOverlay: {
       ...StyleSheet.absoluteFillObject,

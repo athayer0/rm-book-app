@@ -24,6 +24,9 @@ export const LightColors = {
   // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
   goalActionBg: '#253960',
   statusOtherColor: '#000000',
+  // Tint behind the call and message buttons, so the accent glyph sits on a soft
+  // accent wash rather than the bare card.
+  contactActionBg: '#DFF4F7',
   // Event reporting states, shared by the calendar's status badges and the
   // unreported-events shortcut. Centralised because two features have to agree:
   // an amber dot on the home row must mean the same thing as one on a block.
@@ -58,6 +61,8 @@ export const DarkColors: typeof LightColors = {
   // A fill, not text — navy still reads against the dark card and keeps its white label legible.
   goalActionBg: '#2E4877',
   statusOtherColor: '#FFFFFF',
+  // Same wash, darkened so the accent glyph keeps its contrast on a dark card.
+  contactActionBg: '#123B42',
   // Lifted from the light values, which are mid-tones chosen against white and
   // go muddy on a dark card. Hue is preserved so the states stay recognisable.
   statusCompleted: '#3FB56B',
@@ -89,6 +94,9 @@ export const SwatchColors: string[] = [
   '#BDBDBD', // light grey
 ];
 
+// Key order is the display order: SettingsScreen and AddEditEventModal both
+// build their type lists with Object.keys(EventColors). EventTypeLabels and
+// EventTypeConfig are kept in the same order so the three read as one table.
 export const EventColors: Record<string, string> = {
   church:    '#E05C6B',
   travel:    '#800000',
@@ -100,9 +108,9 @@ export const EventColors: Record<string, string> = {
   temple:    '#00B5C8',
   prayer:    '#A29BFE',
   scripture: '#9B59B6',
+  task:      '#795548',
   exercise:  '#616161',
   other:     '#BDBDBD',
-  task:      '#795548',
 };
 
 export const EventTypeLabels: Record<string, string> = {
@@ -116,9 +124,9 @@ export const EventTypeLabels: Record<string, string> = {
   temple:    'Temple',
   prayer:    'Prayer',
   scripture: 'Scripture Study',
+  task:      'Task',
   exercise:  'Exercise',
   other:     'Other',
-  task:      'Task',
 };
 
 export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckbox: boolean }> = {
@@ -132,7 +140,7 @@ export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckb
   temple:    { defaultMinutes: 30, hasCheckbox: false },
   prayer:    { defaultMinutes: 0, hasCheckbox: true },
   scripture: { defaultMinutes: 30, hasCheckbox: false },
+  task:      { defaultMinutes: 0, hasCheckbox: true },
   exercise:  { defaultMinutes: 30, hasCheckbox: false },
   other:     { defaultMinutes: 30, hasCheckbox: false },
-  task:      { defaultMinutes: 0, hasCheckbox: true },
 };

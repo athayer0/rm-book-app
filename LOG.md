@@ -5,9 +5,11 @@ TO DO
 [ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review
+[ ] onboarding
+[ ] is there a reason why we store deleted people and events instead of just deleting them from the db
 [x] be able to pinch, or add small, medium, large options in terms of zoom
 [x] tasks with the checkbox and get crossed out
-[ ] unreported events button to view all and mass report them
+[x] unreported events button to view all and mass report them
 [ ] make friends and districts, be able to view each others KIs
 [ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
 [ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
