@@ -281,6 +281,12 @@ create table if not exists settings (
     references auth.users,
   week_start text default 'monday',
   theme text default 'light',
+  -- Undefaulted, like event_size: the shipped
+  -- starting colour has moved once already and
+  -- a copy here would silently drift from
+  -- DEFAULT_THEME_COLOR. fromRow skips nulls,
+  -- so a null lands on the client default.
+  theme_color text,
   grid_start_hour int default 6,
   grid_end_hour int default 24,
   event_size text,
@@ -289,6 +295,8 @@ create table if not exists settings (
   event_type_default_minutes jsonb
     default '{}'::jsonb,
   default_country_code text default '+1',
+  default_contact_method text
+    default 'phone',
   -- iOS only: which app an address opens in.
   -- Android always uses Google Maps.
   maps_app text default 'apple',
@@ -300,6 +308,13 @@ alter table settings
 alter table settings
   add column if not exists
   maps_app text default 'apple';
+alter table settings
+  add column if not exists
+  theme_color text;
+alter table settings
+  add column if not exists
+  default_contact_method text
+  default 'phone';
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;
