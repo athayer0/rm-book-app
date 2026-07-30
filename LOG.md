@@ -1,12 +1,12 @@
 TO DO
 
-[ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts, make a call and maybe whatsapp shortcut icon next to their phone number, messenger?
+[ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts
+[x] make a call and maybe whatsapp shortcut icon next to their phone number, messenger
 [ ] add a circular arrow icon to repeating events
 [ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review
 [ ] onboarding
-[ ] is there a reason why we store deleted people and events instead of just deleting them from the db
 [x] be able to pinch, or add small, medium, large options in terms of zoom
 [x] tasks with the checkbox and get crossed out
 [x] unreported events button to view all and mass report them

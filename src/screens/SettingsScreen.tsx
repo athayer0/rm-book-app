@@ -272,9 +272,6 @@ export function SettingsScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.sectionFootnote}>
-            Controls how tall events and time slots appear on the calendar.
-          </Text>
         </View>
 
         {/* Default Country Code */}
