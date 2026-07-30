@@ -77,35 +77,5 @@ export function useEventStatuses() {
     [current, user, write],
   );
 
-  /**
-   * Record many occurrences at once.
-   *
-   * Folded into a single `write` because the whole status map is serialised on
-   * every call — reporting a month's backlog one setStatus at a time would
-   * rewrite that map once per event. The queue ops stay per-occurrence, since
-   * each is its own row in event_statuses.
-   */
-  const setStatuses = useCallback(
-    async (entries: { eventId: string; dateStr: string; status: EventStatus }[]) => {
-      if (entries.length === 0) return;
-      await write(current => {
-        const next = { ...current };
-        for (const entry of entries) next[statusKey(entry.eventId, entry.dateStr)] = entry.status;
-        return next;
-      });
-
-      if (!user) return;
-      for (const entry of entries) {
-        await enqueueUpsert('event_statuses', `${entry.eventId}|${entry.dateStr}`, {
-          user_id: user.id,
-          event_id: entry.eventId,
-          occurrence_date: entry.dateStr,
-          status: entry.status,
-        });
-      }
-    },
-    [user, write],
-  );
-
-  return { statuses, getStatus, setStatus, setStatuses, moveStatus, reload };
+  return { statuses, getStatus, setStatus, moveStatus, reload };
 }

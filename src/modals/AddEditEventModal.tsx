@@ -10,16 +10,11 @@ import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colo
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd, isCheckboxType } from '../utils/eventUtils';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import { StatusCheckbox } from '../components/StatusCheckbox';
+import { StatusPicker, STATUS_LABELS } from '../components/StatusPicker';
 import { SheetModal } from '../components/SheetModal';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
 import { format } from 'date-fns';
-
-const STATUS_OPTIONS: { value: EventStatus; label: string; icon: string; color: string }[] = [
-  { value: 'pending',   label: 'Pending',   icon: 'alert-circle',    color: '#E8980E' },
-  { value: 'completed', label: 'Completed', icon: 'checkmark-circle', color: '#1A7A40' },
-  { value: 'failed',    label: 'Failed',    icon: 'ban',             color: '#B03030' },
-];
 
 interface Props {
   visible: boolean;
@@ -159,8 +154,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
   }, [showEndPicker]);
 
-  function handleStatusTap(value: EventStatus) {
-    const next = localStatus === value ? undefined : value;
+  // StatusPicker owns the tap-again-to-clear toggle, so this just adopts whatever
+  // it resolves to.
+  function handleStatusTap(next: EventStatus | undefined) {
     setLocalStatus(next);
     onStatusChange?.(next);
   }
@@ -313,33 +309,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             <View style={styles.section}>
               <View style={styles.statusRow}>
                 <Text style={[styles.label, { marginBottom: 0, paddingLeft: 6, fontSize: 16 }]}>
-                  {localStatus ? STATUS_OPTIONS.find(o => o.value === localStatus)?.label : 'None'}
+                  {localStatus ? STATUS_LABELS[localStatus] : 'None'}
                 </Text>
-                <View style={styles.statusIcons}>
-                  {STATUS_OPTIONS.map(opt => {
-                    const selected = localStatus === opt.value;
-                    return (
-                      <TouchableOpacity
-                        key={opt.value}
-                        onPress={() => handleStatusTap(opt.value)}
-                        style={opt.icon === 'ban' ? { width: 51, height: 54, alignItems: 'center', justifyContent: 'center' } : undefined}
-                      >
-                        {opt.icon === 'ban' && selected ? (
-                          <View style={{ width: 45, height: 45, borderRadius: 23, backgroundColor: opt.color, alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="ban-outline" size={39} color="#fff" style={{ transform: [{ scaleX: -1 }] }} />
-                          </View>
-                        ) : (
-                          <Ionicons
-                            name={(selected ? opt.icon : opt.icon + '-outline') as any}
-                            size={opt.icon === 'ban' ? 51 : 54}
-                            color={opt.color}
-                            style={opt.icon === 'ban' ? { transform: [{ scaleX: -1 }] } : undefined}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <StatusPicker value={localStatus} onChange={handleStatusTap} />
               </View>
             </View>
           )}

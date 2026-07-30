@@ -25,7 +25,7 @@ export function HomeScreen({ navigation }: any) {
 
   const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
   const { people, updatePerson, deletePerson, reload: reloadPeople } = usePeople();
-  const { unreported, count: unreportedCount, report, reportAll } = useUnreported();
+  const { unreported, count: unreportedCount, report } = useUnreported();
 
   useFocusEffect(useCallback(() => { reload(); reloadPeople(); }, [reload, reloadPeople]));
   const [editVisible, setEditVisible] = useState(false);
@@ -120,7 +120,6 @@ export function HomeScreen({ navigation }: any) {
         onClose={() => { setUnreportedVisible(false); reload(); }}
         unreported={unreported}
         onReport={report}
-        onReportAll={reportAll}
       />
 
       <AddEditPersonModal

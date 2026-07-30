@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
+import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, EVENT_BLOCK_STYLE } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
 
@@ -108,9 +108,9 @@ export function EventBlock({
   // no second layout pass and no flicker.
   const contentWidth =
     columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
-    - (isBackup ? 0 : 3)                      // left colour border
-    - (isBackup ? 8 : 9)                      // paddingLeft
-    - (showBadge ? badge + 6 : 6);            // paddingRight
+    - (isBackup ? 0 : EVENT_BLOCK_STYLE.accentWidth)              // left colour border
+    - (isBackup ? 8 : EVENT_BLOCK_STYLE.paddingLeft)              // paddingLeft
+    - (showBadge ? badge + 6 : EVENT_BLOCK_STYLE.paddingRight);   // paddingRight
   const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
 
   // Checkbox events have only a start time; everything else can show a start–end range.
@@ -128,19 +128,19 @@ export function EventBlock({
           {
             top,
             height,
-            borderLeftWidth: isBackup ? 0 : 3,
+            borderLeftWidth: isBackup ? 0 : EVENT_BLOCK_STYLE.accentWidth,
             borderLeftColor: isBackup ? 'transparent' : event.color,
             left: `${columnOffset * 100}%` as any,
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
-            paddingLeft: isBackup ? 8 : 9,
-            paddingRight: showBadge ? badge + 6 : 6,
+            paddingLeft: isBackup ? 8 : EVENT_BLOCK_STYLE.paddingLeft,
+            paddingRight: showBadge ? badge + 6 : EVENT_BLOCK_STYLE.paddingRight,
             paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
           },
         ]}
         onStartShouldSetResponder={() => true}
       >
-        <View style={[styles.blockTint, { backgroundColor: event.color + '55' }]} />
+        <View style={[styles.blockTint, { backgroundColor: event.color + EVENT_BLOCK_STYLE.tintAlpha }]} />
         {isBackup && (
           <View style={[styles.backupBar, { backgroundColor: event.color + '40', height }]}>
             {Array.from({ length: stripeCount }).map((_, i) => (
@@ -194,10 +194,10 @@ function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     block: {
       position: 'absolute',
-      borderLeftWidth: 3,
-      borderRadius: 2,
+      borderLeftWidth: EVENT_BLOCK_STYLE.accentWidth,
+      borderRadius: EVENT_BLOCK_STYLE.borderRadius,
       paddingLeft: 6,
-      paddingRight: 6,
+      paddingRight: EVENT_BLOCK_STYLE.paddingRight,
       paddingVertical: 3,
       overflow: 'hidden',
       backgroundColor: C.card,

@@ -1,36 +1,40 @@
 import React, { useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO, subDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels } from '../constants/colors';
-import { CalendarEvent, EventStatus, isCheckboxType } from '../utils/eventUtils';
+import { useSettings } from '../hooks/useSettings';
+import { EventSizes, resolveEventSize, EVENT_BLOCK_STYLE } from '../constants/eventSizes';
+import { CalendarEvent, EventStatus, isCheckboxType, renderedEventHeight } from '../utils/eventUtils';
 import { SheetModal } from '../components/SheetModal';
+import { StatusPicker } from '../components/StatusPicker';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   unreported: CalendarEvent[];
   onReport: (occurrence: CalendarEvent, status: EventStatus) => Promise<void>;
-  onReportAll: (status: EventStatus) => Promise<number>;
 }
 
-/** "Today" and "Yesterday" beat a date for the two days that carry most of the backlog. */
+/** "Today" and "Yesterday" beat a date for the two days carrying most of the backlog. */
 function dayLabel(dateStr: string, today: Date): string {
   if (dateStr === format(today, 'yyyy-MM-dd')) return 'Today';
   if (dateStr === format(subDays(today, 1), 'yyyy-MM-dd')) return 'Yesterday';
   return format(parseISO(dateStr), 'EEEE, MMM d');
 }
 
-export function UnreportedEventsModal({
-  visible, onClose, unreported, onReport, onReportAll,
-}: Props) {
+export function UnreportedEventsModal({ visible, onClose, unreported, onReport }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
   const today = new Date();
+
+  // Blocks track the calendar's density setting, so an event is the same size in
+  // both places rather than merely the same shape.
+  const { slotHeight, fontSize } = EventSizes[resolveEventSize(settings.eventSize)];
 
   // findUnreportedOccurrences walks the most recent day first, so insertion order
   // is already newest-first and a Map preserves it.
@@ -43,18 +47,6 @@ export function UnreportedEventsModal({
     }
     return [...byDate.entries()];
   }, [unreported]);
-
-  function confirmReportAll() {
-    const total = unreported.length;
-    Alert.alert(
-      `Report ${total} event${total === 1 ? '' : 's'}?`,
-      'Each one is marked completed and counted toward the goals for the week it happened in.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Mark all completed', onPress: () => { onReportAll('completed'); } },
-      ],
-    );
-  }
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
@@ -72,13 +64,6 @@ export function UnreportedEventsModal({
         </TouchableOpacity>
       </View>
 
-      {unreported.length > 0 && (
-        <TouchableOpacity style={styles.bulkBtn} onPress={confirmReportAll} activeOpacity={0.85}>
-          <Ionicons name="checkmark-done" size={18} color={Colors.white} />
-          <Text style={styles.bulkBtnText}>MARK ALL COMPLETED</Text>
-        </TouchableOpacity>
-      )}
-
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {unreported.length === 0 ? (
           <View style={styles.empty}>
@@ -92,40 +77,50 @@ export function UnreportedEventsModal({
           groups.map(([dateStr, occurrences]) => (
             <View key={dateStr} style={styles.group}>
               <Text style={styles.groupHeader}>{dayLabel(dateStr, today)}</Text>
-              {occurrences.map(occurrence => (
-                <View
-                  key={`${occurrence.id}::${occurrence.date}`}
-                  style={[styles.row, { borderLeftColor: EventColors[occurrence.type] ?? Colors.border }]}
-                >
-                  <View style={styles.rowLabels}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>{occurrence.title}</Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
-                      {/* Checkbox types store no duration — start and end are equal. */}
-                      {isCheckboxType(occurrence.type)
-                        ? occurrence.startTime
-                        : `${occurrence.startTime} – ${occurrence.endTime}`}
-                      {'  ·  '}
-                      {EventTypeLabels[occurrence.type] ?? occurrence.type}
-                    </Text>
+
+              {occurrences.map(occurrence => {
+                const isCheckbox = isCheckboxType(occurrence.type);
+                return (
+                  <View key={`${occurrence.id}::${occurrence.date}`} style={styles.row}>
+                    <View
+                      style={[
+                        styles.block,
+                        {
+                          height: renderedEventHeight(occurrence, slotHeight),
+                          borderLeftColor: occurrence.color,
+                          // Mirrors EventBlock: the tightest densities lose their
+                          // vertical padding so the title still fits.
+                          paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.blockTint,
+                          { backgroundColor: occurrence.color + EVENT_BLOCK_STYLE.tintAlpha },
+                        ]}
+                      />
+                      <View style={styles.blockRow}>
+                        <Text style={[styles.blockTitle, { fontSize }]} numberOfLines={1}>
+                          {occurrence.title}
+                        </Text>
+                        <Text style={[styles.blockTime, { fontSize }]} numberOfLines={1}>
+                          {/* Checkbox types store no duration — start and end are equal. */}
+                          {isCheckbox
+                            ? occurrence.startTime
+                            : `${occurrence.startTime} – ${occurrence.endTime}`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <StatusPicker
+                      value={undefined}
+                      onChange={status => { if (status) onReport(occurrence, status); }}
+                      size={30}
+                    />
                   </View>
-
-                  <TouchableOpacity
-                    style={[styles.action, { borderColor: Colors.statusFailed }]}
-                    onPress={() => onReport(occurrence, 'failed')}
-                    hitSlop={6}
-                  >
-                    <Ionicons name="close" size={20} color={Colors.statusFailed} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.action, { borderColor: Colors.statusCompleted, backgroundColor: Colors.statusCompleted }]}
-                    onPress={() => onReport(occurrence, 'completed')}
-                    hitSlop={6}
-                  >
-                    <Ionicons name="checkmark" size={20} color={Colors.white} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ))
         )}
@@ -158,28 +153,11 @@ function makeStyles(C: ColorPalette) {
       color: C.textSecondary,
       marginTop: 2,
     },
-    bulkBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      margin: 16,
-      marginBottom: 4,
-      paddingVertical: 12,
-      borderRadius: 8,
-      backgroundColor: C.statusCompleted,
-    },
-    bulkBtnText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: C.white,
-      letterSpacing: 1.1,
-    },
     scroll: {
       flex: 1,
     },
     content: {
-      paddingTop: 8,
+      paddingTop: 12,
       paddingBottom: 32,
     },
     group: {
@@ -199,34 +177,37 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       gap: 10,
       marginHorizontal: 16,
-      marginBottom: 6,
-      paddingLeft: 10,
-      paddingRight: 10,
-      paddingVertical: 10,
-      borderRadius: 8,
-      borderLeftWidth: 3,
-      backgroundColor: C.background,
+      marginBottom: 8,
     },
-    rowLabels: {
+    // The calendar block's look without its grid geometry: EventBlock is absolutely
+    // positioned into the time grid and carries drag gestures, so the shared part
+    // is the visual signature in EVENT_BLOCK_STYLE rather than the component.
+    block: {
       flex: 1,
-    },
-    rowTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: C.text,
-    },
-    rowMeta: {
-      fontSize: 11,
-      color: C.textSecondary,
-      marginTop: 2,
-    },
-    action: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      borderWidth: 1.5,
-      alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
+      backgroundColor: C.card,
+      borderRadius: EVENT_BLOCK_STYLE.borderRadius,
+      borderLeftWidth: EVENT_BLOCK_STYLE.accentWidth,
+      paddingLeft: EVENT_BLOCK_STYLE.paddingLeft,
+      paddingRight: EVENT_BLOCK_STYLE.paddingRight,
+    },
+    blockTint: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    blockRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    blockTitle: {
+      fontWeight: '700',
+      color: C.text,
+      flexShrink: 1,
+    },
+    blockTime: {
+      color: C.textSecondary,
+      marginLeft: 4,
+      flexShrink: 0,
     },
     empty: {
       alignItems: 'center',
