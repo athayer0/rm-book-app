@@ -212,6 +212,42 @@ export function findUnreportedOccurrences(
   return found;
 }
 
+/**
+ * What a week's completed events contribute to each goal.
+ *
+ * This is the derived half of a week's total; the other half is a stored manual
+ * offset. Recomputed rather than maintained as a running count because far more
+ * than the status toggle invalidates such a count — moving an event to another
+ * week, deleting it, changing its type, shifting a prayer across 2pm, or editing
+ * a church event's duration all change what the total should be, and none of
+ * those operations can be expected to know a cached number exists.
+ *
+ * Takes the week's dates rather than a week key so this stays free of dateUtils;
+ * the caller owns the week-boundary question.
+ *
+ * Backups are skipped explicitly. They carry no status by design, so they can
+ * never read as completed — but that shouldn't rest on the UI alone.
+ */
+export function deriveWeekGoalCounts(
+  events: CalendarEvent[],
+  isCompleted: (eventId: string, dateStr: string) => boolean,
+  weekDates: string[],
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+
+  for (const dateStr of weekDates) {
+    for (const occurrence of getEventsForDate(events, dateStr)) {
+      if (occurrence.backup) continue;
+      if (!isCompleted(occurrence.id, dateStr)) continue;
+      const contrib = getGoalContribution(occurrence);
+      if (!contrib) continue;
+      totals[contrib.goalId] = (totals[contrib.goalId] ?? 0) + contrib.delta;
+    }
+  }
+
+  return totals;
+}
+
 export function hasEventStartPassed(event: CalendarEvent): boolean {
   const now = new Date();
   const todayStr = format(now, 'yyyy-MM-dd');

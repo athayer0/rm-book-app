@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getItem, setItem } from '../utils/storage';
-import { isNewWeek, getWeekKey, getWeekKeyByOffset } from '../utils/dateUtils';
+import { isNewWeek, getWeekKey, getWeekDates } from '../utils/dateUtils';
+import { deriveWeekGoalCounts } from '../utils/eventUtils';
 import { DEFAULT_GOALS, GoalDefinition } from '../constants/defaultGoals';
 import {
   GOAL_DEFINITIONS_KEY,
@@ -9,6 +10,8 @@ import {
   goalTargetsKey,
 } from '../constants/storageKeys';
 import { useStoredState } from './useStoredState';
+import { useCalendarEvents } from './useCalendarEvents';
+import { useEventStatuses } from './useEventStatuses';
 import { enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
@@ -17,6 +20,25 @@ export type WeeklyGoals = Record<string, number>;
 
 const EMPTY: Record<string, number> = {};
 const EMPTY_DEFS: GoalDefinition[] = [];
+
+/**
+ * A week's totals: what its completed events contribute, plus the user's manual
+ * adjustment.
+ *
+ * The zero floor belongs on the total rather than on the stored offset — a
+ * negative offset is exactly how "this week reads 0 even though two events are
+ * checked off" is expressed.
+ */
+function mergeCounts(derived: WeeklyCounts, offsets: WeeklyCounts): WeeklyCounts {
+  const totals: WeeklyCounts = { ...derived };
+  for (const [id, offset] of Object.entries(offsets)) {
+    totals[id] = (totals[id] ?? 0) + offset;
+  }
+  for (const id of Object.keys(totals)) {
+    if (totals[id] < 0) totals[id] = 0;
+  }
+  return totals;
+}
 
 // Each goal's weekly target is stored per week. A week at or before the current one treats
 // an unset target as 0; a future week stays unset so the UI can prompt for one.
@@ -46,12 +68,31 @@ export function useWeeklyGoals() {
   const targetsKey = goalTargetsKey(weekKey);
 
   const defsState = useStoredState<GoalDefinition[]>(GOAL_DEFINITIONS_KEY, EMPTY_DEFS);
-  const countsState = useStoredState<WeeklyCounts>(countsKey, EMPTY);
+  // Holds manual offsets, not totals. The event-driven share of every total is
+  // derived below from events and statuses, which are the authority on it.
+  const offsetsState = useStoredState<WeeklyCounts>(countsKey, EMPTY);
   const targetsState = useStoredState<WeeklyGoals>(targetsKey, EMPTY);
 
+  const { events } = useCalendarEvents();
+  const { getStatus } = useEventStatuses();
+
   const definitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_GOALS;
-  const counts = countsState.value;
   const goals = targetsState.value;
+
+  const isCompleted = useCallback(
+    (eventId: string, dateStr: string) => getStatus(eventId, dateStr) === 'completed',
+    [getStatus],
+  );
+
+  const derived = useMemo(
+    () => deriveWeekGoalCounts(events, isCompleted, getWeekDates(weekKey)),
+    [events, isCompleted, weekKey],
+  );
+
+  const counts = useMemo(
+    () => mergeCounts(derived, offsetsState.value),
+    [derived, offsetsState.value],
+  );
 
   const [resetChecked, setResetChecked] = useState(false);
   useEffect(() => {
@@ -66,6 +107,11 @@ export function useWeeklyGoals() {
 
   const syncCount = useCallback(async (goalId: string, wk: string, count: number) => {
     if (!user) return;
+    // `count` carries the manual offset, not the total: the total is recomputed on
+    // each device from events and statuses, which sync as rows of their own. This
+    // is also what makes concurrent edits survivable — two devices ticking the
+    // same event converge instead of each replaying a +1.
+    //
     // Only the count column is sent — PostgREST builds the conflict update from
     // the keys present, so this cannot null out a target set for the same week.
     await enqueueUpsert('goal_entries', `${goalId}|${wk}|count`, {
@@ -73,30 +119,23 @@ export function useWeeklyGoals() {
     });
   }, [user]);
 
-  const adjustBy = useCallback(async (id: string, delta: number, floorAtZero = true) => {
-    const updated = await countsState.write(current => {
-      const next = (current[id] ?? 0) + delta;
-      return { ...current, [id]: floorAtZero ? Math.max(0, next) : next };
-    });
-    await syncCount(id, weekKey, updated[id]);
-  }, [countsState, syncCount, weekKey]);
-
-  const increment = useCallback((id: string) => adjustBy(id, 1), [adjustBy]);
-
-  const decrement = useCallback(async (id: string) => {
-    if ((countsState.current.current[id] ?? 0) <= 0) return;
-    await adjustBy(id, -1);
-  }, [countsState, adjustBy]);
-
-  const reset = useCallback(async (id: string) => {
-    await countsState.write(current => ({ ...current, [id]: 0 }));
-    await syncCount(id, weekKey, 0);
-  }, [countsState, syncCount, weekKey]);
-
+  /**
+   * Force every goal to read zero for the current week.
+   *
+   * Completed events cannot be un-completed from here, so zeroing means offsetting
+   * their contribution: the offset is the negative of what the week derives. Goals
+   * with nothing derived store no offset at all, which keeps the file free of
+   * zero entries that would otherwise be indistinguishable from a real edit.
+   */
   const resetAll = useCallback(async () => {
-    await countsState.write(() => ({}));
-    for (const def of definitions) await syncCount(def.id, weekKey, 0);
-  }, [countsState, definitions, syncCount, weekKey]);
+    const offsets: WeeklyCounts = {};
+    for (const def of definitions) {
+      const contributed = derived[def.id] ?? 0;
+      if (contributed > 0) offsets[def.id] = -contributed;
+    }
+    await offsetsState.write(() => offsets);
+    for (const def of definitions) await syncCount(def.id, weekKey, offsets[def.id] ?? 0);
+  }, [offsetsState, definitions, derived, syncCount, weekKey]);
 
   const updateDefinitions = useCallback(async (defs: GoalDefinition[]) => {
     await defsState.write(() => defs);
@@ -114,53 +153,48 @@ export function useWeeklyGoals() {
   }, [definitions, updateDefinitions]);
 
   const reload = useCallback(async () => {
-    await Promise.all([defsState.reload(), countsState.reload(), targetsState.reload()]);
-  }, [defsState, countsState, targetsState]);
-
-  const getCount = useCallback((id: string) => counts[id] ?? 0, [counts]);
+    await Promise.all([defsState.reload(), offsetsState.reload(), targetsState.reload()]);
+  }, [defsState, offsetsState, targetsState]);
 
   // ── Per-week data access ────────────────────────────────────────────────
 
+  /** Derive any week's contributions. The current week is already memoised above. */
+  const derivedFor = useCallback(
+    (wk: string): WeeklyCounts =>
+      wk === weekKey ? derived : deriveWeekGoalCounts(events, isCompleted, getWeekDates(wk)),
+    [weekKey, derived, events, isCompleted],
+  );
+
   const getWeekData = useCallback(async (wk: string): Promise<{ counts: WeeklyCounts; goals: Record<string, number> }> => {
-    const [wkCounts, wkGoals] = await Promise.all([
+    const [wkOffsets, wkGoals] = await Promise.all([
       getItem<WeeklyCounts>(goalCountsKey(wk)),
       getItem<Record<string, number>>(goalTargetsKey(wk)),
     ]);
-    return { counts: wkCounts ?? {}, goals: wkGoals ?? {} };
-  }, []);
+    return { counts: mergeCounts(derivedFor(wk), wkOffsets ?? {}), goals: wkGoals ?? {} };
+  }, [derivedFor]);
 
-  const saveCountForWeek = useCallback(async (id: string, wk: string, value: number) => {
-    if (wk === getWeekKeyByOffset(0)) {
-      await countsState.write(current => ({ ...current, [id]: value }));
+  /**
+   * Set a goal's displayed total for a week.
+   *
+   * Stored as the difference from what that week's events already contribute, so
+   * the number typed is the number shown — and so ticking an event off afterwards
+   * moves the total without discarding the adjustment. The offset may be negative;
+   * only the total is floored.
+   */
+  const saveCountForWeek = useCallback(async (id: string, wk: string, total: number) => {
+    const offset = total - (derivedFor(wk)[id] ?? 0);
+    if (wk === weekKey) {
+      await offsetsState.write(current => ({ ...current, [id]: offset }));
     } else {
       const key = goalCountsKey(wk);
       const stored = (await getItem<WeeklyCounts>(key)) ?? {};
-      await setItem(key, { ...stored, [id]: value });
+      await setItem(key, { ...stored, [id]: offset });
     }
-    await syncCount(id, wk, value);
-  }, [countsState, syncCount]);
-
-  /**
-   * Move a goal's count within a specific week.
-   *
-   * Reporting credits the week the event happened in, not the week you got round
-   * to reporting it — so Sunday's scripture study still lands in Sunday's week
-   * when you tick it off on Tuesday.
-   *
-   * The current week is read from the live ref rather than the rendered `counts`,
-   * because a bulk report applies many deltas in one tick and closed-over state
-   * would be one write behind for every event after the first.
-   */
-  const adjustCountForWeek = useCallback(async (id: string, wk: string, delta: number) => {
-    if (delta === 0) return;
-    const existing = wk === getWeekKeyByOffset(0)
-      ? (countsState.current.current[id] ?? 0)
-      : ((await getWeekData(wk)).counts[id] ?? 0);
-    await saveCountForWeek(id, wk, Math.max(0, existing + delta));
-  }, [countsState, getWeekData, saveCountForWeek]);
+    await syncCount(id, wk, offset);
+  }, [derivedFor, weekKey, offsetsState, syncCount]);
 
   const saveGoalForWeek = useCallback(async (id: string, wk: string, value: number) => {
-    if (wk === getWeekKeyByOffset(0)) {
+    if (wk === weekKey) {
       await targetsState.write(current => ({ ...current, [id]: value }));
     } else {
       const key = goalTargetsKey(wk);
@@ -172,7 +206,7 @@ export function useWeeklyGoals() {
     await enqueueUpsert('goal_entries', `${id}|${wk}|target`, {
       user_id: user.id, goal_id: id, week_key: wk, target: value,
     });
-  }, [targetsState, user]);
+  }, [targetsState, user, weekKey]);
 
-  return { definitions, counts, goals, increment, decrement, reset, resetAll, updateDefinitions, resetBuiltInDefinitions, adjustCountForWeek, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
+  return { definitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek };
 }

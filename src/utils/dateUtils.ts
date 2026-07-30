@@ -1,4 +1,4 @@
-import { getISOWeek, getISOWeekYear, format, addWeeks } from 'date-fns';
+import { getISOWeek, getISOWeekYear, format, addWeeks, addDays, parseISO } from 'date-fns';
 
 export function getWeekKey(date: Date = new Date()): string {
   const year = getISOWeekYear(date);
@@ -13,16 +13,27 @@ export function isNewWeek(lastResetDate: string | null): boolean {
   return getWeekKey(last) !== getWeekKey(now);
 }
 
-export function formatWeekLabel(weekKey: string): string {
-  // weekKey format: "2024-W01"
+/**
+ * The seven dates a week key covers, Monday first — the inverse of getWeekKey.
+ *
+ * Lives next to getWeekKey so the two cannot drift about where a week begins.
+ * Goal counts are derived by summing the events inside a week, so a disagreement
+ * here would land contributions in the neighbouring bucket.
+ */
+export function getWeekDates(weekKey: string): string[] {
+  // weekKey format: "2024-W01". Jan 4th is always in ISO week 1.
   const [year, week] = weekKey.split('-W');
   const jan4 = new Date(parseInt(year), 0, 4);
+  // getDay() calls Sunday 0; ISO calls it 7.
   const dayOfWeek = jan4.getDay() || 7;
   const monday = new Date(jan4);
   monday.setDate(jan4.getDate() - dayOfWeek + 1 + (parseInt(week) - 1) * 7);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return `${format(monday, 'MMM d')} – ${format(sunday, 'MMM d')}`;
+  return Array.from({ length: 7 }, (_, i) => format(addDays(monday, i), 'yyyy-MM-dd'));
+}
+
+export function formatWeekLabel(weekKey: string): string {
+  const dates = getWeekDates(weekKey);
+  return `${format(parseISO(dates[0]), 'MMM d')} – ${format(parseISO(dates[6]), 'MMM d')}`;
 }
 
 export function formatTime(hour: number, minute: number): string {
