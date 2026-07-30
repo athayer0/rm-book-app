@@ -2,7 +2,8 @@ TO DO
 
 [ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts
 [x] make a call and maybe whatsapp shortcut icon next to their phone number, messenger
-[ ] add a circular arrow icon to repeating events
+[x] add a circular arrow icon to repeating events
+[ ] add more hideable kis for the other event types (sevice hours, hours worked, hours of school, etc.)
 [ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review

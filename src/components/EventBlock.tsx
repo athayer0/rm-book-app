@@ -13,6 +13,7 @@ import { StatusCheckbox } from './StatusCheckbox';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
 const TIME_GAP = 4; // styles.time marginLeft
+const REPEAT_GAP = 3; // between the repeat marker and the status badge
 
 // The block's visual signature. Named because each of these appears twice: once in
 // the rendered style, and once in the width arithmetic that decides whether the
@@ -129,11 +130,25 @@ export function EventBlock({
   // only whole — a half-shown start time is worse than none. Widths are derived from
   // columnWidth (the same figure the drag ghost uses) rather than measured, so there is
   // no second layout pass and no flicker.
+  // Scales with the block's font so it stays proportionate at every density.
+  const repeatSize = Math.round(fontSize * 1.75);
+  const isRecurring = !!event.recurring;
+
+  // The right-hand gutter: the status badge sits nearest the edge, the repeat
+  // marker to its left. With no badge the marker takes the badge's place, at the
+  // same 6pt inset. Both are absolute, so the gutter has to be reserved as
+  // paddingRight or the title would run underneath them.
+  const repeatRight = showBadge ? 6 + badge + REPEAT_GAP : 6;
+  const gutter = showBadge
+    ? 6 + badge + (isRecurring ? REPEAT_GAP + repeatSize : 0)
+    : isRecurring ? 6 + repeatSize : BLOCK.paddingRight;
+
   const contentWidth =
     columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
     - (isBackup ? 0 : BLOCK.accentWidth)              // left colour border
     - (isBackup ? 8 : BLOCK.paddingLeft)              // paddingLeft
-    - (showBadge ? badge + 6 : BLOCK.paddingRight);   // paddingRight
+    - gutter;                                         // paddingRight
+
   const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
 
   // Checkbox events have only a start time; everything else can show a start–end range.
@@ -157,7 +172,7 @@ export function EventBlock({
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
             paddingLeft: isBackup ? 8 : BLOCK.paddingLeft,
-            paddingRight: showBadge ? badge + 6 : BLOCK.paddingRight,
+            paddingRight: gutter,
             paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
           },
           // Last, so it wins over the grid placement computed above.
@@ -183,6 +198,12 @@ export function EventBlock({
             <Text style={[styles.time, { fontSize }]} numberOfLines={1}>{timeLabel}</Text>
           )}
         </View>
+
+        {isRecurring && (
+          <View style={[styles.statusWrap, { width: repeatSize, right: repeatRight }]}>
+            <Ionicons name="sync-outline" size={repeatSize} color={Colors.textSecondary} />
+          </View>
+        )}
 
         {isCheckbox && (
           <GestureDetector gesture={Gesture.Tap().runOnJS(true).onEnd(() => onToggleStatus?.())}>
@@ -250,7 +271,7 @@ function makeStyles(C: ColorPalette) {
     },
     time: {
       color: C.textSecondary,
-      marginLeft: 4,
+      marginLeft: TIME_GAP,
       flexShrink: 0,
     },
     statusWrap: {
