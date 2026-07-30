@@ -12,6 +12,7 @@ TO DO
 [x] wiped the old local data and deleted the legacy-key migration - no more indicator_* keys or schema_version anywhere
 [x] fold EXPORT_KEYS/EXPORT_PREFIXES in SettingsScreen into APP_DATA_KEYS/APP_DATA_PREFIXES in storageKeys - export and wipe now share isAppDataKey, and device-local keys split out into DEVICE_LOCAL_KEYS
 [ ] make it so that relevant menus dont just say edit (blank) at the top and have cancel and save buttons, have them have an x that saves or maybe a delete button with an are you sure popup
+[ ] Fix up the weekly Planning goals menu so that future events when the goals are set display zero out of and then the side goal instead of justice the set goal and when moving back to the current week from a future week There is a flash of it still saying set goals I think before correcting to the current week's key indicators
 [ ] tapping the event + gives aestetic event selecter bubbles
 [ ] be able to import people from contacts app on your phone
 [ ] be able to sign in/make an account with apple and google and facebook?
