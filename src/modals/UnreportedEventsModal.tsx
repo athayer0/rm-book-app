@@ -7,18 +7,18 @@ import { format, parseISO, subDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
-import { EventSizes, resolveEventSize, EVENT_BLOCK_STYLE } from '../constants/eventSizes';
-import { CalendarEvent, EventStatus, isCheckboxType, renderedEventHeight, resolveEventStatus } from '../utils/eventUtils';
+import { EventSizes, resolveEventSize } from '../constants/eventSizes';
+import { CalendarEvent, EventStatus } from '../utils/eventUtils';
 import { SheetModal } from '../components/SheetModal';
-import { StatusPicker } from '../components/StatusPicker';
+import { EventBlock } from '../components/EventBlock';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   unreported: CalendarEvent[];
-  onReport: (occurrence: CalendarEvent, status: EventStatus | undefined) => Promise<void>;
-  /** The recorded status, which resolveEventStatus turns into the displayed one. */
+  /** The recorded status; EventBlock resolves it into the badge it draws. */
   statusOf: (eventId: string, dateStr: string) => EventStatus | undefined;
+  onPressEvent: (occurrence: CalendarEvent) => void;
 }
 
 /** "Today" and "Yesterday" beat a date for the two days carrying most of the backlog. */
@@ -28,14 +28,14 @@ function dayLabel(dateStr: string, today: Date): string {
   return format(parseISO(dateStr), 'EEEE, MMM d');
 }
 
-export function UnreportedEventsModal({ visible, onClose, unreported, onReport, statusOf }: Props) {
+export function UnreportedEventsModal({ visible, onClose, unreported, statusOf, onPressEvent }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
   const today = new Date();
 
-  // Blocks track the calendar's density setting, so an event is the same size in
-  // both places rather than merely the same shape.
+  // The calendar's own density, so a block here is the same size as the one it
+  // stands for rather than an approximation of it.
   const { slotHeight, fontSize } = EventSizes[resolveEventSize(settings.eventSize)];
 
   // findUnreportedOccurrences walks the most recent day first, so insertion order
@@ -80,56 +80,21 @@ export function UnreportedEventsModal({ visible, onClose, unreported, onReport, 
             <View key={dateStr} style={styles.group}>
               <Text style={styles.groupHeader}>{dayLabel(dateStr, today)}</Text>
 
-              {occurrences.map(occurrence => {
-                const isCheckbox = isCheckboxType(occurrence.type);
-                return (
-                  <View key={`${occurrence.id}::${occurrence.date}`} style={styles.row}>
-                    <View
-                      style={[
-                        styles.block,
-                        {
-                          height: renderedEventHeight(occurrence, slotHeight),
-                          borderLeftColor: occurrence.color,
-                          // Mirrors EventBlock: the tightest densities lose their
-                          // vertical padding so the title still fits.
-                          paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.blockTint,
-                          { backgroundColor: occurrence.color + EVENT_BLOCK_STYLE.tintAlpha },
-                        ]}
-                      />
-                      <View style={styles.blockRow}>
-                        <Text style={[styles.blockTitle, { fontSize }]} numberOfLines={1}>
-                          {occurrence.title}
-                        </Text>
-                        <Text style={[styles.blockTime, { fontSize }]} numberOfLines={1}>
-                          {/* Checkbox types store no duration — start and end are equal. */}
-                          {isCheckbox
-                            ? occurrence.startTime
-                            : `${occurrence.startTime} – ${occurrence.endTime}`}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/*
-                      The resolved state, not the stored one, so a never-touched
-                      event and a deliberately deferred one look alike — they are
-                      the same thing. Everything in this list resolves to pending,
-                      so pending reads as selected throughout, and tapping it
-                      merely clears a stored value that resolves straight back.
-                    */}
-                    <StatusPicker
-                      value={resolveEventStatus(occurrence, statusOf(occurrence.id, occurrence.date))}
-                      onChange={status => onReport(occurrence, status)}
-                      size={30}
-                    />
-                  </View>
-                );
-              })}
+              {occurrences.map(occurrence => (
+                <View key={`${occurrence.id}::${occurrence.date}`} style={styles.blockRow}>
+                  <EventBlock
+                    inline
+                    event={occurrence}
+                    status={statusOf(occurrence.id, occurrence.date)}
+                    onPress={() => onPressEvent(occurrence)}
+                    // A checkbox event's tick target would otherwise swallow the
+                    // press and do nothing, leaving a dead patch on the block.
+                    onToggleStatus={() => onPressEvent(occurrence)}
+                    slotHeight={slotHeight}
+                    fontSize={fontSize}
+                  />
+                </View>
+              ))}
             </View>
           ))
         )}
@@ -181,42 +146,9 @@ function makeStyles(C: ColorPalette) {
       paddingHorizontal: 16,
       paddingBottom: 6,
     },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
+    blockRow: {
       marginHorizontal: 16,
       marginBottom: 8,
-    },
-    // The calendar block's look without its grid geometry: EventBlock is absolutely
-    // positioned into the time grid and carries drag gestures, so the shared part
-    // is the visual signature in EVENT_BLOCK_STYLE rather than the component.
-    block: {
-      flex: 1,
-      justifyContent: 'center',
-      overflow: 'hidden',
-      backgroundColor: C.card,
-      borderRadius: EVENT_BLOCK_STYLE.borderRadius,
-      borderLeftWidth: EVENT_BLOCK_STYLE.accentWidth,
-      paddingLeft: EVENT_BLOCK_STYLE.paddingLeft,
-      paddingRight: EVENT_BLOCK_STYLE.paddingRight,
-    },
-    blockTint: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    blockRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    blockTitle: {
-      fontWeight: '700',
-      color: C.text,
-      flexShrink: 1,
-    },
-    blockTime: {
-      color: C.textSecondary,
-      marginLeft: 4,
-      flexShrink: 0,
     },
     empty: {
       alignItems: 'center',

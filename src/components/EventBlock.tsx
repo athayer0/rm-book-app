@@ -6,13 +6,26 @@ import * as Haptics from 'expo-haptics';
 import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, EVENT_BLOCK_STYLE } from '../constants/eventSizes';
+import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
 const TIME_GAP = 4; // styles.time marginLeft
+
+// The block's visual signature. Named because each of these appears twice: once in
+// the rendered style, and once in the width arithmetic that decides whether the
+// time label still fits.
+const BLOCK = {
+  borderRadius: 2,
+  /** The left bar carrying the event's type colour. */
+  accentWidth: 3,
+  /** Alpha suffix appended to the event colour for the block's fill. */
+  tintAlpha: '55',
+  paddingLeft: 9,
+  paddingRight: 6,
+} as const;
 
 // Approximate width of a string in the system font. Times are a fixed format so this is
 // dependable for them; titles vary, and over-estimating one only drops the time, which is
@@ -36,12 +49,20 @@ interface Props {
   gridStartHour?: number;
   slotHeight?: number;
   fontSize?: number;
+  /**
+   * Render in a list rather than positioned into the time grid: no absolute
+   * placement and no drag, since neither means anything outside the calendar.
+   * Everything else — tint, accent, badge, checkbox, density — is unchanged, which
+   * is the point of reusing this instead of imitating it.
+   */
+  inline?: boolean;
 }
 
 export function EventBlock({
   event, status, onPress, onToggleStatus, onDragStart, onDragMove, onDragEnd, onDragCancel,
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
   slotHeight = DEFAULT_SLOT_HEIGHT, fontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize,
+  inline = false,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -93,7 +114,7 @@ export function EventBlock({
     .runOnJS(true)
     .onEnd((_e, success) => { if (success) onPress(); });
 
-  const composed = Gesture.Race(dragPanGesture, tapGesture);
+  const composed = inline ? tapGesture : Gesture.Race(dragPanGesture, tapGesture);
 
   const stripeCount = Math.ceil(height / 7) + 4;
 
@@ -110,9 +131,9 @@ export function EventBlock({
   // no second layout pass and no flicker.
   const contentWidth =
     columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
-    - (isBackup ? 0 : EVENT_BLOCK_STYLE.accentWidth)              // left colour border
-    - (isBackup ? 8 : EVENT_BLOCK_STYLE.paddingLeft)              // paddingLeft
-    - (showBadge ? badge + 6 : EVENT_BLOCK_STYLE.paddingRight);   // paddingRight
+    - (isBackup ? 0 : BLOCK.accentWidth)              // left colour border
+    - (isBackup ? 8 : BLOCK.paddingLeft)              // paddingLeft
+    - (showBadge ? badge + 6 : BLOCK.paddingRight);   // paddingRight
   const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
 
   // Checkbox events have only a start time; everything else can show a start–end range.
@@ -130,19 +151,21 @@ export function EventBlock({
           {
             top,
             height,
-            borderLeftWidth: isBackup ? 0 : EVENT_BLOCK_STYLE.accentWidth,
+            borderLeftWidth: isBackup ? 0 : BLOCK.accentWidth,
             borderLeftColor: isBackup ? 'transparent' : event.color,
             left: `${columnOffset * 100}%` as any,
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
-            paddingLeft: isBackup ? 8 : EVENT_BLOCK_STYLE.paddingLeft,
-            paddingRight: showBadge ? badge + 6 : EVENT_BLOCK_STYLE.paddingRight,
+            paddingLeft: isBackup ? 8 : BLOCK.paddingLeft,
+            paddingRight: showBadge ? badge + 6 : BLOCK.paddingRight,
             paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
           },
+          // Last, so it wins over the grid placement computed above.
+          inline && styles.blockInline,
         ]}
         onStartShouldSetResponder={() => true}
       >
-        <View style={[styles.blockTint, { backgroundColor: event.color + EVENT_BLOCK_STYLE.tintAlpha }]} />
+        <View style={[styles.blockTint, { backgroundColor: event.color + BLOCK.tintAlpha }]} />
         {isBackup && (
           <View style={[styles.backupBar, { backgroundColor: event.color + '40', height }]}>
             {Array.from({ length: stripeCount }).map((_, i) => (
@@ -196,13 +219,19 @@ function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     block: {
       position: 'absolute',
-      borderLeftWidth: EVENT_BLOCK_STYLE.accentWidth,
-      borderRadius: EVENT_BLOCK_STYLE.borderRadius,
+      borderLeftWidth: BLOCK.accentWidth,
+      borderRadius: BLOCK.borderRadius,
       paddingLeft: 6,
-      paddingRight: EVENT_BLOCK_STYLE.paddingRight,
+      paddingRight: BLOCK.paddingRight,
       paddingVertical: 3,
       overflow: 'hidden',
       backgroundColor: C.card,
+    },
+    blockInline: {
+      position: 'relative',
+      top: 0,
+      left: 0,
+      width: '100%',
     },
     blockTint: {
       ...StyleSheet.absoluteFillObject,
