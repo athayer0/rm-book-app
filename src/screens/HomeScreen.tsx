@@ -8,9 +8,6 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { usePeople } from '../hooks/usePeople';
-import { useSettings } from '../hooks/useSettings';
-import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { CalendarEvent } from '../utils/eventUtils';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { PersonCard } from '../components/PersonCard';
@@ -18,7 +15,6 @@ import { UnreportedRow } from '../components/UnreportedRow';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
 import { GoalWeeklyModal } from '../modals/GoalWeeklyModal';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
-import { AddEditEventModal } from '../modals/AddEditEventModal';
 import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
 import { useUnreported } from '../hooks/useUnreported';
 import { Person } from '../hooks/usePeople';
@@ -29,9 +25,7 @@ export function HomeScreen({ navigation }: any) {
 
   const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
   const { people, updatePerson, deletePerson, reload: reloadPeople } = usePeople();
-  const { unreported, count: unreportedCount, report, statusOf } = useUnreported();
-  const { settings } = useSettings();
-  const { updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
+  const { count: unreportedCount } = useUnreported();
 
   useFocusEffect(useCallback(() => { reload(); reloadPeople(); }, [reload, reloadPeople]));
   const [editVisible, setEditVisible] = useState(false);
@@ -39,7 +33,6 @@ export function HomeScreen({ navigation }: any) {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [personModalVisible, setPersonModalVisible] = useState(false);
   const [unreportedVisible, setUnreportedVisible] = useState(false);
-  const [editingOccurrence, setEditingOccurrence] = useState<CalendarEvent | null>(null);
 
   const featuredPeople = people.filter(p => p.starred);
 
@@ -50,10 +43,6 @@ export function HomeScreen({ navigation }: any) {
 
   async function handlePersonSave(personData: Omit<Person, 'id' | 'createdAt'>) {
     if (editingPerson) await updatePerson(editingPerson.id, personData);
-  }
-
-  async function handleOccurrenceSave(eventData: Omit<CalendarEvent, 'id'>) {
-    if (editingOccurrence) await updateEvent(editingOccurrence.id, eventData);
   }
 
   return (
@@ -129,27 +118,6 @@ export function HomeScreen({ navigation }: any) {
       <UnreportedEventsModal
         visible={unreportedVisible}
         onClose={() => { setUnreportedVisible(false); reload(); }}
-        unreported={unreported}
-        statusOf={statusOf}
-        onPressEvent={setEditingOccurrence}
-      />
-
-      {/*
-        Declared after the backlog sheet so it stacks above it, and the sheet is
-        left mounted rather than closed — which is what puts the user back on the
-        backlog when they dismiss this, instead of on the home screen.
-      */}
-      <AddEditEventModal
-        visible={editingOccurrence !== null}
-        event={editingOccurrence}
-        settings={settings}
-        currentStatus={editingOccurrence ? statusOf(editingOccurrence.id, editingOccurrence.date) : undefined}
-        onStatusChange={editingOccurrence ? (s) => report(editingOccurrence, s) : undefined}
-        onSave={handleOccurrenceSave}
-        onDelete={(id, occurrenceDate, mode) =>
-          mode === 'future' ? deleteFromDate(id, occurrenceDate) : deleteOccurrence(id, occurrenceDate)
-        }
-        onClose={() => setEditingOccurrence(null)}
       />
 
       <AddEditPersonModal

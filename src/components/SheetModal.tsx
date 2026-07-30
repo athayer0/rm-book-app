@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal, View, Pressable, StyleSheet, useWindowDimensions, Animated,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -55,14 +56,23 @@ export function SheetModal({ visible, onClose, children, topInset }: Props) {
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View style={[styles.root, { paddingTop: gap }]}>
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-          {children}
-        </Animated.View>
-      </View>
+      {/*
+        A Modal is its own native view hierarchy, outside the GestureHandlerRootView
+        in App.tsx, so gesture-handler needs a root of its own in here. Without one a
+        GestureDetector inside a sheet never fires — and worse, its view still claims
+        touches into a system that isn't listening, which deadens the whole sheet
+        rather than just that component.
+      */}
+      <GestureHandlerRootView style={styles.root}>
+        <View style={[styles.root, { paddingTop: gap }]}>
+          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          </Animated.View>
+          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+            {children}
+          </Animated.View>
+        </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

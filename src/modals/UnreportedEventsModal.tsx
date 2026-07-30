@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
 } from 'react-native';
@@ -7,18 +7,17 @@ import { format, parseISO, subDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
+import { useCalendarEvents } from '../hooks/useCalendarEvents';
+import { useUnreported } from '../hooks/useUnreported';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
-import { CalendarEvent, EventStatus } from '../utils/eventUtils';
+import { CalendarEvent } from '../utils/eventUtils';
 import { SheetModal } from '../components/SheetModal';
 import { EventBlock } from '../components/EventBlock';
+import { AddEditEventModal } from './AddEditEventModal';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  unreported: CalendarEvent[];
-  /** The recorded status; EventBlock resolves it into the badge it draws. */
-  statusOf: (eventId: string, dateStr: string) => EventStatus | undefined;
-  onPressEvent: (occurrence: CalendarEvent) => void;
 }
 
 /** "Today" and "Yesterday" beat a date for the two days carrying most of the backlog. */
@@ -28,10 +27,13 @@ function dayLabel(dateStr: string, today: Date): string {
   return format(parseISO(dateStr), 'EEEE, MMM d');
 }
 
-export function UnreportedEventsModal({ visible, onClose, unreported, statusOf, onPressEvent }: Props) {
+export function UnreportedEventsModal({ visible, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
+  const { unreported, report, statusOf } = useUnreported();
+  const { updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
+  const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const today = new Date();
 
   // The calendar's own density, so a block here is the same size as the one it
@@ -49,6 +51,10 @@ export function UnreportedEventsModal({ visible, onClose, unreported, statusOf, 
     }
     return [...byDate.entries()];
   }, [unreported]);
+
+  async function handleSave(eventData: Omit<CalendarEvent, 'id'>) {
+    if (editing) await updateEvent(editing.id, eventData);
+  }
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
@@ -86,10 +92,10 @@ export function UnreportedEventsModal({ visible, onClose, unreported, statusOf, 
                     inline
                     event={occurrence}
                     status={statusOf(occurrence.id, occurrence.date)}
-                    onPress={() => onPressEvent(occurrence)}
+                    onPress={() => setEditing(occurrence)}
                     // A checkbox event's tick target would otherwise swallow the
                     // press and do nothing, leaving a dead patch on the block.
-                    onToggleStatus={() => onPressEvent(occurrence)}
+                    onToggleStatus={() => setEditing(occurrence)}
                     slotHeight={slotHeight}
                     fontSize={fontSize}
                   />
@@ -99,6 +105,27 @@ export function UnreportedEventsModal({ visible, onClose, unreported, statusOf, 
           ))
         )}
       </ScrollView>
+
+      {/*
+        Nested inside this sheet rather than sitting beside it in HomeScreen. Two
+        Modals as siblings both race to present from the same view controller; a
+        Modal declared within another's content presents from that one, which is
+        what makes them stack. It also makes "closing the editor returns to the
+        backlog" structural — this sheet is still open behind it, not merely
+        re-shown in the right order.
+      */}
+      <AddEditEventModal
+        visible={editing !== null}
+        event={editing}
+        settings={settings}
+        currentStatus={editing ? statusOf(editing.id, editing.date) : undefined}
+        onStatusChange={editing ? (s) => report(editing, s) : undefined}
+        onSave={handleSave}
+        onDelete={(id, occurrenceDate, mode) =>
+          mode === 'future' ? deleteFromDate(id, occurrenceDate) : deleteOccurrence(id, occurrenceDate)
+        }
+        onClose={() => setEditing(null)}
+      />
     </SheetModal>
   );
 }
