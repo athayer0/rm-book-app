@@ -1,9 +1,14 @@
 TO DO
 
-[ ] add section to save recent convert, companion, mission pres, senior missionaries, and members contact info and be able to report contacts with them, make repeating contacts
+[ ] admission pres, senior missionariescontact info
+[ ] be able to report contacts with them, make repeating contacts
+[ ] be able to import people from contacts app on your phone
 [x] make a call and maybe whatsapp shortcut icon next to their phone number, messenger
 [x] add a circular arrow icon to repeating events
 [ ] add more hideable kis for the other event types (sevice hours, hours worked, hours of school, etc.)
+[ ] add the ability to tie custom events to kis so that reporting them makes them 
+[ ] add address to people, add people to events, add date (like going on a date) event
+[ ] add color picker for event colors and a different way to select default duration for events
 [ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review
