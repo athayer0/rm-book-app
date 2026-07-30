@@ -427,9 +427,10 @@ export function SettingsScreen() {
               style={[styles.row, !colorOpen && styles.rowLast]}
               onPress={() => setColorOpen(v => !v)}
             >
+              {/* The dot is the value; the hex it happens to have said nothing
+                  the colour itself doesn't. */}
               <View style={[styles.colorDot, { backgroundColor: Colors.primary }]} />
               <Text style={styles.rowLabel}>App Color</Text>
-              <Text style={styles.rowValue}>{Colors.primary}</Text>
               <Ionicons
                 name={colorOpen ? 'chevron-up' : 'chevron-down'}
                 size={16}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useColors } from '../hooks/useColors';
 import { useTrackDrag } from '../hooks/useTrackDrag';
@@ -101,9 +101,10 @@ export function GradientColorPicker({ color, onChange }: Props) {
         <Thumb styles={styles} fill={pure} fraction={hsv.h / 360} />
       </View>
 
+      {/* The colour itself is the readout — the hex string it happens to have is
+          not something anyone picking a colour needs to read. */}
       <View style={styles.readout}>
         <View style={[styles.preview, { backgroundColor: draft }]} />
-        <Text style={styles.hex}>{draft}</Text>
       </View>
     </View>
   );
@@ -161,24 +162,15 @@ function makeStyles(C: ColorPalette) {
       elevation: 3,
     },
     readout: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
       marginTop: 12,
     },
     preview: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
-    },
-    hex: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: C.textSecondary,
-      letterSpacing: 0.5,
     },
   });
 }

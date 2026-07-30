@@ -8,6 +8,14 @@ export interface GoalDefinition {
   builtIn: boolean;
 }
 
+/**
+ * Order matters: the grid lays these out two cards per row, so the array reads
+ * left, right, left, right down the page.
+ *
+ * The pairs are chosen so the left column runs warm (amber, brown, pink, maroon)
+ * and the right column cool (violet, purple, navy, cyan). Anything inserted here
+ * shifts every card after it — keep new goals on the column their colour belongs to.
+ */
 export const DEFAULT_GOALS: GoalDefinition[] = [
   {
     id: 'morning_prayer',
@@ -28,6 +36,15 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     builtIn: true,
   },
   {
+    id: 'times_exercised',
+    label: 'Times Exercised',
+    icon: 'barbell-outline',
+    iconFamily: 'Ionicons',
+    color: '#8B5A2B',
+    visible: true,
+    builtIn: true,
+  },
+  {
     id: 'personal_study',
     label: 'Personal Study',
     icon: 'book-outline',
@@ -37,11 +54,11 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     builtIn: true,
   },
   {
-    id: 'church_hours',
-    label: 'Church Hours',
-    icon: 'church',
-    iconFamily: 'MaterialCommunityIcons',
-    color: '#8B1A4A',
+    id: 'total_dates',
+    label: 'Total Dates',
+    icon: 'heart',
+    iconFamily: 'Ionicons',
+    color: '#E05C6B',
     visible: true,
     builtIn: true,
   },
@@ -55,11 +72,11 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     builtIn: true,
   },
   {
-    id: 'times_exercised',
-    label: 'Times Exercised',
-    icon: 'barbell-outline',
-    iconFamily: 'Ionicons',
-    color: '#616161',
+    id: 'church_hours',
+    label: 'Church Hours',
+    icon: 'church',
+    iconFamily: 'MaterialCommunityIcons',
+    color: '#8B1A4A',
     visible: true,
     builtIn: true,
   },
@@ -69,15 +86,6 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     icon: 'church',
     iconFamily: 'MaterialCommunityIcons',
     color: '#00B5C8',
-    visible: true,
-    builtIn: true,
-  },
-  {
-    id: 'total_dates',
-    label: 'Total Dates',
-    icon: 'heart',
-    iconFamily: 'Ionicons',
-    color: '#E05C6B',
     visible: true,
     builtIn: true,
   },

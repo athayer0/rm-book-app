@@ -134,8 +134,9 @@ export const SwatchColors: string[] = [
   '#A29BFE', // periwinkle
   '#9B59B6', // violet
   '#795548', // brown
-  '#616161', // dark grey
-  '#BDBDBD', // light grey
+  '#8B5A2B', // mid brown
+  '#A9744F', // light brown
+  '#8F8F8F', // grey
 ];
 
 // Key order is the display order: SettingsScreen and AddEditEventModal both
@@ -143,8 +144,10 @@ export const SwatchColors: string[] = [
 // EventTypeConfig are kept in the same order so the three read as one table.
 //
 // The order tracks each type's colour through SwatchColors — warm through cool,
-// then the browns and greys — so the list reads as a spectrum rather than an
+// then the browns and the grey — so the list reads as a spectrum rather than an
 // arbitrary order. A new type belongs wherever its colour falls, not at the end.
+// The muted tail has no hue to sort on, so it ramps by lightness instead, ending
+// on the neutral grey.
 export const EventColors: Record<string, string> = {
   church:    '#E05C6B',
   travel:    '#800000',
@@ -153,14 +156,14 @@ export const EventColors: Record<string, string> = {
   date:      '#E8B820',
   contact:   '#2ECC71',
   work:      '#27AE60',
-  service:   '#1A3A6B',
-  school:    '#2979FF',
   temple:    '#00B5C8',
+  school:    '#2979FF',
+  service:   '#1A3A6B',
   prayer:    '#A29BFE',
   scripture: '#9B59B6',
   task:      '#795548',
-  exercise:  '#616161',
-  other:     '#BDBDBD',
+  exercise:  '#A9744F',
+  other:     '#8F8F8F',
 };
 
 export const EventTypeLabels: Record<string, string> = {
@@ -171,9 +174,9 @@ export const EventTypeLabels: Record<string, string> = {
   date:      'Date',
   contact:   'Contact',
   work:      'Work',
-  service:   'Service',
-  school:    'School',
   temple:    'Temple',
+  school:    'School',
+  service:   'Service',
   prayer:    'Prayer',
   scripture: 'Scripture Study',
   task:      'Task',
@@ -195,9 +198,9 @@ export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckb
   date:      { defaultMinutes: 60, hasCheckbox: false },
   contact:   { defaultMinutes: 0, hasCheckbox: false, optionalEnd: true },
   work:      { defaultMinutes: 30, hasCheckbox: false },
-  service:   { defaultMinutes: 30, hasCheckbox: false },
-  school:    { defaultMinutes: 30, hasCheckbox: false },
   temple:    { defaultMinutes: 120, hasCheckbox: false },
+  school:    { defaultMinutes: 30, hasCheckbox: false },
+  service:   { defaultMinutes: 30, hasCheckbox: false },
   prayer:    { defaultMinutes: 15, hasCheckbox: false },
   scripture: { defaultMinutes: 30, hasCheckbox: false },
   task:      { defaultMinutes: 0, hasCheckbox: true },

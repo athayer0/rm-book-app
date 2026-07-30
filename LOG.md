@@ -20,7 +20,7 @@ TO DO
 [ ] add color picker for event colors and a different way to select default duration for events
 [ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
-[ ] daily review
+[ ] daily review notification
 [ ] onboarding
 [ ] make friends and districts, be able to view each others KIs
 [ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
