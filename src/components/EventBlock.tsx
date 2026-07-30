@@ -32,10 +32,11 @@ const METHOD_ICON_RATIO = 1.45;
  * Deliberately not derived from slotHeight. It reports state, and state does not
  * become more or less important because the calendar is set denser; a marker
  * that changed size between settings made the same event look like a different
- * kind of thing. Pinned to what the medium preset used to produce, so the
- * middle setting is unchanged and the others move to meet it.
+ * kind of thing. Pinned to COMPACT_EVENT_HEIGHT — the shortest a block ever
+ * renders, at any density — so the marker never draws taller than the smallest
+ * event it might sit on.
  */
-const STATUS_MARKER_SIZE = Math.round(36 * (EventSizes.md.slotHeight / DEFAULT_SLOT_HEIGHT));
+const STATUS_MARKER_SIZE = COMPACT_EVENT_HEIGHT;
 
 // The block's visual signature. Named because each of these appears twice: once in
 // the rendered style, and once in the width arithmetic that decides whether the

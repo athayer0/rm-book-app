@@ -39,9 +39,9 @@ interface Props {
  *
  * The same uppercase labels as the editor, minus every affordance: no rules under
  * the values, no chevron on the status, no × on a contact method. Unlike the
- * editor, which gives each field a card of its own, everything here shares one
- * card and is separated by rules — a page about the person rather than a stack of
- * things to fill in. Only their name sits outside it.
+ * editor, which gives each field a card of its own, everything here — including
+ * their name — shares one card and is separated by rules, reading as a page
+ * about the person rather than a stack of things to fill in.
  *
  * What stays live are the actions — call, text, WhatsApp, Messenger, Maps — since
  * those do something to the world rather than edit the record. The star is shown
@@ -219,25 +219,19 @@ export function PersonDetailView({
 
   return (
     <ScrollView style={styles.scroll} bounces={false} overScrollMode="never">
-      <View style={styles.hero}>
-        <Text style={styles.heroName}>{trimmedName || 'Unnamed'}</Text>
-        {starred && (
-          <Ionicons name="star" size={22} color={Colors.favorite} accessibilityLabel="Favorite" />
-        )}
-      </View>
-
       <View style={styles.card}>
-        {groups.map((group, i) => (
-          <View key={group.key} style={[styles.group, i > 0 && styles.groupDivided]}>
+        <View style={styles.hero}>
+          <Text style={styles.heroName}>{trimmedName || 'Unnamed'}</Text>
+          {starred && (
+            <Ionicons name="star" size={22} color={Colors.favorite} accessibilityLabel="Favorite" />
+          )}
+        </View>
+        {groups.map((group) => (
+          <View key={group.key} style={[styles.group, styles.groupDivided]}>
             {group.node}
           </View>
         ))}
       </View>
-
-      {/* Status is always there, so a lone group means nothing else was recorded. */}
-      {groups.length === 1 && (
-        <Text style={styles.empty}>Nothing recorded yet beyond a name and status.</Text>
-      )}
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -247,24 +241,24 @@ export function PersonDetailView({
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     scroll: { flex: 1, backgroundColor: C.background },
-    // On the background with no card behind it, so the name reads as the sheet's
-    // subject rather than as the first of the fields.
+    // The card's own first row rather than a group, so the name can run larger
+    // and centered while still sharing the card's rounded corners and background.
     hero: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      paddingHorizontal: 16,
-      paddingTop: 18,
-      paddingBottom: 2,
+      padding: 12,
+      paddingTop: 16,
+      paddingBottom: 14,
     },
-    heroName: { flex: 1, fontSize: 24, fontWeight: '700', color: C.text },
+    heroName: { flex: 1, fontSize: 24, fontWeight: '600', color: C.text, textAlign: 'center' },
     // One card for the whole person. The padding lives on the groups instead, so
     // the rules between them run the full width and read as divisions of one
     // thing rather than as gaps between several.
     card: {
       backgroundColor: C.card,
       marginHorizontal: 16,
-      marginTop: 12,
+      marginTop: 18,
       borderRadius: 12,
       overflow: 'hidden',
     },
@@ -294,13 +288,6 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: C.contactActionBg,
-    },
-    empty: {
-      fontSize: 14,
-      color: C.textLight,
-      textAlign: 'center',
-      marginTop: 20,
-      marginHorizontal: 32,
     },
   });
 }

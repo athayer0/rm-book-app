@@ -58,9 +58,9 @@ function recurrenceSummary(event: CalendarEvent): string {
  *
  * The same uppercase labels as the editor, minus every affordance: no underlines
  * beneath values, no chevrons, no remove buttons. Unlike the editor, which gives
- * each field a card of its own, everything here shares one card and is separated
- * by rules — a page about the event rather than a stack of things to fill in.
- * Only the title sits outside it.
+ * each field a card of its own, everything here — including the title — shares
+ * one card and is separated by rules, reading as a page about the event rather
+ * than a stack of things to fill in.
  *
  * The one thing that stays live is the reported status, which is an action taken
  * on the event rather than one of its fields.
@@ -222,18 +222,17 @@ export function EventDetailView({ event, settings, status, onStatusChange }: Pro
 
   return (
     <ScrollView style={styles.scroll} bounces={false} overScrollMode="never">
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>{event.title}</Text>
-        {isBackup && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Backup</Text>
-          </View>
-        )}
-      </View>
-
       <View style={styles.card}>
-        {groups.map((group, i) => (
-          <View key={group.key} style={[styles.group, i > 0 && styles.groupDivided]}>
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>{event.title}</Text>
+          {isBackup && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Backup</Text>
+            </View>
+          )}
+        </View>
+        {groups.map((group) => (
+          <View key={group.key} style={[styles.group, styles.groupDivided]}>
             {group.node}
           </View>
         ))}
@@ -247,17 +246,17 @@ export function EventDetailView({ event, settings, status, onStatusChange }: Pro
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     scroll: { flex: 1, backgroundColor: C.background },
-    // On the background with no card behind it, so the title reads as the sheet's
-    // subject rather than as the first of the fields.
+    // The card's own first row rather than a group, so the title can run larger
+    // and centered while still sharing the card's rounded corners and background.
     hero: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      paddingHorizontal: 16,
-      paddingTop: 18,
-      paddingBottom: 2,
+      padding: 12,
+      paddingTop: 16,
+      paddingBottom: 14,
     },
-    heroTitle: { flex: 1, fontSize: 24, fontWeight: '700', color: C.text },
+    heroTitle: { flex: 1, fontSize: 24, fontWeight: '600', color: C.text, textAlign: 'center' },
     badge: {
       paddingHorizontal: 8,
       paddingVertical: 2,
@@ -279,7 +278,7 @@ function makeStyles(C: ColorPalette) {
     card: {
       backgroundColor: C.card,
       marginHorizontal: 16,
-      marginTop: 12,
+      marginTop: 18,
       borderRadius: 12,
       overflow: 'hidden',
     },

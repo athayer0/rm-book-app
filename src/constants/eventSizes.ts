@@ -12,13 +12,17 @@ export const EventSizes: Record<EventSize, EventSizeConfig> = {
   sm: { label: 'Small',       slotHeight: 30, fontSize: 11 },
   md: { label: 'Medium',      slotHeight: 40, fontSize: 12 },
   lg: { label: 'Large',       slotHeight: 50, fontSize: 13 },
-  xl: { label: 'Extra Large', slotHeight: 70, fontSize: 14 },
+  xl: { label: 'Extra Large', slotHeight: 60, fontSize: 14 },
 };
 
 export const EVENT_SIZE_OPTIONS = Object.keys(EventSizes) as EventSize[];
 
-// 50px per half-hour is the density the calendar has always used.
-export const DEFAULT_EVENT_SIZE: EventSize = 'lg';
+// How a size reads against Medium, e.g. for "Large (125%)" in settings.
+export function eventSizePercent(size: EventSize): number {
+  return Math.round((EventSizes[size].slotHeight / EventSizes.md.slotHeight) * 100);
+}
+
+export const DEFAULT_EVENT_SIZE: EventSize = 'md';
 
 export const DEFAULT_SLOT_HEIGHT = EventSizes[DEFAULT_EVENT_SIZE].slotHeight;
 

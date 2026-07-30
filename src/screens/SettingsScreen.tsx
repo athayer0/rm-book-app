@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig, DEFAULT_THEME_COLOR } from '../constants/colors';
-import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize } from '../constants/eventSizes';
+import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
 import { GradientColorPicker } from '../components/GradientColorPicker';
 import { DurationSlider, durationLabel } from '../components/DurationSlider';
 import { useSettings } from '../hooks/useSettings';
@@ -285,7 +285,7 @@ export function SettingsScreen() {
                 style={[styles.row, i === arr.length - 1 && styles.rowLast]}
                 onPress={() => updateSettings({ eventSize: size })}
               >
-                <Text style={styles.rowLabel}>{EventSizes[size].label}</Text>
+                <Text style={styles.rowLabel}>{EventSizes[size].label} ({eventSizePercent(size)}%)</Text>
                 {selectedEventSize === size && (
                   <Ionicons name="checkmark" size={18} color={Colors.control} />
                 )}

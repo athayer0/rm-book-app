@@ -154,7 +154,7 @@ export const EventColors: Record<string, string> = {
   meal:      '#D2691E',
   activity:  '#E8980E',
   date:      '#E8B820',
-  contact:   '#7CB342',
+  contact:   '#8FCF4A',
   work:      '#1E8449',
   temple:    '#00B5C8',
   school:    '#2979FF',
