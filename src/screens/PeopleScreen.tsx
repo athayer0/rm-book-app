@@ -27,6 +27,10 @@ function matchesFilter(status: string, selection: FilterSelection): boolean {
   return status === selection.name;
 }
 
+// Enough for a handful of rows on the shortest screen, so a mis-measurement can
+// never leave the filter a sliver too small to use.
+const MIN_FILTER_LIST_HEIGHT = 200;
+
 type ListRow =
   | { kind: 'header'; label: string; key: string }
   | { kind: 'person'; person: Person; key: string };
@@ -57,6 +61,10 @@ export function PeopleScreen() {
   const [search, setSearch] = useState('');
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({ kind: 'all' });
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  // Both measured in the safe area's own space rather than the window's, so the
+  // notch can't skew the ratio the dropdown's height is worked out from.
+  const [pageHeight, setPageHeight] = useState(0);
+  const [headerBottom, setHeaderBottom] = useState(0);
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
@@ -72,6 +80,16 @@ export function PeopleScreen() {
 
   const isFiltered = search.length > 0 || filterSelection.kind !== 'all';
 
+  // The filter list is longer than the screen — every group plus every status —
+  // so it scrolls, stopping about three quarters of the way down the page. Measured
+  // from where the dropdown opens (just under the header) rather than from the top
+  // of the page, since that lower edge is what the cap is really about. Falls back
+  // to the floor until the first layout lands, when both measurements are still 0.
+  const filterListMaxHeight = Math.max(
+    pageHeight * (3 / 4) - headerBottom,
+    MIN_FILTER_LIST_HEIGHT,
+  );
+
   function handleEdit(person: Person) {
     setEditingPerson(person);
     setShowModal(true);
@@ -86,8 +104,11 @@ export function PeopleScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safe} onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}>
+      <View
+        style={styles.header}
+        onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
+      >
         <Text style={styles.headerTitle}>People</Text>
         <View>
           <TouchableOpacity
@@ -100,42 +121,49 @@ export function PeopleScreen() {
 
           {showFilterDropdown && (
             <View style={styles.filterDropdown}>
-              <TouchableOpacity
-                style={styles.filterDropdownItem}
-                onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
+              <ScrollView
+                style={{ maxHeight: filterListMaxHeight }}
+                nestedScrollEnabled
+                bounces={false}
+                overScrollMode="never"
               >
-                <Text style={styles.filterDropdownText}>All</Text>
-                {filterSelection.kind === 'all' && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-              </TouchableOpacity>
-              {STATUS_GROUPS.map(g => (
                 <TouchableOpacity
-                  key={g.name}
                   style={styles.filterDropdownItem}
-                  onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
+                  onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
                 >
-                  <Text style={styles.filterDropdownText}>{g.name}</Text>
-                  {filterSelection.kind === 'group' && filterSelection.name === g.name && (
-                    <Ionicons name="checkmark" size={16} color={Colors.control} />
-                  )}
+                  <Text style={styles.filterDropdownText}>All</Text>
+                  {filterSelection.kind === 'all' && <Ionicons name="checkmark" size={16} color={Colors.control} />}
                 </TouchableOpacity>
-              ))}
-              <View style={styles.filterDropdownDivider} />
-              {STATUS_OPTIONS.map(s => {
-                const cfg = PERSON_STATUSES[s];
-                return (
+                {STATUS_GROUPS.map(g => (
                   <TouchableOpacity
-                    key={s}
+                    key={g.name}
                     style={styles.filterDropdownItem}
-                    onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
+                    onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
                   >
-                    <StatusIcon config={cfg} size={14} style={styles.filterChipIcon} />
-                    <Text style={styles.filterDropdownText}>{s}</Text>
-                    {filterSelection.kind === 'status' && filterSelection.name === s && (
+                    <Text style={styles.filterDropdownText}>{g.name}</Text>
+                    {filterSelection.kind === 'group' && filterSelection.name === g.name && (
                       <Ionicons name="checkmark" size={16} color={Colors.control} />
                     )}
                   </TouchableOpacity>
-                );
-              })}
+                ))}
+                <View style={styles.filterDropdownDivider} />
+                {STATUS_OPTIONS.map(s => {
+                  const cfg = PERSON_STATUSES[s];
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      style={styles.filterDropdownItem}
+                      onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
+                    >
+                      <StatusIcon config={cfg} size={14} style={styles.filterChipIcon} />
+                      <Text style={styles.filterDropdownText}>{s}</Text>
+                      {filterSelection.kind === 'status' && filterSelection.name === s && (
+                        <Ionicons name="checkmark" size={16} color={Colors.control} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
         </View>
