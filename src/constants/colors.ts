@@ -126,8 +126,8 @@ export const SwatchColors: string[] = [
   '#D2691E', // chocolate
   '#E8980E', // orange
   '#E8B820', // yellow
-  '#2ECC71', // green
-  '#27AE60', // deep green
+  '#7CB342', // lime
+  '#1E8449', // deep green
   '#00B5C8', // cyan
   '#2979FF', // blue
   '#1A3A6B', // navy
@@ -154,8 +154,8 @@ export const EventColors: Record<string, string> = {
   meal:      '#D2691E',
   activity:  '#E8980E',
   date:      '#E8B820',
-  contact:   '#2ECC71',
-  work:      '#27AE60',
+  contact:   '#7CB342',
+  work:      '#1E8449',
   temple:    '#00B5C8',
   school:    '#2979FF',
   service:   '#1A3A6B',
