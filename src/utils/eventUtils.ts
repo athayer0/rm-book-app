@@ -181,8 +181,12 @@ export function isReportableType(type: string): boolean {
 export const UNREPORTED_LOOKBACK_DAYS = 30;
 
 /**
- * Every occurrence in the lookback window whose start has passed and that has no
- * status recorded, most recent day first.
+ * Every occurrence in the lookback window whose start has passed and that has not
+ * been reported, most recent day first.
+ *
+ * What counts as reported is the caller's to define — notably, being marked
+ * pending is not an answer but the absence of one, so such an occurrence stays in
+ * the backlog until it is resolved either way.
  *
  * Walks a day at a time because getEventsForDate is the only recurrence
  * expander — it answers "what falls on this date", so there is no bulk form to
@@ -191,7 +195,7 @@ export const UNREPORTED_LOOKBACK_DAYS = 30;
  */
 export function findUnreportedOccurrences(
   events: CalendarEvent[],
-  hasStatus: (eventId: string, dateStr: string) => boolean,
+  isReported: (eventId: string, dateStr: string) => boolean,
   today: Date = new Date(),
 ): CalendarEvent[] {
   const found: CalendarEvent[] = [];
@@ -204,7 +208,7 @@ export function findUnreportedOccurrences(
       // getEventsForDate stamps the occurrence's own date, so this reads the
       // occurrence's start rather than the series' first one.
       if (!hasEventStartPassed(occurrence)) continue;
-      if (hasStatus(occurrence.id, dateStr)) continue;
+      if (isReported(occurrence.id, dateStr)) continue;
       found.push(occurrence);
     }
   }

@@ -4,11 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import { EventStatus } from '../utils/eventUtils';
 
-/** The three reporting states, in the order the event edit modal presents them. */
+/**
+ * The three reporting states, worst to best — the one order every display of all
+ * three uses. This component is the only such display, so it is the only place
+ * that order needs to be stated.
+ */
 const OPTIONS: { value: EventStatus; icon: string }[] = [
+  { value: 'failed', icon: 'ban' },
   { value: 'pending', icon: 'alert-circle' },
   { value: 'completed', icon: 'checkmark-circle' },
-  { value: 'failed', icon: 'ban' },
 ];
 
 export const STATUS_LABELS: Record<EventStatus, string> = {

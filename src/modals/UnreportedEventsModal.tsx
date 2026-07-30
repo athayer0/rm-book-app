@@ -16,7 +16,9 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   unreported: CalendarEvent[];
-  onReport: (occurrence: CalendarEvent, status: EventStatus) => Promise<void>;
+  onReport: (occurrence: CalendarEvent, status: EventStatus | undefined) => Promise<void>;
+  /** Lets a pending occurrence show its own state, since it stays in the list. */
+  statusOf: (eventId: string, dateStr: string) => EventStatus | undefined;
 }
 
 /** "Today" and "Yesterday" beat a date for the two days carrying most of the backlog. */
@@ -26,7 +28,7 @@ function dayLabel(dateStr: string, today: Date): string {
   return format(parseISO(dateStr), 'EEEE, MMM d');
 }
 
-export function UnreportedEventsModal({ visible, onClose, unreported, onReport }: Props) {
+export function UnreportedEventsModal({ visible, onClose, unreported, onReport, statusOf }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
@@ -114,8 +116,8 @@ export function UnreportedEventsModal({ visible, onClose, unreported, onReport }
                     </View>
 
                     <StatusPicker
-                      value={undefined}
-                      onChange={status => { if (status) onReport(occurrence, status); }}
+                      value={statusOf(occurrence.id, occurrence.date)}
+                      onChange={status => onReport(occurrence, status)}
                       size={30}
                     />
                   </View>
