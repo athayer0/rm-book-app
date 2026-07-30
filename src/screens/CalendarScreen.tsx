@@ -14,10 +14,10 @@ import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
-import { CalendarEvent, EventStatus, renderedEventHeight, hasEndTime } from '../utils/eventUtils';
+import { CalendarEvent, renderedEventHeight, hasEndTime } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
-import { useEventStatuses } from '../hooks/useEventStatuses';
+import { useEventReport } from '../hooks/useEventReport';
 import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -33,7 +33,7 @@ function CalendarContent() {
   const [defaultStartTime, setDefaultStartTime] = useState<string | undefined>();
   const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
-  const { getStatus, setStatus } = useEventStatuses();
+  const { getStatus, report } = useEventReport();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, grabOffsetY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
@@ -112,13 +112,6 @@ function CalendarContent() {
     setEditingEvent(null);
     setDefaultStartTime(timeStr);
     setShowEventModal(true);
-  }
-
-  // Goal counts are derived from statuses, so recording one is the whole job —
-  // the occurrence's week picks up the contribution on its own, and it lets go
-  // again if the event is later moved, retyped, or deleted.
-  async function handleStatusChange(event: CalendarEvent, newStatus: EventStatus | undefined) {
-    await setStatus(event.id, event.date, newStatus);
   }
 
   async function handleSaveEvent(eventData: Omit<CalendarEvent, 'id'>) {
@@ -236,7 +229,7 @@ function CalendarContent() {
                   events={frozenEventsRef.current ?? events}
                   getStatus={getStatus}
                   onEventPress={handleEventPress}
-                  onToggleStatus={(ev) => handleStatusChange(ev, getStatus(ev.id, ev.date) === 'completed' ? undefined : 'completed')}
+                  onToggleStatus={(ev) => report(ev, getStatus(ev.id, ev.date) === 'completed' ? undefined : 'completed')}
                   onTapEmpty={handleTapEmpty}
                   onDragStart={handleDragStart}
                   onDragMove={moveDrag}
@@ -346,7 +339,7 @@ function CalendarContent() {
         defaultStartTime={defaultStartTime}
         settings={settings}
         currentStatus={editingEvent ? getStatus(editingEvent.id, editingEvent.date) : undefined}
-        onStatusChange={editingEvent ? (s) => handleStatusChange(editingEvent, s) : undefined}
+        onStatusChange={editingEvent ? (s) => report(editingEvent, s) : undefined}
         onSave={handleSaveEvent}
         onDelete={(id, occurrenceDate, mode) =>
           mode === 'future' ? deleteFromDate(id, occurrenceDate) : deleteOccurrence(id, occurrenceDate)

@@ -1,31 +1,22 @@
-import { useCallback, useMemo } from 'react';
-import { CalendarEvent, EventStatus, findUnreportedOccurrences } from '../utils/eventUtils';
+import { useMemo } from 'react';
+import { findUnreportedOccurrences } from '../utils/eventUtils';
 import { useCalendarEvents } from './useCalendarEvents';
-import { useEventStatuses } from './useEventStatuses';
+import { useEventReport } from './useEventReport';
 
 /**
- * The unreported backlog and the two ways to clear it.
+ * The unreported backlog and the way to clear it.
  *
- * Reporting writes a status and nothing else. Goal counts are derived from
- * statuses rather than accumulated, so the week each occurrence belongs to picks
- * up its contribution without being told — and gives it back if the event is
- * later moved, retyped, or deleted.
+ * Reporting is `useEventReport`'s job, handed straight back so the backlog can't
+ * become a second, quieter definition of what a report does; `undefined` clears the
+ * status, which returns the occurrence to the backlog.
  */
 export function useUnreported() {
   const { events } = useCalendarEvents();
-  const { getStatus, setStatus } = useEventStatuses();
+  const { getStatus, report } = useEventReport();
 
   const unreported = useMemo(
     () => findUnreportedOccurrences(events, getStatus),
     [events, getStatus],
-  );
-
-  /** `undefined` clears the status, which returns the occurrence to unreported. */
-  const report = useCallback(
-    async (occurrence: CalendarEvent, status: EventStatus | undefined) => {
-      await setStatus(occurrence.id, occurrence.date, status);
-    },
-    [setStatus],
   );
 
   return { unreported, count: unreported.length, report, statusOf: getStatus };

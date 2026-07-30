@@ -6,7 +6,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { useEventStatuses } from '../hooks/useEventStatuses';
+import { useEventReport } from '../hooks/useEventReport';
 import { CalendarEvent, getEventsForDate } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { EventBlock } from './EventBlock';
@@ -52,7 +52,7 @@ export function PersonTimelineTab({ personId }: Props) {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
   const { events, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
-  const { getStatus, setStatus } = useEventStatuses();
+  const { getStatus, report } = useEventReport();
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
 
   // The calendar's own density, so a block here is the same size as the one it
@@ -131,7 +131,7 @@ export function PersonTimelineTab({ personId }: Props) {
         event={editing}
         settings={settings}
         currentStatus={editing ? getStatus(editing.id, editing.date) : undefined}
-        onStatusChange={editing ? (s) => setStatus(editing.id, editing.date, s) : undefined}
+        onStatusChange={editing ? (s) => report(editing, s) : undefined}
         onSave={handleSave}
         onDelete={(id, occurrenceDate, mode) =>
           mode === 'future' ? deleteFromDate(id, occurrenceDate) : deleteOccurrence(id, occurrenceDate)

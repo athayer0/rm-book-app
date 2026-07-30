@@ -30,8 +30,8 @@ export const STATUS_OPTIONS = Object.keys(PERSON_STATUSES);
 /** The headings people are listed under, in display order. */
 export const STATUS_GROUPS: { name: string; statuses: string[] }[] = [
   { name: 'Church', statuses: ['Recent Converts', 'Members', 'Mission Leaders'] },
-  { name: 'Dating', statuses: ['Relationship', '1+ Dates', 'Potential Dates', 'Not Interested', 'Do Not Contact'] },
   { name: 'Friends & Family', statuses: ['Eternal Companion', 'Family', 'Mission Friends', 'Friends'] },
+  { name: 'Dating', statuses: ['Relationship', '1+ Dates', 'Potential Dates', 'Not Interested', 'Do Not Contact'] },
 ];
 
 /** Sort order for a status: the order PERSON_STATUSES declares it in. */
@@ -76,4 +76,25 @@ const STATUS_SINGULAR_DISPLAY: Record<string, string> = {
 
 export function statusDisplayName(status: string): string {
   return STATUS_SINGULAR_DISPLAY[status] ?? status;
+}
+
+/**
+ * The statuses a reported date moves someone out of.
+ *
+ * Only the rung before a first date promotes. Someone already at '1+ Dates' or in
+ * a 'Relationship' has nowhere to go, and 'Not Interested' / 'Do Not Contact' are
+ * deliberate answers — a logged date must not quietly overturn one.
+ *
+ * The singular spelling is only ever a display form (STATUS_SINGULAR_DISPLAY), but
+ * recognising it here costs nothing and means the promotion can't silently miss
+ * someone whose stored status arrived in that shape.
+ */
+const PROMOTED_BY_DATE = new Set(['Potential Dates', 'Potential Date']);
+
+/**
+ * Where a person lands once a date with them is reported completed, or null when
+ * the date says nothing new about where they already stand.
+ */
+export function statusAfterCompletedDate(status: string): string | null {
+  return PROMOTED_BY_DATE.has(status) ? '1+ Dates' : null;
 }
