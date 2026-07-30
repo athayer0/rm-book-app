@@ -17,6 +17,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { isCheckboxType, hasOptionalEnd } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
 import { drainThenClear } from '../lib/localData';
+import { isAppDataKey } from '../constants/storageKeys';
 import { pullAll } from '../lib/sync';
 import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
 
@@ -33,15 +34,6 @@ function hourLabel(h: number): string {
 const COLOR_SWATCHES = SwatchColors;
 
 const EVENT_TYPES = Object.keys(EventColors);
-
-/** Keys that are safe to hand to the share sheet: user data, no credentials. */
-const EXPORT_PREFIXES = ['goal_counts_', 'goal_targets_'];
-const EXPORT_KEYS = ['people', 'calendar_events', 'goal_definitions', 'event_statuses', 'settings'];
-
-function isExportable(key: string): boolean {
-  if (EXPORT_KEYS.includes(key)) return true;
-  return EXPORT_PREFIXES.some(prefix => key.startsWith(prefix));
-}
 
 export function SettingsScreen() {
   const Colors = useColors();
@@ -113,7 +105,7 @@ export function SettingsScreen() {
       // Allowlisted: a blanket dump includes the `sb-<ref>-auth-token` key,
       // which holds the access AND refresh tokens — anyone receiving the shared
       // file would own the account until the refresh token is revoked.
-      const keys = (await AsyncStorage.getAllKeys()).filter(isExportable);
+      const keys = (await AsyncStorage.getAllKeys()).filter(isAppDataKey);
       const pairs = await AsyncStorage.multiGet(keys as string[]);
       const data: Record<string, unknown> = {};
       pairs.forEach(([k, v]) => { if (v) data[k] = JSON.parse(v); });

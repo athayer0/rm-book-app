@@ -13,9 +13,14 @@ export const LAST_RESET_KEY = 'last_reset_date';
 export const LAST_SYNCED_KEY = 'last_synced_at';
 
 /**
- * The user's own data — everything that is safe to export and must be cleared
- * when a different account signs in. Deliberately excludes the Supabase auth
- * token and the sync bookkeeping keys.
+ * The user's own data: the rows they created, and nothing else. This is both
+ * what gets cleared when a different account signs in and what the export hands
+ * to the share sheet, so a key belongs here only if it is safe to send to a
+ * third party. Deliberately excludes the Supabase auth token — a blanket dump
+ * would carry `sb-<ref>-auth-token`, whose refresh token owns the account.
+ *
+ * A key that must be cleared but must NOT leave the device goes in
+ * DEVICE_LOCAL_KEYS instead.
  */
 const APP_DATA_KEYS = [
   PEOPLE_KEY,
@@ -27,9 +32,24 @@ const APP_DATA_KEYS = [
 
 const APP_DATA_PREFIXES = ['goal_counts_', 'goal_targets_'];
 
+/**
+ * Cleared on account switch, never exported: bookkeeping that describes this
+ * device's sync state rather than anything the user typed. Restoring one of
+ * these from someone else's export would be actively wrong — a foreign
+ * `last_synced_at` makes the first pull run incrementally against a watermark
+ * from another session and come back empty.
+ */
+const DEVICE_LOCAL_KEYS = [LAST_SYNCED_KEY, LAST_RESET_KEY];
+
+/** True for the user's own data — the export allowlist, and most of the wipe. */
 export function isAppDataKey(key: string): boolean {
   if (APP_DATA_KEYS.includes(key)) return true;
   return APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
+/** Everything a sign-out must remove: app data plus this device's sync state. */
+export function isClearableKey(key: string): boolean {
+  return isAppDataKey(key) || DEVICE_LOCAL_KEYS.includes(key);
 }
 
 /** Per-week counts. `wk` is a bare week key like "2025-W21" from getWeekKey(). */

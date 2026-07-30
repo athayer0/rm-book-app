@@ -1,5 +1,5 @@
 import { getAllKeys, multiRemove } from '../utils/storage';
-import { LAST_RESET_KEY, LAST_SYNCED_KEY, isAppDataKey } from '../constants/storageKeys';
+import { isClearableKey } from '../constants/storageKeys';
 import { peekQueue } from './syncQueue';
 import { drainQueue } from './sync';
 
@@ -10,13 +10,11 @@ import { drainQueue } from './sync';
  * in on the same device would see the first user's rows — and, worse, push them
  * back up under their own user_id the moment they edited anything.
  *
- * `last_synced_at` goes too: leaving it would make the next account's first pull
- * run incrementally against a watermark from someone else's session and return
- * nothing.
+ * The sync bookkeeping keys go too — see DEVICE_LOCAL_KEYS in storageKeys.
  */
 export async function clearLocalData(): Promise<void> {
-  const keys = (await getAllKeys()).filter(isAppDataKey);
-  await multiRemove([...keys, LAST_SYNCED_KEY, LAST_RESET_KEY]);
+  const keys = (await getAllKeys()).filter(isClearableKey);
+  await multiRemove(keys);
 }
 
 export type ClearResult = { cleared: boolean; pending: number };
