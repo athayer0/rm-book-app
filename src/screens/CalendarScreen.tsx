@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { format, addDays, subDays } from 'date-fns';
+import { format, addDays, subDays, parseISO } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
@@ -19,8 +19,7 @@ import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventStatuses } from '../hooks/useEventStatuses';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
-import { isInCurrentWeek } from '../utils/dateUtils';
-import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
+import { addMinutesToTimeString, formatTime, getWeekKey, parseTimeString } from '../utils/dateUtils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
@@ -36,7 +35,7 @@ function CalendarContent() {
   const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
   const { getStatus, setStatus } = useEventStatuses();
-  const { adjustCount } = useWeeklyGoals();
+  const { adjustCountForWeek } = useWeeklyGoals();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, grabOffsetY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
@@ -119,12 +118,15 @@ function CalendarContent() {
 
   async function handleStatusChange(event: CalendarEvent, newStatus: EventStatus | undefined) {
     const prevStatus = getStatus(event.id, event.date);
-    if (isInCurrentWeek(event.date)) {
-      const contrib = getGoalContribution(event);
-      if (contrib) {
-        if (prevStatus === 'completed') await adjustCount(contrib.goalId, -contrib.delta);
-        if (newStatus === 'completed')  await adjustCount(contrib.goalId, +contrib.delta);
-      }
+    const contrib = getGoalContribution(event);
+    if (contrib) {
+      // The occurrence's own week, not the current one: ticking off a past event
+      // credits the week it happened in. Reporting from here and from the
+      // unreported shortcut have to agree, or the same event would count
+      // differently depending on where it was reported.
+      const wk = getWeekKey(parseISO(event.date));
+      if (prevStatus === 'completed') await adjustCountForWeek(contrib.goalId, wk, -contrib.delta);
+      if (newStatus === 'completed')  await adjustCountForWeek(contrib.goalId, wk, +contrib.delta);
     }
     await setStatus(event.id, event.date, newStatus);
   }

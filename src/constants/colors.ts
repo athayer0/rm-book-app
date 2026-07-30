@@ -24,6 +24,12 @@ export const LightColors = {
   // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
   goalActionBg: '#253960',
   statusOtherColor: '#000000',
+  // Event reporting states, shared by the calendar's status badges and the
+  // unreported-events shortcut. Centralised because two features have to agree:
+  // an amber dot on the home row must mean the same thing as one on a block.
+  statusCompleted: '#1A7A40',
+  statusFailed: '#B03030',
+  statusPending: '#E8980E',
 };
 
 export const DarkColors: typeof LightColors = {
@@ -52,6 +58,11 @@ export const DarkColors: typeof LightColors = {
   // A fill, not text — navy still reads against the dark card and keeps its white label legible.
   goalActionBg: '#2E4877',
   statusOtherColor: '#FFFFFF',
+  // Lifted from the light values, which are mid-tones chosen against white and
+  // go muddy on a dark card. Hue is preserved so the states stay recognisable.
+  statusCompleted: '#3FB56B',
+  statusFailed: '#E36A6A',
+  statusPending: '#F5B33C',
 };
 
 export type ColorPalette = typeof LightColors;

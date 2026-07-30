@@ -98,11 +98,6 @@ export function useWeeklyGoals() {
     for (const def of definitions) await syncCount(def.id, weekKey, 0);
   }, [countsState, definitions, syncCount, weekKey]);
 
-  const adjustCount = useCallback(async (id: string, delta: number) => {
-    if (delta === 0) return;
-    await adjustBy(id, delta);
-  }, [adjustBy]);
-
   const updateDefinitions = useCallback(async (defs: GoalDefinition[]) => {
     await defsState.write(() => defs);
     if (!user) return;
@@ -145,6 +140,25 @@ export function useWeeklyGoals() {
     await syncCount(id, wk, value);
   }, [countsState, syncCount]);
 
+  /**
+   * Move a goal's count within a specific week.
+   *
+   * Reporting credits the week the event happened in, not the week you got round
+   * to reporting it — so Sunday's scripture study still lands in Sunday's week
+   * when you tick it off on Tuesday.
+   *
+   * The current week is read from the live ref rather than the rendered `counts`,
+   * because a bulk report applies many deltas in one tick and closed-over state
+   * would be one write behind for every event after the first.
+   */
+  const adjustCountForWeek = useCallback(async (id: string, wk: string, delta: number) => {
+    if (delta === 0) return;
+    const existing = wk === getWeekKeyByOffset(0)
+      ? (countsState.current.current[id] ?? 0)
+      : ((await getWeekData(wk)).counts[id] ?? 0);
+    await saveCountForWeek(id, wk, Math.max(0, existing + delta));
+  }, [countsState, getWeekData, saveCountForWeek]);
+
   const saveGoalForWeek = useCallback(async (id: string, wk: string, value: number) => {
     if (wk === getWeekKeyByOffset(0)) {
       await targetsState.write(current => ({ ...current, [id]: value }));
@@ -160,5 +174,5 @@ export function useWeeklyGoals() {
     });
   }, [targetsState, user]);
 
-  return { definitions, counts, goals, increment, decrement, reset, resetAll, updateDefinitions, resetBuiltInDefinitions, adjustCount, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
+  return { definitions, counts, goals, increment, decrement, reset, resetAll, updateDefinitions, resetBuiltInDefinitions, adjustCountForWeek, reload, getCount, getWeekData, saveCountForWeek, saveGoalForWeek };
 }

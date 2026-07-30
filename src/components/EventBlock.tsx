@@ -22,12 +22,6 @@ function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * AVG_CHAR_WIDTH;
 }
 
-const STATUS_CONFIG: Record<EventStatus, { color: string; icon: string }> = {
-  completed: { color: '#1A7A40', icon: 'checkmark-circle' },
-  failed:    { color: '#B03030', icon: 'ban' },
-  pending:   { color: '#E8980E', icon: 'alert-circle' },
-};
-
 interface Props {
   event: CalendarEvent;
   status?: EventStatus;
@@ -51,6 +45,12 @@ export function EventBlock({
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
+  const statusColor: Record<EventStatus, string> = {
+    completed: Colors.statusCompleted,
+    failed: Colors.statusFailed,
+    pending: Colors.statusPending,
+  };
 
   const { active, event: draggingEvent } = useDrag();
   const top = eventTopOffset(event.startTime, gridStartHour, slotHeight) + 1;
@@ -170,7 +170,7 @@ export function EventBlock({
         {effectiveStatus && (
           <View style={[styles.statusWrap, { width: badge }]}>
             {effectiveStatus === 'failed' ? (
-              <View style={{ width: badgeInner + badgeInset, height: badgeInner + badgeInset, borderRadius: (badgeInner + badgeInset) / 2, backgroundColor: STATUS_CONFIG.failed.color, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: badgeInner + badgeInset, height: badgeInner + badgeInset, borderRadius: (badgeInner + badgeInset) / 2, backgroundColor: statusColor.failed, alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name="ban-outline" size={badge - 10} color={Colors.white} style={{ transform: [{ scaleX: -1 }] }} />
               </View>
             ) : (
@@ -179,7 +179,7 @@ export function EventBlock({
                 <Ionicons
                   name={effectiveStatus === 'completed' ? 'checkmark-circle' : 'alert-circle'}
                   size={badge}
-                  color={effectiveStatus === 'completed' ? STATUS_CONFIG.completed.color : STATUS_CONFIG.pending.color}
+                  color={effectiveStatus === 'completed' ? statusColor.completed : statusColor.pending}
                 />
               </View>
             )}

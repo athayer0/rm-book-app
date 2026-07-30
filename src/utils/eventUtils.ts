@@ -158,6 +158,60 @@ export function getGoalContribution(event: CalendarEvent): { goalId: string; del
   }
 }
 
+/**
+ * Whether the reporting shortcut should account for this type.
+ *
+ * Derived from the two things that make an event reportable at all — feeding a
+ * goal, or carrying a checkbox — rather than listed out, so adding either trait
+ * to a type enrols it automatically. A hardcoded list would silently leave a new
+ * type out of the unreported count, which reads as a counting bug rather than as
+ * a missing entry.
+ */
+export function isReportableType(type: string): boolean {
+  return TRACKABLE_TYPES.has(type) || isCheckboxType(type);
+}
+
+/**
+ * How far back the unreported sweep looks.
+ *
+ * Bounded because a recurring series with no `recurringUntil` expands one
+ * occurrence per day forever — an unbounded sweep would walk from the earliest
+ * event to today and build a list thousands long.
+ */
+export const UNREPORTED_LOOKBACK_DAYS = 30;
+
+/**
+ * Every occurrence in the lookback window whose start has passed and that has no
+ * status recorded, most recent day first.
+ *
+ * Walks a day at a time because getEventsForDate is the only recurrence
+ * expander — it answers "what falls on this date", so there is no bulk form to
+ * call. Backups are skipped: they carry no status by design, so they can never
+ * be unreported.
+ */
+export function findUnreportedOccurrences(
+  events: CalendarEvent[],
+  hasStatus: (eventId: string, dateStr: string) => boolean,
+  today: Date = new Date(),
+): CalendarEvent[] {
+  const found: CalendarEvent[] = [];
+
+  for (let back = 0; back <= UNREPORTED_LOOKBACK_DAYS; back++) {
+    const dateStr = format(addDays(today, -back), 'yyyy-MM-dd');
+    for (const occurrence of getEventsForDate(events, dateStr)) {
+      if (occurrence.backup) continue;
+      if (!isReportableType(occurrence.type)) continue;
+      // getEventsForDate stamps the occurrence's own date, so this reads the
+      // occurrence's start rather than the series' first one.
+      if (!hasEventStartPassed(occurrence)) continue;
+      if (hasStatus(occurrence.id, dateStr)) continue;
+      found.push(occurrence);
+    }
+  }
+
+  return found;
+}
+
 export function hasEventStartPassed(event: CalendarEvent): boolean {
   const now = new Date();
   const todayStr = format(now, 'yyyy-MM-dd');

@@ -11,9 +11,12 @@ import { usePeople } from '../hooks/usePeople';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { PersonCard } from '../components/PersonCard';
+import { UnreportedRow } from '../components/UnreportedRow';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
 import { GoalWeeklyModal } from '../modals/GoalWeeklyModal';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
+import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
+import { useUnreported } from '../hooks/useUnreported';
 import { Person } from '../hooks/usePeople';
 
 export function HomeScreen({ navigation }: any) {
@@ -22,12 +25,14 @@ export function HomeScreen({ navigation }: any) {
 
   const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
   const { people, updatePerson, deletePerson, reload: reloadPeople } = usePeople();
+  const { unreported, count: unreportedCount, report, reportAll } = useUnreported();
 
   useFocusEffect(useCallback(() => { reload(); reloadPeople(); }, [reload, reloadPeople]));
   const [editVisible, setEditVisible] = useState(false);
   const [planningVisible, setPlanningVisible] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [personModalVisible, setPersonModalVisible] = useState(false);
+  const [unreportedVisible, setUnreportedVisible] = useState(false);
 
   const featuredPeople = people.filter(p => p.starred);
 
@@ -68,6 +73,8 @@ export function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
+        <UnreportedRow count={unreportedCount} onPress={() => setUnreportedVisible(true)} />
+
         <View style={styles.card}>
           <SectionHeader title="Favorites" />
           {featuredPeople.length === 0 ? (
@@ -106,6 +113,14 @@ export function HomeScreen({ navigation }: any) {
         visible={planningVisible}
         onClose={() => { setPlanningVisible(false); reload(); }}
         definitions={definitions}
+      />
+
+      <UnreportedEventsModal
+        visible={unreportedVisible}
+        onClose={() => { setUnreportedVisible(false); reload(); }}
+        unreported={unreported}
+        onReport={report}
+        onReportAll={reportAll}
       />
 
       <AddEditPersonModal
