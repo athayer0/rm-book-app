@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { format, parseISO, subDays } from 'date-fns';
 import { CalendarEvent, generateId, getEventsForDate } from '../utils/eventUtils';
-import { CALENDAR_EVENTS_KEY } from '../constants/storageKeys';
+import { CALENDAR_EVENTS_KEY, EVENT_STATUSES_KEY } from '../constants/storageKeys';
+import { multiSet } from '../utils/storage';
 import { useStoredState } from './useStoredState';
 import { useEventStatuses } from './useEventStatuses';
 import { enqueueDelete, enqueueUpsert } from '../lib/syncQueue';
@@ -12,7 +13,7 @@ const EMPTY: CalendarEvent[] = [];
 export function useCalendarEvents() {
   const { user } = useAuth();
   const { value: events, current, write, reload } = useStoredState<CalendarEvent[]>(CALENDAR_EVENTS_KEY, EMPTY);
-  const { moveStatus } = useEventStatuses();
+  const { planStatusMove, syncStatusMove } = useEventStatuses();
 
   // Persist locally, then queue a remote upsert for the given event when signed in.
   const persist = useCallback(async (update: (current: CalendarEvent[]) => CalendarEvent[], changedId: string) => {
@@ -43,14 +44,38 @@ export function useCalendarEvents() {
    */
   const updateEvent = useCallback(async (id: string, changes: Partial<CalendarEvent>) => {
     const before = current.current.find(e => e.id === id);
-    await persist(prev => prev.map(e => e.id === id ? { ...e, ...changes } : e), id);
+    const apply = (list: CalendarEvent[]) => list.map(e => e.id === id ? { ...e, ...changes } : e);
 
-    if (!before || !changes.date || changes.date === before.date) return;
-    // Also skipped when recurrence is being switched on in the same edit: the one
-    // status the event had no longer identifies a single occurrence.
-    if (before.recurring || changes.recurring === true) return;
-    await moveStatus(id, before.date, changes.date);
-  }, [persist, current, moveStatus]);
+    // Recurrence being switched on in the same edit is excluded too: the single
+    // status the event had stops identifying a single occurrence.
+    const dateMoved = !!before && !!changes.date && changes.date !== before.date
+      && !before.recurring && changes.recurring !== true;
+    const statusMove = dateMoved ? planStatusMove(id, before!.date, changes.date!) : null;
+
+    if (!statusMove) {
+      await persist(apply, id);
+      return;
+    }
+
+    // Both keys in one multiSet. Writing them separately notifies subscribers in
+    // two different ticks — each setItem awaits — so React paints in between, and
+    // that frame has the event at its new date with its status still at the old
+    // one: the badge flashes pending. multiSet awaits once and then notifies both
+    // keys synchronously, which React coalesces into a single render.
+    //
+    // Writing a key from outside its owning hook is the same route pullAll takes:
+    // the subscription in useStoredState adopts the new value, so both hooks stay
+    // current without either calling its own write().
+    const nextEvents = apply(current.current);
+    await multiSet([
+      [CALENDAR_EVENTS_KEY, nextEvents],
+      [EVENT_STATUSES_KEY, statusMove.next],
+    ]);
+
+    const row = nextEvents.find(e => e.id === id);
+    if (user && row) await enqueueUpsert('calendar_events', row.id, { ...row, user_id: user.id });
+    await syncStatusMove(id, before!.date, changes.date!, statusMove.status);
+  }, [persist, current, planStatusMove, syncStatusMove, user]);
 
   const deleteEvent = useCallback(async (id: string) => {
     await write(prev => prev.filter(e => e.id !== id));

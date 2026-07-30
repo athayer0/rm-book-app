@@ -40,32 +40,48 @@ export function useEventStatuses() {
   );
 
   /**
-   * Carry an occurrence's status across to a new date.
+   * What the map becomes when an occurrence's date changes — computed, not written.
    *
-   * A status is keyed `eventId::date`, so the date is part of its identity. Moving
-   * an event without this leaves the record stranded on a date the event no longer
-   * occupies, and the lookup at the new date finds nothing — which EventBlock
-   * renders as `pending`, so a completed event silently reverts to unreported.
+   * A status is keyed `eventId::date`, so the date is part of its identity and a
+   * moved event stops matching its own record. The lookup at the new date finds
+   * nothing, and resolveEventStatus reads that as pending, so a completed event
+   * appears to revert.
    *
-   * One `write` rather than a clear followed by a set: two writes would publish an
-   * intermediate map where the status exists at neither date, and every subscribed
-   * screen would flash `pending` between them. The old row gets a tombstone so the
-   * move propagates instead of leaving a duplicate on another device.
+   * The write is deliberately left to the caller. Storing this separately from the
+   * event list means two notifications in two ticks, and React paints between them
+   * — one frame with the event moved and its status not, which is the pending flash.
+   * Handing back the next map lets updateEvent commit both keys in a single write,
+   * so subscribers hear once and there is no intermediate frame to paint.
+   *
+   * Returns null when there is nothing to carry.
    */
-  const moveStatus = useCallback(
-    async (eventId: string, fromDate: string, toDate: string) => {
-      if (fromDate === toDate) return;
+  const planStatusMove = useCallback(
+    (
+      eventId: string,
+      fromDate: string,
+      toDate: string,
+    ): { next: EventStatusMap; status: EventStatus } | null => {
+      if (fromDate === toDate) return null;
       const fromKey = statusKey(eventId, fromDate);
       const status = current.current[fromKey];
-      if (status === undefined) return;
+      if (status === undefined) return null;
 
-      await write(existing => {
-        const next = { ...existing };
-        delete next[fromKey];
-        next[statusKey(eventId, toDate)] = status;
-        return next;
-      });
+      const next = { ...current.current };
+      delete next[fromKey];
+      next[statusKey(eventId, toDate)] = status;
+      return { next, status };
+    },
+    [current],
+  );
 
+  /**
+   * Propagate a move that has already been written locally.
+   *
+   * The old row is tombstoned rather than dropped, so the move reaches other
+   * devices instead of leaving the status at both dates.
+   */
+  const syncStatusMove = useCallback(
+    async (eventId: string, fromDate: string, toDate: string, status: EventStatus) => {
       if (!user) return;
       await enqueueDelete('event_statuses', `${eventId}|${fromDate}`, {
         user_id: user.id, event_id: eventId, occurrence_date: fromDate,
@@ -74,8 +90,8 @@ export function useEventStatuses() {
         user_id: user.id, event_id: eventId, occurrence_date: toDate, status,
       });
     },
-    [current, user, write],
+    [user],
   );
 
-  return { statuses, getStatus, setStatus, moveStatus, reload };
+  return { statuses, getStatus, setStatus, planStatusMove, syncStatusMove, reload };
 }
