@@ -8,7 +8,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
 import {
-  CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd,
+  CalendarEvent, EventStatus, RecurringRule, defaultRecurrenceEnd,
   isCheckboxType, hasOptionalEnd, resolveEventStatus,
 } from '../utils/eventUtils';
 import {
@@ -16,8 +16,7 @@ import {
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
 import { InlineDatePicker } from '../components/InlineDatePicker';
-import { StatusCheckbox } from '../components/StatusCheckbox';
-import { StatusPicker, STATUS_LABELS } from '../components/StatusPicker';
+import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { addMinutesToTimeString, parseTimeString } from '../utils/dateUtils';
@@ -138,12 +137,24 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const showEndsOnPicker = openPicker === 'endsOn';
   const showMethodPicker = openPicker === 'method';
   const [showPersonPicker, setShowPersonPicker] = useState(false);
+  /**
+   * An event that already exists opens as a page about itself; only editing it
+   * shows the form. A new one has nothing to display, so it starts in the form
+   * and never returns here — Cancel and Save both close it outright.
+   */
+  const [mode, setMode] = useState<'view' | 'edit'>(event ? 'view' : 'edit');
   const [error, setError] = useState('');
   const startScrollRef = useRef<ScrollView>(null);
   const endScrollRef = useRef<ScrollView>(null);
   const DROPDOWN_ITEM_HEIGHT = 40;
 
-  useEffect(() => {
+  /**
+   * Seed every field from the event, or from the defaults for a new one.
+   *
+   * Also what Cancel calls: leaving edit mode has to put back what was there,
+   * since the sheet stays open on the display view rather than being torn down.
+   */
+  function resetForm() {
     if (event) {
       setTitle(event.title);
       setType(event.type);
@@ -186,15 +197,28 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
     setOpenPicker(null);
     setShowPersonPicker(false);
-    setLocalStatus(resolvedStatus);
     setError('');
-    // resolvedStatus is read but deliberately not a dependency: it consults the
-    // clock, so listing it would re-run this whole reset the minute an event's
-    // start time passed with the sheet open — discarding any unsaved edits. Its
-    // other inputs, `event` and `currentStatus`, are both listed, so it stays in
-    // step with everything that can actually change the answer.
+  }
+
+  useEffect(() => {
+    resetForm();
+    setMode(event ? 'view' : 'edit');
+    // resetForm reads a good deal more than this lists, but every one of those is
+    // either a prop covered here or state it only writes. `currentStatus` in
+    // particular is deliberately absent: reporting a status from the display view
+    // pushes a new one down as a prop, and re-running this would throw away an
+    // edit in progress. The status itself is carried by the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, defaultDate, defaultStartTime, prefill, visible, currentStatus]);
+  }, [event, defaultDate, defaultStartTime, prefill, visible]);
+
+  useEffect(() => {
+    setLocalStatus(resolvedStatus);
+    // resolvedStatus is read but not listed: it consults the clock, so listing it
+    // would re-run this the minute an event's start time passed. Its other inputs
+    // — `event` and `currentStatus` — are both here, so it stays in step with
+    // everything that can actually change the answer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event, currentStatus, visible]);
 
   useEffect(() => {
     if (showStartPicker) {
@@ -218,15 +242,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
   }, [showEndPicker]);
 
-  // StatusPicker owns the tap-again-to-clear toggle, so this just adopts whatever
-  // it resolves to.
+  // Reporting happens on the display view now. Both controls there hand back the
+  // status they resolve to, including undefined when the active one is tapped
+  // again, so this just adopts it and passes it on.
   function handleStatusTap(next: EventStatus | undefined) {
-    setLocalStatus(next);
-    onStatusChange?.(next);
-  }
-
-  function handleCheckboxToggle() {
-    const next: EventStatus | undefined = localStatus === 'completed' ? undefined : 'completed';
     setLocalStatus(next);
     onStatusChange?.(next);
   }
@@ -330,37 +349,55 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     );
   }
 
+  /**
+   * The event the form currently describes.
+   *
+   * Shared by Save and by the display view, so what the page reads back after a
+   * save is exactly what was written. Rendering the display view off the `event`
+   * prop instead would show stale values — the screens hold a snapshot taken when
+   * the sheet opened and never refresh it.
+   */
+  function buildEventData(): Omit<CalendarEvent, 'id'> {
+    return {
+      title: title.trim() || (EventTypeLabels[type] ?? type),
+      type,
+      color: resolvedColor(type, settings),
+      date,
+      startTime,
+      // Checkbox events have only a start time; store the end equal to it (a 0-minute event).
+      endTime: isCheckboxType(type) ? startTime : endTime,
+      notes: notes.trim(),
+      recurring,
+      recurringRule: recurring ? recurringRule : undefined,
+      recurringUntil: recurring ? endsOn : undefined,
+      recurringDays: recurring && recurringRule === 'weekly'
+        ? (recurringDays.length ? recurringDays : [weekdayOf(date)])
+        : undefined,
+      excludedDates: recurring ? event?.excludedDates : undefined,
+      backup: isBackup,
+      // undefined rather than [] / '' for the empty cases: toRow maps it to a
+      // null column, so clearing the last person off an event syncs as a clear.
+      people: attendees.length ? attendees : undefined,
+      contactMethod: usesContactMethod(type) ? contactMethod : undefined,
+    };
+  }
+
   async function handleSave() {
     setError('');
-    // Checkbox events have only a start time; store the end equal to it (a 0-minute event).
-    const computedEnd = isCheckboxType(type) ? startTime : endTime;
     try {
-      await onSave({
-        title: title.trim() || (EventTypeLabels[type] ?? type),
-        type,
-        color: resolvedColor(type, settings),
-        date,
-        startTime,
-        endTime: computedEnd,
-        notes: notes.trim(),
-        recurring,
-        recurringRule: recurring ? recurringRule : undefined,
-        recurringUntil: recurring ? endsOn : undefined,
-        recurringDays: recurring && recurringRule === 'weekly'
-          ? (recurringDays.length ? recurringDays : [weekdayOf(date)])
-          : undefined,
-        excludedDates: recurring ? event?.excludedDates : undefined,
-        backup: isBackup,
-        // undefined rather than [] / '' for the empty cases: toRow maps it to a
-        // null column, so clearing the last person off an event syncs as a clear.
-        people: attendees.length ? attendees : undefined,
-        contactMethod: usesContactMethod(type) ? contactMethod : undefined,
-      });
-      onClose();
+      await onSave(buildEventData());
+      // An existing event has a page to go back to; a new one does not.
+      if (event) setMode('view'); else onClose();
     } catch (e) {
       console.error('[AddEditEventModal] onSave failed:', e);
       setError('Failed to save event. Please try again.');
     }
+  }
+
+  function handleCancel() {
+    if (!event) { onClose(); return; }
+    resetForm();
+    setMode('view');
   }
 
   const fixed = isCheckboxType(type);
@@ -393,60 +430,81 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     setOpenPicker(cur => (cur === which ? null : which));
   }
 
+  // Narrowed rather than a bare boolean so the display view can read the id off it.
+  const viewedEvent = mode === 'view' ? event : null;
+
   return (
     <SheetModal visible={visible} onClose={onClose}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancel}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{event ? 'Edit Event' : 'New Event'}</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.save}>Save</Text>
-          </TouchableOpacity>
+          {viewedEvent ? (
+            <>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Event</Text>
+              <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
+                <Text style={styles.save}>Edit</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* The glyph says which of the two things leaving does. Editing an
+                  event that exists steps back to the page about it, so an arrow;
+                  a new event has no page behind it and the form is the sheet, so
+                  an ×, the same mark that closes it from the display view. */}
+              <TouchableOpacity
+                onPress={handleCancel}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel={event ? 'Back' : 'Close'}
+              >
+                {event
+                  ? <Ionicons name="arrow-back" size={24} color={Colors.textSecondary} />
+                  : <Ionicons name="close" size={22} color={Colors.textSecondary} />}
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>{event ? 'Edit Event' : 'New Event'}</Text>
+              <TouchableOpacity onPress={handleSave} style={styles.headerRightBtn}>
+                <Text style={styles.save}>Save</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
+
+        {viewedEvent ? (
+          <EventDetailView
+            event={{ id: viewedEvent.id, ...buildEventData() }}
+            settings={settings}
+            status={localStatus}
+            onStatusChange={onStatusChange ? handleStatusTap : undefined}
+          />
+        ) : (
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
           {anyPickerOpen && (
             <Pressable style={styles.pickerBackdrop} onPress={closePickers} />
           )}
-          {event && !isBackup && isCheckboxType(type) && (
-            <View style={styles.section}>
-              <View style={styles.statusRow}>
-                <Text style={[styles.label, { marginBottom: 0, paddingLeft: 6, fontSize: 16 }]}>
-                  {localStatus === 'completed' ? 'Completed' : 'Not completed'}
-                </Text>
-                <TouchableOpacity onPress={handleCheckboxToggle} style={styles.statusIcons} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <StatusCheckbox checked={localStatus === 'completed'} size={40} color={resolvedColor(type, settings)} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
 
-          {event && !isBackup && !isCheckboxType(type) && TRACKABLE_TYPES.has(type) && (
-            <View style={styles.section}>
-              <View style={styles.statusRow}>
-                <Text style={[styles.label, { marginBottom: 0, paddingLeft: 6, fontSize: 16 }]}>
-                  {localStatus ? STATUS_LABELS[localStatus] : 'None'}
-                </Text>
-                <StatusPicker value={localStatus} onChange={handleStatusTap} />
-              </View>
-            </View>
-          )}
-
-          <View style={styles.section}>
+          <View style={styles.card}>
+          <View style={styles.group}>
             <Text style={styles.label}>Title</Text>
             <TextInput
               style={styles.input}
               value={title}
               onChangeText={setTitle}
+              onFocus={closePickers}
               placeholder={EventTypeLabels[type] ?? 'Event title'}
               placeholderTextColor={Colors.textLight}
             />
           </View>
 
-          <View style={[styles.row, styles.pickerRow, showTypePicker && styles.openPickerRow]}>
-            <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
+          <View style={[styles.group, styles.columns, styles.pickerRow, showTypePicker && styles.openPickerRow]}>
+            <View style={styles.column}>
               <Text style={styles.label}>Event Type</Text>
               <View>
                 <TouchableOpacity style={styles.picker} onPress={() => togglePicker('type')}>
@@ -473,7 +531,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 )}
               </View>
             </View>
-            <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
+            <View style={styles.column}>
               <Text style={styles.label}>Date</Text>
               <TouchableOpacity style={styles.picker} onPress={() => togglePicker('date')}>
                 <Text style={styles.pickerText}>{format(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</Text>
@@ -481,8 +539,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               </TouchableOpacity>
             </View>
           </View>
+          {/* A group of its own rather than a panel hanging off the row: it
+              belongs to the Date field above it, and reads that way sitting
+              directly beneath it inside the same card. */}
           {showDatePicker && (
-            <View style={[styles.section, { paddingTop: 4 }, styles.openPickerRow]}>
+            <View style={[styles.group, { paddingTop: 4 }, styles.openPickerRow]}>
               <InlineDatePicker
                 value={date}
                 weekStart={settings.weekStart}
@@ -491,8 +552,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           )}
 
-          <View style={[styles.row, styles.pickerRow, (showStartPicker || showEndPicker) && styles.openPickerRow]}>
-            <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
+          <View style={[styles.group, styles.columns, styles.pickerRow, (showStartPicker || showEndPicker) && styles.openPickerRow]}>
+            <View style={styles.column}>
               <Text style={styles.label}>Start Time</Text>
               <View>
                 <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
@@ -515,7 +576,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
 
             {!fixed && endOmitted && (
-              <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
+              <View style={styles.column}>
                 <Text style={styles.label}>End Time</Text>
                 <TouchableOpacity style={styles.picker} onPress={addEndTime}>
                   <Ionicons name="add-circle-outline" size={16} color={Colors.control} style={{ marginRight: 6 }} />
@@ -525,7 +586,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
 
             {!fixed && !endOmitted && (
-              <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
+              <View style={styles.column}>
                 <View style={styles.labelRow}>
                   <Text style={[styles.label, { marginBottom: 0 }]}>End Time</Text>
                   {hasOptionalEnd(type) && (
@@ -561,49 +622,56 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
           </View>
 
+          {/* Half a row, with the other half left empty: the value is a short
+              label off a fixed list, and stretching it the full width made it
+              read as a longer field than it is. */}
           {usesContactMethod(type) && (
-            <View style={[styles.section, styles.pickerRow, showMethodPicker && styles.openPickerRow]}>
-              <Text style={styles.label}>{methodFieldLabel(type)}</Text>
-              <View>
-                <TouchableOpacity style={styles.picker} onPress={() => togglePicker('method')}>
-                  <GoalIcon
-                    icon={CONTACT_METHODS[contactMethod].icon}
-                    iconFamily={CONTACT_METHODS[contactMethod].iconFamily}
-                    size={16}
-                    color={Colors.textSecondary}
-                  />
-                  <Text style={[styles.pickerText, { marginLeft: 8 }]}>{contactMethodLabel(contactMethod)}</Text>
-                  <Ionicons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
-                </TouchableOpacity>
-                {showMethodPicker && (
-                  <View style={[styles.dropdown, styles.dropdownFloating]}>
-                    {methodOptionsFor(type).map(m => (
-                      <TouchableOpacity
-                        key={m}
-                        style={styles.dropdownItem}
-                        onPress={() => { setContactMethod(m); closePickers(); }}
-                      >
-                        <GoalIcon
-                          icon={CONTACT_METHODS[m].icon}
-                          iconFamily={CONTACT_METHODS[m].iconFamily}
-                          size={16}
-                          color={Colors.textSecondary}
-                        />
-                        <Text style={[styles.dropdownText, { marginLeft: 8 }]}>{CONTACT_METHODS[m].label}</Text>
-                        {contactMethod === m && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+            <View style={[styles.group, styles.columns, styles.pickerRow, showMethodPicker && styles.openPickerRow]}>
+              <View style={styles.column}>
+                <Text style={styles.label}>{methodFieldLabel(type)}</Text>
+                <View>
+                  <TouchableOpacity style={styles.picker} onPress={() => togglePicker('method')}>
+                    <GoalIcon
+                      icon={CONTACT_METHODS[contactMethod].icon}
+                      iconFamily={CONTACT_METHODS[contactMethod].iconFamily}
+                      size={16}
+                      color={Colors.textSecondary}
+                    />
+                    <Text style={[styles.pickerText, { marginLeft: 8 }]}>{contactMethodLabel(contactMethod)}</Text>
+                    <Ionicons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                  </TouchableOpacity>
+                  {showMethodPicker && (
+                    <View style={[styles.dropdown, styles.dropdownFloating]}>
+                      {methodOptionsFor(type).map(m => (
+                        <TouchableOpacity
+                          key={m}
+                          style={styles.dropdownItem}
+                          onPress={() => { setContactMethod(m); closePickers(); }}
+                        >
+                          <GoalIcon
+                            icon={CONTACT_METHODS[m].icon}
+                            iconFamily={CONTACT_METHODS[m].iconFamily}
+                            size={16}
+                            color={Colors.textSecondary}
+                          />
+                          <Text style={[styles.dropdownText, { marginLeft: 8 }]}>{CONTACT_METHODS[m].label}</Text>
+                          {contactMethod === m && <Ionicons name="checkmark" size={16} color={Colors.control} />}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
               </View>
+              <View style={styles.column} />
             </View>
           )}
 
-          <View style={styles.section}>
+          <View style={[styles.group]}>
             <Text style={styles.label}>People</Text>
-            {attendees.length === 0 ? (
-              <Text style={styles.personEmpty}>No one added yet</Text>
-            ) : (
+            {/* Nothing at all when no one is on the event. The label says what
+                the group is and the link below says what to do about it; a line
+                of prose between them only repeated that the list was empty. */}
+            {attendees.length > 0 && (
               <View>
                 {attendees.map((id, i) => {
                   const attendee = peopleById.get(id);
@@ -616,7 +684,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         {attendee?.name ?? 'Unknown person'}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => toggleAttendee(id)}
+                        onPress={() => { closePickers(); toggleAttendee(id); }}
                         hitSlop={8}
                         accessibilityRole="button"
                         accessibilityLabel={`Remove ${attendee?.name ?? 'this person'}`}
@@ -628,25 +696,28 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 })}
               </View>
             )}
+
+            {/* Closes the People group rather than sitting on the background
+                below it. One card leaves nowhere below to stand — everything
+                after this belongs to other fields — and a link under the list it
+                adds to reads the same either way. */}
+            <TouchableOpacity
+              style={styles.addPersonBtn}
+              onPress={() => { closePickers(); setShowPersonPicker(true); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add" size={18} color={Colors.goalTextAction} />
+              <Text style={styles.addPersonText}>Add Person</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Outside the card, on the sheet's background — the same footing
-              "Add a Goal" has under the goal list. */}
-          <TouchableOpacity
-            style={styles.addPersonBtn}
-            onPress={() => { closePickers(); setShowPersonPicker(true); }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="add" size={18} color={Colors.goalTextAction} />
-            <Text style={styles.addPersonText}>Add Person</Text>
-          </TouchableOpacity>
-
-          <View style={styles.section}>
+          <View style={[styles.group]}>
             <Text style={styles.label}>Notes</Text>
             <TextInput
               style={[styles.input, styles.notesInput]}
               value={notes}
               onChangeText={setNotes}
+              onFocus={closePickers}
               placeholder="Add notes..."
               placeholderTextColor={Colors.textLight}
               multiline
@@ -654,7 +725,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          <View style={[styles.section, styles.pickerRow, (showRulePicker || showEndsOnPicker) && styles.openPickerRow]}>
+          <View style={[styles.group, styles.pickerRow, (showRulePicker || showEndsOnPicker) && styles.openPickerRow]}>
             <View style={styles.switchRow}>
               <Text style={styles.label}>Recurring</Text>
               <Switch
@@ -666,8 +737,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
             {recurring && (
               <>
-                <View style={[styles.row, { marginTop: 12 }, showRulePicker && styles.openPickerRow]}>
-                  <View style={{ flex: 1, marginRight: 4 }}>
+                <View style={[styles.columns, { marginTop: 12 }, showRulePicker && styles.openPickerRow]}>
+                  <View style={styles.column}>
                     <Text style={styles.label}>Frequency</Text>
                     <View>
                       <TouchableOpacity style={styles.picker} onPress={() => togglePicker('rule')}>
@@ -695,7 +766,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     </View>
                   </View>
 
-                  <View style={{ flex: 1, marginLeft: 4 }}>
+                  <View style={styles.column}>
                     <Text style={styles.label}>Ends</Text>
                     <TouchableOpacity style={styles.picker} onPress={() => togglePicker('endsOn')}>
                       <Text style={styles.pickerText}>
@@ -740,16 +811,20 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
           </View>
 
-          <View style={styles.section}>
+          <View style={[styles.group]}>
             <View style={styles.switchRow}>
               <Text style={styles.label}>Backup Event</Text>
               <Switch
                 value={isBackup}
-                onValueChange={setIsBackup}
+                // Sits above the dismiss backdrop now that the card does, so it
+                // closes any open dropdown itself — the same reason the Recurring
+                // switch above it does.
+                onValueChange={v => { closePickers(); setIsBackup(v); }}
                 trackColor={{ true: Colors.control }}
                 thumbColor={Colors.white}
               />
             </View>
+          </View>
           </View>
 
           {event && onDelete && (
@@ -764,6 +839,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={{ height: 40 }} />
         </ScrollView>
+        )}
 
         {/*
           Nested inside this sheet for the reason UnreportedEventsModal spells
@@ -794,21 +870,44 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     headerTitle: { fontSize: 17, fontWeight: '600', color: C.text },
-    cancel: { fontSize: 16, color: C.textSecondary },
+    // The display header's ×-and-Edit pair, sized the way WeeklyPlanningModal
+    // sizes its close button: equal 60pt slots on both ends so the title sits
+    // centred whatever the right-hand label says.
+    closeBtn: { width: 60, alignItems: 'flex-start' },
+    headerRightBtn: { width: 60, alignItems: 'flex-end' },
     save: { fontSize: 16, fontWeight: '600', color: C.accent },
     form: { flex: 1, backgroundColor: C.background },
-    section: {
+    /**
+     * One card for the whole form, the way the display view has one for the whole
+     * event. The padding lives on the groups instead, so the rules between them
+     * run the full width and the fields read as parts of one thing.
+     *
+     * Deliberately no `overflow: 'hidden'`: the dropdowns hang below their rows
+     * and the ones near the bottom — Frequency, Ends — reach past the card's own
+     * edge. Rounded corners survive without it, since every rule is interior.
+     *
+     * The zIndex is what lifts the card over the dismiss backdrop; without it an
+     * open dropdown paints behind. It costs the backdrop its claim on taps that
+     * land on a control, so the controls in here close the pickers themselves.
+     */
+    card: {
       backgroundColor: C.card,
       marginHorizontal: 16,
       marginTop: 12,
       borderRadius: 12,
-      padding: 12,
+      zIndex: 20,
     },
-    row: { flexDirection: 'row', marginHorizontal: 0 },
-    // Layers, low to high: plain form content (auto) < backdrop (10) < any row holding a
-    // picker trigger (20) < the row whose picker is open (30). Keeping every trigger above
-    // the backdrop is what lets one tap switch dropdowns instead of just dismissing.
-    // zIndex only, no elevation — elevation would paint an Android shadow on the card rows.
+    // No rule between groups: the form is already full of hairlines under the
+    // fields themselves, and a second kind of line reads as another one of those
+    // rather than as a division. The labels carry the separation instead.
+    group: { padding: 12 },
+    // Two fields sharing a group's width — type and date, start and end.
+    columns: { flexDirection: 'row', gap: 8 },
+    column: { flex: 1 },
+    // Layers within the card, low to high: plain groups (auto) < any group holding a
+    // picker trigger (20) < the group whose picker is open (30). Keeping every trigger
+    // above its neighbours is what lets one tap switch dropdowns instead of just dismissing.
+    // zIndex only, no elevation — elevation would paint an Android shadow on the rows.
     pickerRow: { zIndex: 20 },
     openPickerRow: { zIndex: 30 },
     label: {
@@ -849,7 +948,6 @@ function makeStyles(C: ColorPalette) {
     // The People tab's row, scaled down to sit inside a form section: same
     // status-marker-then-name reading, tighter type and spacing. It borrows the
     // shape rather than the component because a row here removes rather than opens.
-    personEmpty: { fontSize: 14, color: C.textLight, paddingVertical: 2 },
     personRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -864,15 +962,14 @@ function makeStyles(C: ColorPalette) {
     personIcon: { marginRight: 10 },
     personName: { flex: 1, fontSize: 15, color: C.text },
     // Matches WeeklyPlanningModal's "Add a Goal" — the same centred ＋-and-label
-    // link sitting on the background below its card, since both open something
-    // rather than committing anything.
+    // link, since both open something rather than committing anything.
     addPersonBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      marginTop: 4,
-      paddingVertical: 10,
+      marginTop: 8,
+      paddingVertical: 6,
     },
     addPersonText: { fontSize: 14, fontWeight: '700', color: C.goalTextAction },
     dropdown: {
@@ -953,16 +1050,5 @@ function makeStyles(C: ColorPalette) {
     },
     deleteText: { fontSize: 15, fontWeight: '600', color: C.danger },
     errorBanner: { fontSize: 13, color: C.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: C.danger + '12' },
-    statusRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 6,
-    },
-    statusIcons: {
-      flexDirection: 'row',
-      gap: 12,
-      alignItems: 'center',
-    },
   });
 }
