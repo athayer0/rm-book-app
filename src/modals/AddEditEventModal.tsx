@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd, isCheckboxType } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd, isCheckboxType, resolveEventStatus } from '../utils/eventUtils';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import { StatusCheckbox } from '../components/StatusCheckbox';
 import { StatusPicker, STATUS_LABELS } from '../components/StatusPicker';
@@ -67,9 +67,24 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
+  /**
+   * What the event's status actually is, rather than only what has been written.
+   *
+   * Callers hand over the stored status, which is empty for anything never
+   * reported — so a past scripture block opened here read as "None" while the
+   * calendar badge and the unreported backlog were both already calling it
+   * pending. Resolving here rather than at the call sites covers both entry
+   * points and leaves no third one to get it wrong.
+   *
+   * Display only: status is pushed out through onStatusChange on tap, and
+   * CalendarEvent has no status field for onSave to carry, so opening this and
+   * closing it writes nothing. Pending stays derived.
+   */
+  const resolvedStatus = event ? resolveEventStatus(event, currentStatus) : undefined;
+
   const [title, setTitle] = useState('');
   const [type, setType] = useState('scripture');
-  const [localStatus, setLocalStatus] = useState<EventStatus | undefined>(currentStatus);
+  const [localStatus, setLocalStatus] = useState<EventStatus | undefined>(resolvedStatus);
   const [date, setDate] = useState(defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
   const [startTime, setStartTime] = useState('9:00 AM');
   const [endTime, setEndTime] = useState('9:30 AM');
@@ -128,8 +143,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setIsBackup(false);
     }
     setOpenPicker(null);
-    setLocalStatus(currentStatus);
+    setLocalStatus(resolvedStatus);
     setError('');
+    // resolvedStatus is read but deliberately not a dependency: it consults the
+    // clock, so listing it would re-run this whole reset the minute an event's
+    // start time passed with the sheet open — discarding any unsaved edits. Its
+    // other inputs, `event` and `currentStatus`, are both listed, so it stays in
+    // step with everything that can actually change the answer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, defaultDate, defaultStartTime, visible, currentStatus]);
 
   useEffect(() => {
