@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, hasEventStartPassed, eventTopOffset, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, EVENT_BLOCK_STYLE } from '../constants/eventSizes';
@@ -62,9 +62,11 @@ export function EventBlock({
   // three-state badge, and only when they aren't a backup.
   const isCheckbox = !isBackup && isCheckboxType(event.type);
   const isChecked = status === 'completed';
-  const effectiveStatus: EventStatus | undefined = isBackup || isCheckbox ? undefined : (
-    status ?? (TRACKABLE_TYPES.has(event.type) && hasEventStartPassed(event) ? 'pending' : undefined)
-  );
+  // The state comes from resolveEventStatus; only the choice not to draw it as a
+  // badge belongs here. Synthesising pending locally is what let this drift from
+  // the unreported sweep's idea of the same word.
+  const effectiveStatus: EventStatus | undefined =
+    isBackup || isCheckbox ? undefined : resolveEventStatus(event, status);
   const showBadge = isCheckbox || !!effectiveStatus;
 
   const isDraggingRef = useRef(false);

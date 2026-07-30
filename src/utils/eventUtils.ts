@@ -181,21 +181,46 @@ export function isReportableType(type: string): boolean {
 export const UNREPORTED_LOOKBACK_DAYS = 30;
 
 /**
- * Every occurrence in the lookback window whose start has passed and that has not
- * been reported, most recent day first.
+ * The status an occurrence actually has, recorded or not.
  *
- * What counts as reported is the caller's to define — notably, being marked
- * pending is not an answer but the absence of one, so such an occurrence stays in
- * the backlog until it is resolved either way.
+ * The single definition of what the three states mean. An event whose start has
+ * passed with nothing recorded is pending — it is waiting on an answer, which is
+ * the same condition as one marked pending by hand, so both resolve here to the
+ * same value. Callers that need to know whether something is outstanding ask this
+ * rather than reassembling it from a type check, a clock check and a status check.
  *
- * Walks a day at a time because getEventsForDate is the only recurrence
- * expander — it answers "what falls on this date", so there is no bulk form to
- * call. Backups are skipped: they carry no status by design, so they can never
- * be unreported.
+ * Deliberately says nothing about how the state is drawn. A prayer renders a
+ * checkbox rather than a badge, but it is still pending until it is ticked, and
+ * letting that presentation choice reach back into the meaning is what previously
+ * forced the unreported sweep to special-case prayers and tasks.
+ *
+ * Types that cannot be reported resolve to undefined even if a status is somehow
+ * stored against them — there is no UI that can produce one, and a status on an
+ * unreportable type has nothing to mean.
+ */
+export function resolveEventStatus(
+  event: CalendarEvent,
+  stored: EventStatus | undefined,
+): EventStatus | undefined {
+  if (event.backup) return undefined;
+  if (!isReportableType(event.type)) return undefined;
+  return stored ?? (hasEventStartPassed(event) ? 'pending' : undefined);
+}
+
+/**
+ * Every occurrence in the lookback window still waiting on an answer, most recent
+ * day first.
+ *
+ * One condition, because resolveEventStatus already owns the definition: pending
+ * covers both the never-touched and the deliberately deferred, while completed and
+ * failed are answers and drop out.
+ *
+ * Walks a day at a time because getEventsForDate is the only recurrence expander
+ * — it answers "what falls on this date", so there is no bulk form to call.
  */
 export function findUnreportedOccurrences(
   events: CalendarEvent[],
-  isReported: (eventId: string, dateStr: string) => boolean,
+  statusOf: (eventId: string, dateStr: string) => EventStatus | undefined,
   today: Date = new Date(),
 ): CalendarEvent[] {
   const found: CalendarEvent[] = [];
@@ -203,13 +228,12 @@ export function findUnreportedOccurrences(
   for (let back = 0; back <= UNREPORTED_LOOKBACK_DAYS; back++) {
     const dateStr = format(addDays(today, -back), 'yyyy-MM-dd');
     for (const occurrence of getEventsForDate(events, dateStr)) {
-      if (occurrence.backup) continue;
-      if (!isReportableType(occurrence.type)) continue;
-      // getEventsForDate stamps the occurrence's own date, so this reads the
-      // occurrence's start rather than the series' first one.
-      if (!hasEventStartPassed(occurrence)) continue;
-      if (isReported(occurrence.id, dateStr)) continue;
-      found.push(occurrence);
+      // getEventsForDate stamps the occurrence's own date, so the clock check
+      // inside resolveEventStatus reads this occurrence rather than the series'
+      // first one.
+      if (resolveEventStatus(occurrence, statusOf(occurrence.id, dateStr)) === 'pending') {
+        found.push(occurrence);
+      }
     }
   }
 

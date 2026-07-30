@@ -8,7 +8,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
 import { EventSizes, resolveEventSize, EVENT_BLOCK_STYLE } from '../constants/eventSizes';
-import { CalendarEvent, EventStatus, isCheckboxType, renderedEventHeight } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, isCheckboxType, renderedEventHeight, resolveEventStatus } from '../utils/eventUtils';
 import { SheetModal } from '../components/SheetModal';
 import { StatusPicker } from '../components/StatusPicker';
 
@@ -17,7 +17,7 @@ interface Props {
   onClose: () => void;
   unreported: CalendarEvent[];
   onReport: (occurrence: CalendarEvent, status: EventStatus | undefined) => Promise<void>;
-  /** Lets a pending occurrence show its own state, since it stays in the list. */
+  /** The recorded status, which resolveEventStatus turns into the displayed one. */
   statusOf: (eventId: string, dateStr: string) => EventStatus | undefined;
 }
 
@@ -115,8 +115,15 @@ export function UnreportedEventsModal({ visible, onClose, unreported, onReport, 
                       </View>
                     </View>
 
+                    {/*
+                      The resolved state, not the stored one, so a never-touched
+                      event and a deliberately deferred one look alike — they are
+                      the same thing. Everything in this list resolves to pending,
+                      so pending reads as selected throughout, and tapping it
+                      merely clears a stored value that resolves straight back.
+                    */}
                     <StatusPicker
-                      value={statusOf(occurrence.id, occurrence.date)}
+                      value={resolveEventStatus(occurrence, statusOf(occurrence.id, occurrence.date))}
                       onChange={status => onReport(occurrence, status)}
                       size={30}
                     />

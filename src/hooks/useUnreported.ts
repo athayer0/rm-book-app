@@ -16,13 +16,7 @@ export function useUnreported() {
   const { getStatus, setStatus } = useEventStatuses();
 
   const unreported = useMemo(
-    () => findUnreportedOccurrences(events, (id, dateStr) => {
-      // Only completed and failed settle an occurrence. Pending is a note that it
-      // still needs dealing with, so it keeps its place in the backlog rather
-      // than quietly clearing it.
-      const status = getStatus(id, dateStr);
-      return status === 'completed' || status === 'failed';
-    }),
+    () => findUnreportedOccurrences(events, getStatus),
     [events, getStatus],
   );
 
