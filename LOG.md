@@ -11,6 +11,8 @@ TO DO
 [x] unreported events button to view all and mass report them
 [x] wiped the old local data and deleted the legacy-key migration - no more indicator_* keys or schema_version anywhere
 [x] fold EXPORT_KEYS/EXPORT_PREFIXES in SettingsScreen into APP_DATA_KEYS/APP_DATA_PREFIXES in storageKeys - export and wipe now share isAppDataKey, and device-local keys split out into DEVICE_LOCAL_KEYS
+[ ] make it so that relevant menus dont just say edit (blank) at the top and have cancel and save buttons, have them have an x that saves or maybe a delete button with an are you sure popup
+[ ] tapping the event + gives aestetic event selecter bubbles
 [ ] be able to import people from contacts app on your phone
 [ ] be able to sign in/make an account with apple and google and facebook?
 [ ] add more hideable kis for the other event types (hours worked, hours of school, etc.) or add the ability to tie custom events to kis so that reporting them makes them 
