@@ -11,7 +11,7 @@ const EMPTY: EventStatusMap = {};
 
 export function useEventStatuses() {
   const { user } = useAuth();
-  const { value: statuses, write, reload } = useStoredState<EventStatusMap>(EVENT_STATUSES_KEY, EMPTY);
+  const { value: statuses, current, write, reload } = useStoredState<EventStatusMap>(EVENT_STATUSES_KEY, EMPTY);
 
   const getStatus = useCallback(
     (eventId: string, dateStr: string): EventStatus | undefined => statuses[statusKey(eventId, dateStr)],
@@ -37,6 +37,44 @@ export function useEventStatuses() {
       else await enqueueUpsert('event_statuses', identity, { ...row, status });
     },
     [user, write],
+  );
+
+  /**
+   * Carry an occurrence's status across to a new date.
+   *
+   * A status is keyed `eventId::date`, so the date is part of its identity. Moving
+   * an event without this leaves the record stranded on a date the event no longer
+   * occupies, and the lookup at the new date finds nothing — which EventBlock
+   * renders as `pending`, so a completed event silently reverts to unreported.
+   *
+   * One `write` rather than a clear followed by a set: two writes would publish an
+   * intermediate map where the status exists at neither date, and every subscribed
+   * screen would flash `pending` between them. The old row gets a tombstone so the
+   * move propagates instead of leaving a duplicate on another device.
+   */
+  const moveStatus = useCallback(
+    async (eventId: string, fromDate: string, toDate: string) => {
+      if (fromDate === toDate) return;
+      const fromKey = statusKey(eventId, fromDate);
+      const status = current.current[fromKey];
+      if (status === undefined) return;
+
+      await write(existing => {
+        const next = { ...existing };
+        delete next[fromKey];
+        next[statusKey(eventId, toDate)] = status;
+        return next;
+      });
+
+      if (!user) return;
+      await enqueueDelete('event_statuses', `${eventId}|${fromDate}`, {
+        user_id: user.id, event_id: eventId, occurrence_date: fromDate,
+      });
+      await enqueueUpsert('event_statuses', `${eventId}|${toDate}`, {
+        user_id: user.id, event_id: eventId, occurrence_date: toDate, status,
+      });
+    },
+    [current, user, write],
   );
 
   /**
@@ -69,5 +107,5 @@ export function useEventStatuses() {
     [user, write],
   );
 
-  return { statuses, getStatus, setStatus, setStatuses, reload };
+  return { statuses, getStatus, setStatus, setStatuses, moveStatus, reload };
 }
