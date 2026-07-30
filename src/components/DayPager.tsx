@@ -89,6 +89,8 @@ export function DayPager({ selectedDate, onChangeDate, scrollEnabled = true, ren
         showsHorizontalScrollIndicator={false}
         directionalLockEnabled
         disableIntervalMomentum
+        bounces={false}
+        overScrollMode="never"
         contentOffset={{ x: SCREEN_WIDTH, y: 0 }}
         onLayout={() => recenter(false)}
         onScrollEndDrag={handleScrollEndDrag}

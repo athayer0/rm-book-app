@@ -27,7 +27,7 @@ function makeStyles(C: ColorPalette) {
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: C.accent,
+      backgroundColor: C.control,
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#000',

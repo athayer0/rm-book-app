@@ -1,6 +1,14 @@
 export const LightColors = {
   primary: '#8B1A4A',
+  // Cyan, now reserved for committing and emphasis: Save, Done, EDIT, and the
+  // goal counts. Everything that merely selects or toggles uses `control`.
   accent: '#00B5C8',
+  // Navy, for the interactive furniture — checkmarks, switches, active pills and
+  // tabs, the FAB, and the "add a thing" links. The same navy as the Service
+  // event type and the Service Hours goal (SwatchColors' #1A3A6B), not the
+  // slightly darker #253960 the goal sheets use. Lifts to a pale blue in dark
+  // mode for the same reason goalTextAction does: navy on near-black is unreadable.
+  control: '#1A3A6B',
   background: '#F5F5F5',
   card: '#FFFFFF',
   text: '#1A1A1A',
@@ -17,16 +25,23 @@ export const LightColors = {
   weekStripBg: '#E8E8E8',
   weekStripBgAlt: '#D8D8D8',
   selectedDayBg: '#D4E8F5',
-  selectedDayBorder: '#253960',
+  selectedDayBorder: '#1A3A6B',
   rowPressedBg: 'rgba(160,160,160,0.2)',
-  // Navy, for tappable text actions in the goal screens ("Set goals", "Add a Goal +").
-  goalTextAction: '#253960',
+  // A row standing selected rather than merely being touched, so it has to read
+  // as a state and not as the grey flash of rowPressedBg. Tinted with `control`,
+  // and weighted per theme: the same alpha that reads as a wash on white
+  // disappears on a dark card.
+  rowSelectedBg: 'rgba(26,58,107,0.10)',
+  // Navy, for the "add a thing" text actions — "Set goals" and "Add a Goal +" in
+  // the goal sheets, "Add Person" on an event. Named for where it started; it is
+  // now what any of those links look like.
+  goalTextAction: '#1A3A6B',
   // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
-  goalActionBg: '#253960',
+  goalActionBg: '#1A3A6B',
   statusOtherColor: '#000000',
-  // Tint behind the call and message buttons, so the accent glyph sits on a soft
-  // accent wash rather than the bare card.
-  contactActionBg: '#DFF4F7',
+  // Tint behind the call and message buttons, so the `control` glyph sits on a
+  // soft wash of its own colour rather than the bare card.
+  contactActionBg: '#E1E5EC',
   // Event reporting states, shared by the calendar's status badges and the
   // unreported-events shortcut. Centralised because two features have to agree:
   // an amber dot on the home row must mean the same thing as one on a block.
@@ -38,6 +53,7 @@ export const LightColors = {
 export const DarkColors: typeof LightColors = {
   primary: '#8B1A4A',
   accent: '#00B5C8',
+  control: '#8AAFC8',
   background: '#111111',
   card: '#1E1E1E',
   text: '#F0F0F0',
@@ -56,13 +72,15 @@ export const DarkColors: typeof LightColors = {
   selectedDayBg: '#263040',
   selectedDayBorder: '#8AAFC8',
   rowPressedBg: 'rgba(160,160,160,0.2)',
+  // The dark-mode `control` is the pale blue, so the tint follows it there.
+  rowSelectedBg: 'rgba(138,175,200,0.20)',
   // Navy is unreadable on the dark background; lift it the same way selectedDayBorder does.
   goalTextAction: '#8AAFC8',
   // A fill, not text — navy still reads against the dark card and keeps its white label legible.
   goalActionBg: '#2E4877',
   statusOtherColor: '#FFFFFF',
-  // Same wash, darkened so the accent glyph keeps its contrast on a dark card.
-  contactActionBg: '#123B42',
+  // Same wash, darkened so the pale-blue glyph keeps its contrast on a dark card.
+  contactActionBg: '#1C2740',
   // Lifted from the light values, which are mid-tones chosen against white and
   // go muddy on a dark card. Hue is preserved so the states stay recognisable.
   statusCompleted: '#3FB56B',
@@ -97,12 +115,18 @@ export const SwatchColors: string[] = [
 // Key order is the display order: SettingsScreen and AddEditEventModal both
 // build their type lists with Object.keys(EventColors). EventTypeLabels and
 // EventTypeConfig are kept in the same order so the three read as one table.
+//
+// The order tracks each type's colour through SwatchColors — warm through cool,
+// then the browns and greys — so the picker reads as a spectrum rather than an
+// arbitrary list. A new type belongs wherever its swatch falls, not at the end.
 export const EventColors: Record<string, string> = {
   church:    '#E05C6B',
   travel:    '#800000',
   meal:      '#D2691E',
-  activity:  '#E8B820',
-  work:      '#2ECC71',
+  activity:  '#E8980E',
+  date:      '#E8B820',
+  contact:   '#2ECC71',
+  work:      '#27AE60',
   service:   '#1A3A6B',
   school:    '#2979FF',
   temple:    '#00B5C8',
@@ -118,6 +142,8 @@ export const EventTypeLabels: Record<string, string> = {
   travel:    'Travel',
   meal:      'Meal',
   activity:  'Activity',
+  date:      'Date',
+  contact:   'Contact',
   work:      'Work',
   service:   'Service',
   school:    'School',
@@ -129,11 +155,19 @@ export const EventTypeLabels: Record<string, string> = {
   other:     'Other',
 };
 
-export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckbox: boolean }> = {
+/**
+ * `optionalEnd` types start with no end time at all and offer one on request,
+ * rather than being handed a default duration. Distinct from `hasCheckbox`,
+ * which means the type can never have an end: a contact really may have run
+ * from 2:14 to 2:31, it just usually isn't worth saying so.
+ */
+export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckbox: boolean; optionalEnd?: boolean }> = {
   church:    { defaultMinutes: 30, hasCheckbox: false },
   travel:    { defaultMinutes: 30, hasCheckbox: false },
   meal:      { defaultMinutes: 30, hasCheckbox: false },
   activity:  { defaultMinutes: 30, hasCheckbox: false },
+  date:      { defaultMinutes: 60, hasCheckbox: false },
+  contact:   { defaultMinutes: 0, hasCheckbox: false, optionalEnd: true },
   work:      { defaultMinutes: 30, hasCheckbox: false },
   service:   { defaultMinutes: 30, hasCheckbox: false },
   school:    { defaultMinutes: 30, hasCheckbox: false },

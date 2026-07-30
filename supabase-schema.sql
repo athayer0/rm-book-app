@@ -85,10 +85,28 @@ create table if not exists calendar_events (
   excluded_dates jsonb,
   recurring_days jsonb,
   backup boolean default false,
+  -- Person ids this event involves. jsonb for
+  -- the same reason as the two arrays above: a
+  -- join table would need its own sync path,
+  -- and the list only ever moves with its event.
+  -- No FK either -- queue ordering across
+  -- devices cannot guarantee the person lands
+  -- first.
+  people jsonb,
+  -- Contact events only: which channel it went
+  -- through. Keys come from CONTACT_METHODS in
+  -- src/constants/contactMethods.ts; left
+  -- unconstrained so adding one there needs no
+  -- migration.
+  contact_method text,
   updated_at timestamptz default now(),
   deleted_at timestamptz,
   primary key (user_id, id)
 );
+alter table calendar_events
+  add column if not exists people jsonb;
+alter table calendar_events
+  add column if not exists contact_method text;
 alter table calendar_events
   enable row level security;
 drop policy if exists "users own their events"

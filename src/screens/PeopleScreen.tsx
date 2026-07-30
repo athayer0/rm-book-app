@@ -11,24 +11,15 @@ import { usePeople, Person } from '../hooks/usePeople';
 import { PersonCard } from '../components/PersonCard';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { FAB } from '../components/FAB';
-import { PERSON_STATUSES, STATUS_OPTIONS } from '../constants/personStatuses';
+import {
+  PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus,
+} from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
-
-const STATUS_GROUPS: { name: string; statuses: string[] }[] = [
-  { name: 'Church', statuses: ['Recent Converts', 'Members'] },
-  { name: 'Dating', statuses: ['Relationship', '1+ Dates', 'Potential Dates', 'Not Interested', 'Do Not Contact'] },
-  { name: 'Friends & Family', statuses: ['Eternal Companion', 'Family', 'Mission Friends', 'Friends'] },
-];
 
 type FilterSelection =
   | { kind: 'all' }
   | { kind: 'group'; name: string; statuses: string[] }
   | { kind: 'status'; name: string };
-
-function statusRank(status: string): number {
-  const index = STATUS_OPTIONS.indexOf(status);
-  return index === -1 ? STATUS_OPTIONS.length : index;
-}
 
 function matchesFilter(status: string, selection: FilterSelection): boolean {
   if (selection.kind === 'all') return true;
@@ -49,15 +40,10 @@ function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
     ];
   }
   const rows: ListRow[] = [];
-  for (const group of STATUS_GROUPS) {
-    const members = list.filter(p => group.statuses.includes(p.status));
-    if (members.length === 0) continue;
-    rows.push({ kind: 'header', label: group.name, key: `header-${group.name}` });
-    members.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
+  for (const group of groupByStatus(list)) {
+    if (group.label) rows.push({ kind: 'header', label: group.label, key: `header-${group.label}` });
+    group.people.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
   }
-  const groupedStatuses = new Set(STATUS_GROUPS.flatMap(g => g.statuses));
-  const ungrouped = list.filter(p => !groupedStatuses.has(p.status));
-  ungrouped.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
   return rows;
 }
 
@@ -119,7 +105,7 @@ export function PeopleScreen() {
                 onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
               >
                 <Text style={styles.filterDropdownText}>All</Text>
-                {filterSelection.kind === 'all' && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                {filterSelection.kind === 'all' && <Ionicons name="checkmark" size={16} color={Colors.control} />}
               </TouchableOpacity>
               {STATUS_GROUPS.map(g => (
                 <TouchableOpacity
@@ -129,7 +115,7 @@ export function PeopleScreen() {
                 >
                   <Text style={styles.filterDropdownText}>{g.name}</Text>
                   {filterSelection.kind === 'group' && filterSelection.name === g.name && (
-                    <Ionicons name="checkmark" size={16} color={Colors.accent} />
+                    <Ionicons name="checkmark" size={16} color={Colors.control} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -145,7 +131,7 @@ export function PeopleScreen() {
                     <StatusIcon config={cfg} size={14} style={styles.filterChipIcon} />
                     <Text style={styles.filterDropdownText}>{s}</Text>
                     {filterSelection.kind === 'status' && filterSelection.name === s && (
-                      <Ionicons name="checkmark" size={16} color={Colors.accent} />
+                      <Ionicons name="checkmark" size={16} color={Colors.control} />
                     )}
                   </TouchableOpacity>
                 );

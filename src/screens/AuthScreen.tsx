@@ -143,7 +143,7 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '600',
     },
     toggle: {
-      color: C.accent,
+      color: C.control,
       textAlign: 'center',
       fontSize: 14,
     },

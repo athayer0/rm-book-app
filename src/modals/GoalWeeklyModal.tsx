@@ -348,7 +348,7 @@ function makeStyles(C: ColorPalette) {
       color: C.textSecondary,
     },
     tabLabelActive: {
-      color: C.accent,
+      color: C.control,
     },
     tabUnderline: {
       position: 'absolute',
@@ -357,7 +357,7 @@ function makeStyles(C: ColorPalette) {
       right: '15%',
       height: 2,
       borderRadius: 1,
-      backgroundColor: C.accent,
+      backgroundColor: C.control,
     },
     weekNav: {
       flexDirection: 'row',

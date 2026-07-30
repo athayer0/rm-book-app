@@ -1,6 +1,7 @@
 TO DO
 
-[ ] admission pres, senior missionariescontact info
+[x] add mission pres
+[ ] add spanish portuguese and french
 [ ] be able to report contacts with them, make repeating contacts
 [ ] be able to import people from contacts app on your phone
 [x] make a call and maybe whatsapp shortcut icon next to their phone number, messenger

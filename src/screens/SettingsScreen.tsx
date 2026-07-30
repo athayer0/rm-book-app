@@ -14,7 +14,7 @@ import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize } 
 import { useSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { isCheckboxType } from '../utils/eventUtils';
+import { isCheckboxType, hasOptionalEnd } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
 import { drainThenClear } from '../lib/localData';
 import { pullAll } from '../lib/sync';
@@ -136,8 +136,10 @@ export function SettingsScreen() {
     return settings.eventTypeColors[type] ?? EventColors[type];
   }
 
+  // null means the type has no default duration to offer — either it can never
+  // have one (checkbox types) or it starts without one (optional-end types).
   function effectiveMinutes(type: string): number | null {
-    if (isCheckboxType(type)) return null;
+    if (isCheckboxType(type) || hasOptionalEnd(type)) return null;
     return settings.eventTypeDefaultMinutes[type] ?? EventTypeConfig[type]?.defaultMinutes ?? 30;
   }
 
@@ -178,7 +180,7 @@ export function SettingsScreen() {
               >
                 <Text style={styles.rowLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
                 {settings.weekStart === day && (
-                  <Ionicons name="checkmark" size={18} color={Colors.accent} />
+                  <Ionicons name="checkmark" size={18} color={Colors.control} />
                 )}
               </TouchableOpacity>
             ))}
@@ -214,7 +216,7 @@ export function SettingsScreen() {
                       {hourLabel(h)}
                     </Text>
                     {settings.gridStartHour === h && (
-                      <Ionicons name="checkmark" size={16} color={Colors.accent} />
+                      <Ionicons name="checkmark" size={16} color={Colors.control} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -246,7 +248,7 @@ export function SettingsScreen() {
                       {hourLabel(h)}
                     </Text>
                     {settings.gridEndHour === h && (
-                      <Ionicons name="checkmark" size={16} color={Colors.accent} />
+                      <Ionicons name="checkmark" size={16} color={Colors.control} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -267,7 +269,7 @@ export function SettingsScreen() {
               >
                 <Text style={styles.rowLabel}>{EventSizes[size].label}</Text>
                 {selectedEventSize === size && (
-                  <Ionicons name="checkmark" size={18} color={Colors.accent} />
+                  <Ionicons name="checkmark" size={18} color={Colors.control} />
                 )}
               </TouchableOpacity>
             ))}
@@ -316,7 +318,7 @@ export function SettingsScreen() {
               >
                 <Text style={styles.rowLabel}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</Text>
                 {settings.theme === theme && (
-                  <Ionicons name="checkmark" size={18} color={Colors.accent} />
+                  <Ionicons name="checkmark" size={18} color={Colors.control} />
                 )}
               </TouchableOpacity>
             ))}
@@ -341,7 +343,7 @@ export function SettingsScreen() {
                     <View style={[styles.colorDot, { backgroundColor: color }]} />
                     <Text style={styles.rowLabel}>{EventTypeLabels[type]}</Text>
                     <Text style={styles.durationBadge}>
-                      {mins === null ? 'Fixed' : `${mins} min`}
+                      {mins !== null ? `${mins} min` : hasOptionalEnd(type) ? 'Optional' : 'Fixed'}
                     </Text>
                     <Ionicons
                       name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -388,7 +390,11 @@ export function SettingsScreen() {
                           </View>
                         </>
                       ) : (
-                        <Text style={styles.fixedLabel}>Fixed – 15 min block</Text>
+                        <Text style={styles.fixedLabel}>
+                          {hasOptionalEnd(type)
+                            ? 'No end time unless you add one'
+                            : 'Fixed – 15 min block'}
+                        </Text>
                       )}
                     </View>
                   )}
@@ -654,11 +660,11 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     pillActive: {
-      borderColor: C.accent,
-      backgroundColor: C.accent + '20',
+      borderColor: C.control,
+      backgroundColor: C.control + '20',
     },
     pillText: { fontSize: 13, color: C.textSecondary },
-    pillTextActive: { color: C.accent, fontWeight: '600' },
+    pillTextActive: { color: C.control, fontWeight: '600' },
     dropdownList: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
@@ -684,7 +690,7 @@ function makeStyles(C: ColorPalette) {
       color: C.text,
     },
     dropdownItemActive: {
-      color: C.accent,
+      color: C.control,
       fontWeight: '600',
     },
     fixedLabel: {

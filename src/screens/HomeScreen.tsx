@@ -173,7 +173,7 @@ function makeStyles(C: ColorPalette) {
       margin: 16,
       marginTop: 8,
       borderWidth: 2,
-      borderColor: C.accent,
+      borderColor: C.control,
       borderRadius: 8,
       paddingVertical: 12,
       alignItems: 'center',
@@ -181,7 +181,7 @@ function makeStyles(C: ColorPalette) {
     planBtnText: {
       fontSize: 13,
       fontWeight: '700',
-      color: C.accent,
+      color: C.control,
       letterSpacing: 1.2,
     },
     peopleList: {
@@ -199,7 +199,7 @@ function makeStyles(C: ColorPalette) {
     },
     emptyAction: {
       fontSize: 14,
-      color: C.accent,
+      color: C.control,
       fontWeight: '600',
       marginTop: 8,
     },

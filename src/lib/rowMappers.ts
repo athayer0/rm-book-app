@@ -15,6 +15,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     recurringUntil: 'recurring_until',
     excludedDates: 'excluded_dates',
     recurringDays: 'recurring_days',
+    contactMethod: 'contact_method',
   },
   goal_definitions: {
     iconFamily: 'icon_family',
@@ -42,7 +43,7 @@ const COLUMNS: Record<string, string[]> = {
   calendar_events: [
     'user_id', 'id', 'title', 'type', 'color', 'date', 'start_time', 'end_time',
     'notes', 'recurring', 'recurring_rule', 'recurring_until', 'excluded_dates',
-    'recurring_days', 'backup', 'updated_at', 'deleted_at',
+    'recurring_days', 'backup', 'people', 'contact_method', 'updated_at', 'deleted_at',
   ],
   goal_definitions: [
     'user_id', 'id', 'label', 'icon', 'icon_family', 'color',

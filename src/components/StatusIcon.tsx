@@ -10,6 +10,11 @@ interface Props {
   style?: object;
 }
 
+// The ring is drawn by hand rather than as a glyph, so its stroke has to scale
+// with `size` — a fixed width reads right in the 14px dropdown and turns hairline
+// on the 24px person card. The ratio is the dropdown's weight (2.5 at 14).
+const RING_STROKE_RATIO = 2.5 / 14;
+
 export function StatusIcon({ config, size, style }: Props) {
   const Colors = useColors();
   const color = config.themed ? Colors.statusOtherColor : config.color;
@@ -21,7 +26,7 @@ export function StatusIcon({ config, size, style }: Props) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          borderWidth: 2.5,
+          borderWidth: size * RING_STROKE_RATIO,
           borderColor: color,
         }, style]}
       />

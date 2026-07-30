@@ -3,17 +3,39 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, isCheckboxType, hasEndTime, COMPACT_EVENT_HEIGHT } from '../utils/eventUtils';
+import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../constants/contactMethods';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
+import { GoalIcon } from './GoalIcon';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
 const TIME_GAP = 4; // styles.time marginLeft
 const REPEAT_GAP = 3; // between the repeat marker and the status badge
+const METHOD_GAP = 5; // between the method marker and the title
+
+// The title's line height and the method glyph, both as multiples of the block's
+// font size. The title row is as tall as whichever is larger, and the block's
+// padding is derived from that — so either can be retuned without the vertical
+// geometry drifting.
+const TITLE_LINE_RATIO = 1.3;
+const METHOD_ICON_RATIO = 1.45;
+
+/**
+ * The status marker's size, at every density and for both forms it takes — the
+ * three-state badge and the checkbox.
+ *
+ * Deliberately not derived from slotHeight. It reports state, and state does not
+ * become more or less important because the calendar is set denser; a marker
+ * that changed size between settings made the same event look like a different
+ * kind of thing. Pinned to what the medium preset used to produce, so the
+ * middle setting is unchanged and the others move to meet it.
+ */
+const STATUS_MARKER_SIZE = Math.round(36 * (EventSizes.md.slotHeight / DEFAULT_SLOT_HEIGHT));
 
 // The block's visual signature. Named because each of these appears twice: once in
 // the rendered style, and once in the width arithmetic that decides whether the
@@ -119,10 +141,7 @@ export function EventBlock({
 
   const stripeCount = Math.ceil(height / 7) + 4;
 
-  // Status badge scales with density so it never outgrows a 15-minute block. Checkbox
-  // events render at a fixed small size, so their badge follows that density, not the grid's.
-  const badgeSlot = isCheckbox ? EventSizes.sm.slotHeight : slotHeight;
-  const badge = Math.round(Math.min(40, Math.max(22, 36 * (badgeSlot / DEFAULT_SLOT_HEIGHT))));
+  const badge = STATUS_MARKER_SIZE;
   const badgeInner = Math.round(badge * (2 / 3));
   const badgeInset = Math.round(badge / 6);
 
@@ -143,18 +162,52 @@ export function EventBlock({
     ? 6 + badge + (isRecurring ? REPEAT_GAP + repeatSize : 0)
     : isRecurring ? 6 + repeatSize : BLOCK.paddingRight;
 
+  // Contacts and dates lead with how they happened — a phone glyph on a phone
+  // call, a screen on a video date. It rides the title row, so it sits on the
+  // baseline the title does rather than floating in a gutter of its own.
+  const method = usesContactMethod(event.type)
+    ? CONTACT_METHODS[resolveContactMethod(event.contactMethod, event.type)]
+    : null;
+  const methodSize = Math.round(fontSize * METHOD_ICON_RATIO);
+  const methodWidth = method ? methodSize + METHOD_GAP : 0;
+
+  // The title's line height is pinned rather than left to the platform's default
+  // line spacing, because the padding below is derived from the row's height and
+  // that can't be a guess. The glyph is the taller of the two, so it sets the
+  // row's height on the blocks that carry one.
+  const titleLineHeight = Math.round(fontSize * TITLE_LINE_RATIO);
+  const rowHeight = Math.max(titleLineHeight, method ? methodSize : 0);
+
+  /**
+   * Every block gets the padding that would centre its title inside a
+   * no-duration block.
+   *
+   * So a contact logged without an end time reads as centred without anything
+   * actually centring it, and a longer event gets the same figure as breathing
+   * room at the top — the titles across a column still line up, just lower than
+   * they used to. Capped by what this block can afford, since a 15-minute block
+   * at the smallest density is shorter than the compact height and would
+   * otherwise push its own title out of view.
+   */
+  const blockPadding = Math.max(1, Math.min(
+    Math.floor((COMPACT_EVENT_HEIGHT - rowHeight) / 2),
+    Math.floor((height - rowHeight) / 2),
+  ));
+
   const contentWidth =
     columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
     - (isBackup ? 0 : BLOCK.accentWidth)              // left colour border
     - (isBackup ? 8 : BLOCK.paddingLeft)              // paddingLeft
-    - gutter;                                         // paddingRight
+    - gutter                                          // paddingRight
+    - methodWidth;                                    // leading method marker
 
   const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
 
-  // Checkbox events have only a start time; everything else can show a start–end range.
+  // Only an event that actually spans time can show a start–end range; a checkbox
+  // event, or a contact logged without an end, has just the one time to show.
   const bothLabel = `${event.startTime} – ${event.endTime}`;
   const timeLabel =
-    !isCheckbox && spare >= textWidth(bothLabel, fontSize) ? bothLabel
+    hasEndTime(event) && spare >= textWidth(bothLabel, fontSize) ? bothLabel
     : spare >= textWidth(event.startTime, fontSize) ? event.startTime
     : null;
 
@@ -173,7 +226,7 @@ export function EventBlock({
             opacity: isBeingDragged ? 0 : 1,
             paddingLeft: isBackup ? 8 : BLOCK.paddingLeft,
             paddingRight: gutter,
-            paddingVertical: slotHeight <= 40 || isCheckbox ? 1 : 3,
+            paddingVertical: blockPadding,
           },
           // Last, so it wins over the grid placement computed above.
           inline && styles.blockInline,
@@ -193,9 +246,23 @@ export function EventBlock({
         )}
 
         <View style={styles.row}>
-          <Text style={[styles.title, { fontSize }]} numberOfLines={1}>{event.title}</Text>
+          {method && (
+            <View style={{ marginRight: METHOD_GAP }}>
+              <GoalIcon
+                icon={method.icon}
+                iconFamily={method.iconFamily}
+                size={methodSize}
+                color={Colors.text}
+              />
+            </View>
+          )}
+          <Text style={[styles.title, { fontSize, lineHeight: titleLineHeight }]} numberOfLines={1}>
+            {event.title}
+          </Text>
           {timeLabel && (
-            <Text style={[styles.time, { fontSize }]} numberOfLines={1}>{timeLabel}</Text>
+            <Text style={[styles.time, { fontSize, lineHeight: titleLineHeight }]} numberOfLines={1}>
+              {timeLabel}
+            </Text>
           )}
         </View>
 

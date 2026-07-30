@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Text, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import { PERSON_STATUSES } from '../constants/personStatuses';
 import { StatusIcon } from './StatusIcon';
@@ -10,9 +11,15 @@ interface Props {
   person: Person;
   onPress: () => void;
   isFirst?: boolean;
+  /**
+   * Marks the row as picked, for the lists that choose people rather than open
+   * them. Left undefined by the People tab, where a row leads somewhere instead
+   * of holding a state.
+   */
+  selected?: boolean;
 }
 
-export function PersonCard({ person, onPress, isFirst }: Props) {
+export function PersonCard({ person, onPress, isFirst, selected }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const [pressed, setPressed] = useState(false);
@@ -27,11 +34,17 @@ export function PersonCard({ person, onPress, isFirst }: Props) {
 
   return (
     <Pressable
-      style={[styles.row, isFirst && styles.rowFirst, pressed && styles.rowPressed]}
+      style={[
+        styles.row,
+        isFirst && styles.rowFirst,
+        selected && styles.rowSelected,
+        pressed && styles.rowPressed,
+      ]}
       onPress={handlePress}
     >
       <StatusIcon config={statusConfig} size={24} style={styles.statusIcon} />
       <Text style={styles.name}>{person.name}</Text>
+      {selected && <Ionicons name="checkmark" size={20} color={Colors.control} />}
     </Pressable>
   );
 }
@@ -50,6 +63,10 @@ function makeStyles(C: ColorPalette) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
     },
+    rowSelected: {
+      backgroundColor: C.rowSelectedBg,
+    },
+    // Listed after rowSelected so a touch still reads on an already-picked row.
     rowPressed: {
       backgroundColor: C.rowPressedBg,
     },

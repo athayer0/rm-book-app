@@ -14,7 +14,7 @@ import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
-import { CalendarEvent, EventStatus, renderedEventHeight, isCheckboxType } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, renderedEventHeight, hasEndTime } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventStatuses } from '../hooks/useEventStatuses';
@@ -150,9 +150,10 @@ function CalendarContent() {
     const hour = Math.floor(fifteenMinSlot / 4) + settings.gridStartHour;
     const minute = (fifteenMinSlot % 4) * 15;
     const newStart = formatTime(Math.min(hour, 23), minute);
-    // Checkbox events (task, prayer) carry no duration; keep end equal to the new start.
+    // Events with no duration — checkbox types, and contacts logged without an
+    // end — keep end equal to the new start, which is how "no end" is stored.
     let newEnd = newStart;
-    if (!isCheckboxType(dragEvent.type)) {
+    if (hasEndTime(dragEvent)) {
       const { hour: sh, minute: sm } = parseTimeString(dragEvent.startTime);
       const { hour: eh, minute: em } = parseTimeString(dragEvent.endTime);
       const startMins = sh * 60 + sm;

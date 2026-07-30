@@ -11,6 +11,11 @@ import { PERSON_STATUSES, STATUS_OPTIONS, statusDisplayName } from '../constants
 import { StatusIcon } from '../components/StatusIcon';
 import { SheetModal } from '../components/SheetModal';
 import { useSettings } from '../hooks/useSettings';
+import { useCalendarEvents } from '../hooks/useCalendarEvents';
+import { usePendingContact } from '../hooks/usePendingContact';
+import { CalendarEvent } from '../utils/eventUtils';
+import { AddEditEventModal } from './AddEditEventModal';
+import { PersonTimelineTab } from '../components/PersonTimelineTab';
 import {
   callNumber, isFacebookShareLink, messageNumber, openMessenger, openWhatsApp,
   toDialable, toMessengerHandle,
@@ -38,6 +43,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const [starred, setStarred] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
 
   useEffect(() => {
     if (person) {
@@ -58,12 +64,44 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setStarred(false);
     }
     setShowMethodPicker(false);
+    setActiveTab('details');
   }, [person, visible]);
 
   const { settings } = useSettings();
+  const { addEvent } = useCalendarEvents();
+  const { noteAttempt, captured, clearCaptured } = usePendingContact();
   const dialable = toDialable(phone);
   const whatsappDialable = toDialable(whatsapp);
   const messengerHandle = toMessengerHandle(messenger);
+
+  /**
+   * Leave a note that a contact is being made, then hand off to the other app.
+   *
+   * Only for a person who already exists: the draft attaches them by id, and an
+   * unsaved new person has none yet. Their buttons still dial — they just don't
+   * offer to log it.
+   */
+  function contactVia(method: string, open: () => void) {
+    if (person) noteAttempt(method);
+    open();
+  }
+
+  // Seeds the Contact draft that opens on return. Memoised because
+  // AddEditEventModal resets its form whenever this identity changes — rebuilt
+  // inline, it would clear the sheet on every keystroke.
+  const contactDraft = useMemo<Partial<CalendarEvent> | null>(() => {
+    if (!captured || !person) return null;
+    return {
+      type: 'contact',
+      // No title: the draft leaves it blank so it saves as "Contact", the type's
+      // own label. Who it was with is carried by `people`, not by the title.
+      date: captured.date,
+      startTime: captured.startTime,
+      endTime: captured.startTime, // no end time until one is asked for
+      people: [person.id],
+      contactMethod: captured.method,
+    };
+  }, [captured, person]);
 
   const methodOptions = [
     {
@@ -111,7 +149,37 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
+        {/* Only for someone who already exists — a person being added has no id
+            for the timeline to look events up by, and no events to find. */}
+        {person && (
+          <View style={styles.tabBar}>
+            {(['details', 'timeline'] as const).map(tab => (
+              <TouchableOpacity
+                key={tab}
+                style={styles.tabBtn}
+                onPress={() => setActiveTab(tab)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
+                  {tab === 'details' ? 'Details' : 'Timeline'}
+                </Text>
+                {activeTab === tab && <View style={styles.tabUnderline} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {person && activeTab === 'timeline' && <PersonTimelineTab personId={person.id} />}
+
+        {/* Kept mounted while the timeline shows, not swapped out: unmounting would
+            discard every unsaved edit in the form the moment the tab changed. */}
+        <ScrollView
+          style={[styles.form, activeTab !== 'details' && styles.formHidden]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          bounces={false}
+          overScrollMode="never"
+        >
           {showMethodPicker && (
             <Pressable style={styles.pickerBackdrop} onPress={() => setShowMethodPicker(false)} />
           )}
@@ -147,7 +215,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                     >
                       <StatusIcon config={cfg} size={14} style={{ marginRight: 8 }} />
                       <Text style={styles.dropdownText}>{statusDisplayName(s)}</Text>
-                      {status === s && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                      {status === s && <Ionicons name="checkmark" size={16} color={Colors.control} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -183,19 +251,19 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 <>
                   <TouchableOpacity
                     style={styles.contactBtn}
-                    onPress={() => messageNumber(phone)}
+                    onPress={() => contactVia('text', () => messageNumber(phone))}
                     accessibilityRole="button"
                     accessibilityLabel={name.trim() ? `Message ${name.trim()}` : 'Message this number'}
                   >
-                    <Ionicons name="chatbubble" size={17} color={Colors.accent} />
+                    <Ionicons name="chatbubble" size={17} color={Colors.control} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.contactBtn}
-                    onPress={() => callNumber(phone)}
+                    onPress={() => contactVia('phone', () => callNumber(phone))}
                     accessibilityRole="button"
                     accessibilityLabel={name.trim() ? `Call ${name.trim()}` : 'Call this number'}
                   >
-                    <Ionicons name="call" size={18} color={Colors.accent} />
+                    <Ionicons name="call" size={18} color={Colors.control} />
                   </TouchableOpacity>
                 </>
               )}
@@ -227,11 +295,11 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 {whatsappDialable.length > 0 && (
                   <TouchableOpacity
                     style={styles.contactBtn}
-                    onPress={() => openWhatsApp(whatsapp, settings.defaultCountryCode)}
+                    onPress={() => contactVia('whatsapp', () => openWhatsApp(whatsapp, settings.defaultCountryCode))}
                     accessibilityRole="button"
                     accessibilityLabel={name.trim() ? `WhatsApp ${name.trim()}` : 'Open in WhatsApp'}
                   >
-                    <MaterialCommunityIcons name="whatsapp" size={20} color={Colors.accent} />
+                    <MaterialCommunityIcons name="whatsapp" size={20} color={Colors.control} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -265,11 +333,11 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 {messengerHandle.length > 0 && (
                   <TouchableOpacity
                     style={styles.contactBtn}
-                    onPress={() => openMessenger(messenger)}
+                    onPress={() => contactVia('messenger', () => openMessenger(messenger))}
                     accessibilityRole="button"
                     accessibilityLabel={name.trim() ? `Message ${name.trim()} on Messenger` : 'Open in Messenger'}
                   >
-                    <MaterialCommunityIcons name="facebook-messenger" size={20} color={Colors.accent} />
+                    <MaterialCommunityIcons name="facebook-messenger" size={20} color={Colors.control} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -303,7 +371,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   style={styles.addMethodRow}
                   onPress={() => setShowMethodPicker(v => !v)}
                 >
-                  <Ionicons name="add-circle-outline" size={20} color={Colors.accent} />
+                  <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
                   <Text style={styles.addMethodText}>Add contact method</Text>
                   <Ionicons
                     name={showMethodPicker ? 'chevron-up' : 'chevron-down'}
@@ -322,7 +390,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                         <MaterialCommunityIcons
                           name={method.key === 'whatsapp' ? 'whatsapp' : 'facebook-messenger'}
                           size={18}
-                          color={Colors.accent}
+                          color={Colors.control}
                           style={{ marginRight: 8 }}
                         />
                         <Text style={styles.dropdownText}>{method.label}</Text>
@@ -359,6 +427,26 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/*
+          Nested inside this sheet rather than sitting beside it in the screen,
+          for the reason UnreportedEventsModal spells out: two Modals as siblings
+          race to present from the same view controller, while one declared
+          within another's content presents from that one and stacks cleanly.
+          This editor is necessarily still open — the contact was started from
+          one of its own buttons.
+
+          Nothing is written until Save. Closing discards the draft, so a
+          misdialled number or an abandoned call leaves no event behind.
+        */}
+        <AddEditEventModal
+          visible={contactDraft !== null}
+          event={null}
+          prefill={contactDraft}
+          settings={settings}
+          onSave={async eventData => { await addEvent(eventData); }}
+          onClose={clearCaptured}
+        />
     </SheetModal>
   );
 }
@@ -382,7 +470,35 @@ function makeStyles(C: ColorPalette) {
     },
     cancel: { fontSize: 16, color: C.textSecondary },
     save: { fontSize: 16, fontWeight: '600', color: C.accent },
+    // Same two-tab bar as the weekly planning sheet, so switching panes reads the
+    // same way wherever the app does it.
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: C.card,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    tabBtn: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      position: 'relative',
+    },
+    tabLabel: { fontSize: 14, fontWeight: '600', color: C.textSecondary },
+    tabLabelActive: { color: C.control },
+    tabUnderline: {
+      position: 'absolute',
+      bottom: 0,
+      left: '15%',
+      right: '15%',
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: C.control,
+    },
     form: { flex: 1, backgroundColor: C.background },
+    // Collapsed rather than unmounted. display:'none' also drops it out of the
+    // touch tree, so the hidden form can't intercept taps meant for the timeline.
+    formHidden: { display: 'none' },
     section: {
       backgroundColor: C.card,
       marginHorizontal: 16,
@@ -432,7 +548,7 @@ function makeStyles(C: ColorPalette) {
     addMethodText: {
       flex: 1,
       fontSize: 15,
-      color: C.accent,
+      color: C.control,
       fontWeight: '500',
     },
     contactBtn: {

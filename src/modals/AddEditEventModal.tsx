@@ -7,13 +7,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
-import { CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd, isCheckboxType, resolveEventStatus } from '../utils/eventUtils';
+import {
+  CalendarEvent, EventStatus, TRACKABLE_TYPES, RecurringRule, defaultRecurrenceEnd,
+  isCheckboxType, hasOptionalEnd, resolveEventStatus,
+} from '../utils/eventUtils';
+import {
+  CONTACT_METHODS, DEFAULT_CONTACT_METHOD, contactMethodLabel, methodFieldLabel,
+  methodOptionsFor, resolveContactMethod, usesContactMethod,
+} from '../constants/contactMethods';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import { StatusCheckbox } from '../components/StatusCheckbox';
 import { StatusPicker, STATUS_LABELS } from '../components/StatusPicker';
+import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
-import { addMinutesToTimeString } from '../utils/dateUtils';
+import { addMinutesToTimeString, parseTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
+import { usePeople, Person } from '../hooks/usePeople';
+import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
+import { StatusIcon } from '../components/StatusIcon';
+import { PersonPickerModal } from './PersonPickerModal';
 import { format } from 'date-fns';
 
 interface Props {
@@ -21,6 +33,13 @@ interface Props {
   event?: CalendarEvent | null;
   defaultDate?: string;
   defaultStartTime?: string;
+  /**
+   * Seeds a *new* event with more than a date and time — the auto-captured
+   * contact arrives with its type, person and method already known. Ignored when
+   * `event` is set. Must be referentially stable: it feeds the reset effect, so
+   * an object rebuilt each render would wipe the form on every keystroke.
+   */
+  prefill?: Partial<CalendarEvent> | null;
   settings: AppSettings;
   currentStatus?: EventStatus;
   onStatusChange?: (status: EventStatus | undefined) => void;
@@ -49,9 +68,20 @@ function resolvedColor(type: string, settings: AppSettings): string {
 
 // Checkbox events (task, prayer) have no duration, so they contribute no minutes; every
 // other type falls back to its configured default. No type is treated as a 15-minute event.
+// An optional-end type starts at zero too — it gets an end only if one is asked for.
 function resolvedDefaultMinutes(type: string, settings: AppSettings): number {
-  if (isCheckboxType(type)) return 0;
+  if (isCheckboxType(type) || hasOptionalEnd(type)) return 0;
   return settings.eventTypeDefaultMinutes[type] ?? EventTypeConfig[type]?.defaultMinutes ?? 30;
+}
+
+// What "Add end time" offers as a starting length, since the type's own default is 0.
+const ADDED_END_MINUTES = 30;
+
+function minutesBetween(startTime: string, endTime: string): number {
+  const start = parseTimeString(startTime);
+  const end = parseTimeString(endTime);
+  const diff = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute);
+  return diff > 0 ? diff : diff + 24 * 60;
 }
 
 // Single-letter labels indexed by JS weekday (0 = Sunday … 6 = Saturday).
@@ -61,11 +91,12 @@ function weekdayOf(dateStr: string): number {
   return new Date(dateStr + 'T12:00:00').getDay();
 }
 
-type PickerId = 'type' | 'date' | 'start' | 'end' | 'rule' | 'endsOn';
+type PickerId = 'type' | 'date' | 'start' | 'end' | 'rule' | 'endsOn' | 'method';
 
-export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
+export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, prefill, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { people: allPeople } = usePeople();
 
   /**
    * What the event's status actually is, rather than only what has been written.
@@ -94,6 +125,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [endsOn, setEndsOn] = useState(() => defaultRecurrenceEnd(defaultDate ?? format(new Date(), 'yyyy-MM-dd'), 'weekly'));
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [isBackup, setIsBackup] = useState(false);
+  const [attendees, setAttendees] = useState<string[]>([]);
+  const [contactMethod, setContactMethod] = useState(DEFAULT_CONTACT_METHOD);
   // One picker open at a time — a single value makes that structural instead of
   // something six separate booleans have to agree on.
   const [openPicker, setOpenPicker] = useState<PickerId | null>(null);
@@ -103,6 +136,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const showEndPicker = openPicker === 'end';
   const showRulePicker = openPicker === 'rule';
   const showEndsOnPicker = openPicker === 'endsOn';
+  const showMethodPicker = openPicker === 'method';
+  const [showPersonPicker, setShowPersonPicker] = useState(false);
   const [error, setError] = useState('');
   const startScrollRef = useRef<ScrollView>(null);
   const endScrollRef = useRef<ScrollView>(null);
@@ -127,22 +162,28 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
         (event.recurring && rule === 'weekly' ? [weekdayOf(event.date)] : [])
       );
       setIsBackup(event.backup ?? false);
+      setAttendees(event.people ?? []);
+      setContactMethod(resolveContactMethod(event.contactMethod, event.type));
     } else {
-      const initialStart = defaultStartTime ?? '9:00 AM';
-      const initialDate = defaultDate ?? format(new Date(), 'yyyy-MM-dd');
-      setTitle('');
-      setType('scripture');
+      const initialType = prefill?.type ?? 'scripture';
+      const initialStart = prefill?.startTime ?? defaultStartTime ?? '9:00 AM';
+      const initialDate = prefill?.date ?? defaultDate ?? format(new Date(), 'yyyy-MM-dd');
+      setTitle(prefill?.title ?? '');
+      setType(initialType);
       setDate(initialDate);
       setStartTime(initialStart);
-      setEndTime(addMinutesToTimeString(initialStart, resolvedDefaultMinutes('scripture', settings)));
+      setEndTime(prefill?.endTime ?? addMinutesToTimeString(initialStart, resolvedDefaultMinutes(initialType, settings)));
       setNotes('');
       setRecurring(false);
       setRecurringRule('weekly');
       setEndsOn(defaultRecurrenceEnd(initialDate, 'weekly'));
       setRecurringDays([]);
       setIsBackup(false);
+      setAttendees(prefill?.people ?? []);
+      setContactMethod(resolveContactMethod(prefill?.contactMethod, initialType));
     }
     setOpenPicker(null);
+    setShowPersonPicker(false);
     setLocalStatus(resolvedStatus);
     setError('');
     // resolvedStatus is read but deliberately not a dependency: it consults the
@@ -151,7 +192,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     // other inputs, `event` and `currentStatus`, are both listed, so it stays in
     // step with everything that can actually change the answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, defaultDate, defaultStartTime, visible, currentStatus]);
+  }, [event, defaultDate, defaultStartTime, prefill, visible, currentStatus]);
 
   useEffect(() => {
     if (showStartPicker) {
@@ -192,13 +233,42 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     setType(newType);
     if (!title) setTitle(EventTypeLabels[newType] ?? '');
     setEndTime(addMinutesToTimeString(startTime, resolvedDefaultMinutes(newType, settings)));
+    // Types offer different methods, so a retype can strand the current one on a
+    // list that no longer contains it.
+    setContactMethod(resolveContactMethod(contactMethod, newType));
     closePickers();
   }
 
+  // Moving the start normally re-applies the type's default length. An end time
+  // added by hand is not a default, so it slides with the start instead of being
+  // discarded — otherwise the only way to correct a contact's start time is to
+  // re-enter its end time afterwards.
   function handleStartTimeChange(t: string) {
+    const keepDuration = hasOptionalEnd(type) && endTime !== startTime;
     setStartTime(t);
-    setEndTime(addMinutesToTimeString(t, resolvedDefaultMinutes(type, settings)));
+    setEndTime(addMinutesToTimeString(
+      t,
+      keepDuration ? minutesBetween(startTime, endTime) : resolvedDefaultMinutes(type, settings),
+    ));
     closePickers();
+  }
+
+  // End equal to start is how "no end time" is stored, so adding and removing one
+  // is just moving between that and a real duration.
+  function addEndTime() {
+    setEndTime(addMinutesToTimeString(startTime, ADDED_END_MINUTES));
+    setOpenPicker('end');
+  }
+
+  function removeEndTime() {
+    setEndTime(startTime);
+    closePickers();
+  }
+
+  function toggleAttendee(personId: string) {
+    setAttendees(prev =>
+      prev.includes(personId) ? prev.filter(id => id !== personId) : [...prev, personId]
+    );
   }
 
   // Each rule carries its own default span, so switching rules re-applies it.
@@ -277,6 +347,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           : undefined,
         excludedDates: recurring ? event?.excludedDates : undefined,
         backup: isBackup,
+        // undefined rather than [] / '' for the empty cases: toRow maps it to a
+        // null column, so clearing the last person off an event syncs as a clear.
+        people: attendees.length ? attendees : undefined,
+        contactMethod: usesContactMethod(type) ? contactMethod : undefined,
       });
       onClose();
     } catch (e) {
@@ -287,6 +361,25 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
   const fixed = isCheckboxType(type);
   const anyPickerOpen = openPicker !== null;
+  // An optional-end type with end === start has no end time yet; every other type
+  // always shows the picker, so a meal that happens to end when it starts is not
+  // mistaken for one still awaiting an end.
+  const endOmitted = hasOptionalEnd(type) && endTime === startTime;
+  const peopleById = useMemo(
+    () => new Map(allPeople.map(p => [p.id, p])),
+    [allPeople],
+  );
+  /**
+   * The marker the People tab would draw for this person.
+   *
+   * The fallback is a real runtime case despite the types: PERSON_STATUSES is a
+   * Record, so indexing it is typed as always finding something, but a person
+   * carrying a status this build no longer defines — or an id with no person
+   * behind it at all — lands here.
+   */
+  function statusConfigOf(candidate: Person | undefined): StatusConfig {
+    return PERSON_STATUSES[candidate?.status ?? ''] ?? { color: Colors.textLight, icon: 'ellipse', shape: 'dot' };
+  }
 
   function closePickers() {
     setOpenPicker(null);
@@ -368,7 +461,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         >
                           <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
                           <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
-                          {type === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                          {type === t && <Ionicons name="checkmark" size={16} color={Colors.control} />}
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -408,7 +501,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                       {TIME_OPTIONS.map((t, i) => (
                         <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
                           <Text style={styles.dropdownText}>{t}</Text>
-                          {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                          {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.control} />}
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -417,9 +510,31 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               </View>
             </View>
 
-            {!fixed && (
+            {!fixed && endOmitted && (
               <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
                 <Text style={styles.label}>End Time</Text>
+                <TouchableOpacity style={styles.picker} onPress={addEndTime}>
+                  <Ionicons name="add-circle-outline" size={16} color={Colors.control} style={{ marginRight: 6 }} />
+                  <Text style={[styles.pickerText, styles.pickerActionText]}>Add end time</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!fixed && !endOmitted && (
+              <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>End Time</Text>
+                  {hasOptionalEnd(type) && (
+                    <TouchableOpacity
+                      onPress={removeEndTime}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove end time"
+                    >
+                      <Ionicons name="close" size={16} color={Colors.textLight} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <View>
                   <TouchableOpacity style={styles.picker} onPress={() => togglePicker('end')}>
                     <Text style={styles.pickerText}>{endTime}</Text>
@@ -431,7 +546,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         {TIME_OPTIONS.map((t, i) => (
                           <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => { setEndTime(t); closePickers(); }}>
                             <Text style={styles.dropdownText}>{t}</Text>
-                            {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                            {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.control} />}
                           </TouchableOpacity>
                         ))}
                       </ScrollView>
@@ -441,6 +556,86 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               </View>
             )}
           </View>
+
+          {usesContactMethod(type) && (
+            <View style={[styles.section, styles.pickerRow, showMethodPicker && styles.openPickerRow]}>
+              <Text style={styles.label}>{methodFieldLabel(type)}</Text>
+              <View>
+                <TouchableOpacity style={styles.picker} onPress={() => togglePicker('method')}>
+                  <GoalIcon
+                    icon={CONTACT_METHODS[contactMethod].icon}
+                    iconFamily={CONTACT_METHODS[contactMethod].iconFamily}
+                    size={16}
+                    color={Colors.textSecondary}
+                  />
+                  <Text style={[styles.pickerText, { marginLeft: 8 }]}>{contactMethodLabel(contactMethod)}</Text>
+                  <Ionicons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                </TouchableOpacity>
+                {showMethodPicker && (
+                  <View style={[styles.dropdown, styles.dropdownFloating]}>
+                    {methodOptionsFor(type).map(m => (
+                      <TouchableOpacity
+                        key={m}
+                        style={styles.dropdownItem}
+                        onPress={() => { setContactMethod(m); closePickers(); }}
+                      >
+                        <GoalIcon
+                          icon={CONTACT_METHODS[m].icon}
+                          iconFamily={CONTACT_METHODS[m].iconFamily}
+                          size={16}
+                          color={Colors.textSecondary}
+                        />
+                        <Text style={[styles.dropdownText, { marginLeft: 8 }]}>{CONTACT_METHODS[m].label}</Text>
+                        {contactMethod === m && <Ionicons name="checkmark" size={16} color={Colors.control} />}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.section}>
+            <Text style={styles.label}>People</Text>
+            {attendees.length === 0 ? (
+              <Text style={styles.personEmpty}>No one added yet</Text>
+            ) : (
+              <View>
+                {attendees.map((id, i) => {
+                  const attendee = peopleById.get(id);
+                  return (
+                    <View key={id} style={[styles.personRow, i === 0 && styles.personRowFirst]}>
+                      <StatusIcon config={statusConfigOf(attendee)} size={18} style={styles.personIcon} />
+                      {/* A person deleted (or not yet synced) still has an id on the
+                          event; showing the gap is better than dropping them silently. */}
+                      <Text style={styles.personName} numberOfLines={1}>
+                        {attendee?.name ?? 'Unknown person'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => toggleAttendee(id)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${attendee?.name ?? 'this person'}`}
+                      >
+                        <Ionicons name="close" size={16} color={Colors.textLight} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          {/* Outside the card, on the sheet's background — the same footing
+              "Add a Goal" has under the goal list. */}
+          <TouchableOpacity
+            style={styles.addPersonBtn}
+            onPress={() => { closePickers(); setShowPersonPicker(true); }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add" size={18} color={Colors.goalTextAction} />
+            <Text style={styles.addPersonText}>Add Person</Text>
+          </TouchableOpacity>
 
           <View style={styles.section}>
             <Text style={styles.label}>Notes</Text>
@@ -461,7 +656,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               <Switch
                 value={recurring}
                 onValueChange={handleRecurringToggle}
-                trackColor={{ true: Colors.accent }}
+                trackColor={{ true: Colors.control }}
                 thumbColor={Colors.white}
               />
             </View>
@@ -488,7 +683,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                               <Text style={styles.dropdownText}>
                                 {rule.charAt(0).toUpperCase() + rule.slice(1)}
                               </Text>
-                              {recurringRule === rule && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
+                              {recurringRule === rule && <Ionicons name="checkmark" size={16} color={Colors.control} />}
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -547,7 +742,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               <Switch
                 value={isBackup}
                 onValueChange={setIsBackup}
-                trackColor={{ true: Colors.accent }}
+                trackColor={{ true: Colors.control }}
                 thumbColor={Colors.white}
               />
             </View>
@@ -565,6 +760,19 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/*
+          Nested inside this sheet for the reason UnreportedEventsModal spells
+          out: two Modals as siblings race to present from the same view
+          controller, while one declared within another's content presents from
+          that one and stacks. Selection only reaches the form on Done.
+        */}
+        <PersonPickerModal
+          visible={showPersonPicker}
+          selectedIds={attendees}
+          onConfirm={ids => { setAttendees(ids); setShowPersonPicker(false); }}
+          onClose={() => setShowPersonPicker(false)}
+        />
     </SheetModal>
   );
 }
@@ -622,8 +830,47 @@ function makeStyles(C: ColorPalette) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
     },
+    // The label plus a trailing affordance (the × that drops an optional end time),
+    // carrying the 8pt gap the bare label would otherwise supply itself.
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
     colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 8 },
     pickerText: { flex: 1, fontSize: 16, color: C.text },
+    // A picker row that adds something rather than showing a current value.
+    pickerActionText: { fontSize: 15, color: C.control, fontWeight: '500' },
+    // The People tab's row, scaled down to sit inside a form section: same
+    // status-marker-then-name reading, tighter type and spacing. It borrows the
+    // shape rather than the component because a row here removes rather than opens.
+    personEmpty: { fontSize: 14, color: C.textLight, paddingVertical: 2 },
+    personRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 9,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    personRowFirst: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+    },
+    personIcon: { marginRight: 10 },
+    personName: { flex: 1, fontSize: 15, color: C.text },
+    // Matches WeeklyPlanningModal's "Add a Goal" — the same centred ＋-and-label
+    // link sitting on the background below its card, since both open something
+    // rather than committing anything.
+    addPersonBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 4,
+      paddingVertical: 10,
+    },
+    addPersonText: { fontSize: 14, fontWeight: '700', color: C.goalTextAction },
     dropdown: {
       marginTop: 4,
       backgroundColor: C.background,
@@ -679,8 +926,8 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'center',
     },
     dayCircleActive: {
-      backgroundColor: C.accent,
-      borderColor: C.accent,
+      backgroundColor: C.control,
+      borderColor: C.control,
     },
     dayCircleText: {
       fontSize: 13,

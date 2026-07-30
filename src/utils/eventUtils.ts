@@ -18,7 +18,12 @@ export function defaultRecurrenceEnd(startDate: string, rule: RecurringRule): st
 
 export type EventStatus = 'completed' | 'failed' | 'pending';
 
-export const TRACKABLE_TYPES = new Set(['prayer', 'temple', 'church', 'scripture', 'exercise']);
+// Types that carry a reported status. Most of them feed a goal, but `contact`
+// deliberately does not: a contact is worth reporting on without being worth
+// counting, and getGoalContribution is free to return null for it.
+export const TRACKABLE_TYPES = new Set([
+  'prayer', 'temple', 'church', 'scripture', 'exercise', 'service', 'date', 'contact',
+]);
 
 export interface CalendarEvent {
   id: string;
@@ -27,8 +32,17 @@ export interface CalendarEvent {
   color: string;
   date: string;
   startTime: string;
+  /**
+   * Equal to `startTime` means the event has no duration — either because its
+   * type can't have one (checkbox types) or because none was given (an
+   * `optionalEnd` type such as contact). See hasEndTime().
+   */
   endTime: string;
   notes?: string;
+  /** Ids of the people this event involves, in the order they were added. */
+  people?: string[];
+  /** Contact events only: which channel the contact was made through. */
+  contactMethod?: string;
   recurring: boolean;
   recurringRule?: RecurringRule;
   /** Last date the series runs, inclusive. Undefined means it never ends. */
@@ -123,18 +137,55 @@ function eventBlockHeight(startTime: string, endTime: string, slotHeight: number
   return Math.max(eventHeight(startTime, endTime, slotHeight) - 1, slotHeight / 2 - 1);
 }
 
-// Checkbox events (task, prayer) render at a fixed compact size — a 30-minute block at the
-// smallest density — no matter the calendar's size setting or the event's own duration.
-const CHECKBOX_EVENT_HEIGHT = EventSizes.sm.slotHeight - 1;
+// Events with no duration render at a fixed compact size — a 30-minute block at the
+// smallest density — no matter the calendar's size setting. Exported because
+// EventBlock derives its padding from it: the padding that centres a title inside
+// this height is the padding every block gets.
+export const COMPACT_EVENT_HEIGHT = EventSizes.sm.slotHeight - 1;
 
 export function isCheckboxType(type: string): boolean {
   return EventTypeConfig[type]?.hasCheckbox ?? false;
 }
 
-// The pixel height a block should render at, honouring the fixed size for checkbox types.
+/** Whether this type may be saved without an end time rather than taking a default duration. */
+export function hasOptionalEnd(type: string): boolean {
+  return EventTypeConfig[type]?.optionalEnd ?? false;
+}
+
+/**
+ * Whether the event actually spans time.
+ *
+ * One rule for both ways an event can lack a duration: a checkbox type, which
+ * never has one, and an `optionalEnd` type left without one. Both are stored the
+ * same way — end equal to start — so both answer here rather than each caller
+ * asking about the type.
+ *
+ * Only exact equality counts. An event running to "12:00 AM" has an end that
+ * sorts *before* its start, and that midnight wrap is a real duration.
+ */
+export function hasEndTime(event: CalendarEvent): boolean {
+  return event.endTime !== event.startTime;
+}
+
+// The pixel height a block should render at. Anything with no duration gets the
+// same compact block, whether that's a checkbox type or a contact logged without
+// an end time — the alternative is eventHeight() reading end <= start as a
+// midnight wrap and drawing a 24-hour block.
 export function renderedEventHeight(event: CalendarEvent, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
-  if (isCheckboxType(event.type)) return CHECKBOX_EVENT_HEIGHT;
+  if (!hasEndTime(event)) return COMPACT_EVENT_HEIGHT;
   return eventBlockHeight(event.startTime, event.endTime, slotHeight);
+}
+
+/**
+ * An event's length in whole hours, floored at one.
+ *
+ * The rounding is what the hour-counting goals report, so church and service
+ * share it rather than each doing its own arithmetic: a 40-minute block is worth
+ * an hour to both, and neither can end up worth zero.
+ */
+function durationHours(event: CalendarEvent): number {
+  const mins = Math.max(0, timeToMinutes(event.endTime) - timeToMinutes(event.startTime));
+  return Math.max(1, Math.round(mins / 60));
 }
 
 export function getGoalContribution(event: CalendarEvent): { goalId: string; delta: number } | null {
@@ -145,14 +196,17 @@ export function getGoalContribution(event: CalendarEvent): { goalId: string; del
     }
     case 'temple':
       return { goalId: 'temple_attendance', delta: 1 };
-    case 'church': {
-      const mins = Math.max(0, timeToMinutes(event.endTime) - timeToMinutes(event.startTime));
-      return { goalId: 'church_hours', delta: Math.max(1, Math.round(mins / 60)) };
-    }
+    case 'church':
+      return { goalId: 'church_hours', delta: durationHours(event) };
+    case 'service':
+      return { goalId: 'service_hours', delta: durationHours(event) };
     case 'scripture':
       return { goalId: 'personal_study', delta: 1 };
     case 'exercise':
       return { goalId: 'times_exercised', delta: 1 };
+    case 'date':
+      return { goalId: 'total_dates', delta: 1 };
+    // contact is trackable but counts toward nothing — see TRACKABLE_TYPES.
     default:
       return null;
   }
@@ -276,22 +330,31 @@ export function deriveWeekGoalCounts(
   return totals;
 }
 
+/**
+ * Whether the event has started, and so is waiting on a report.
+ *
+ * The minute it starts on counts as started: an event at 2:14 is reportable from
+ * 2:14, not from 2:15. Both sides are minute-resolution, so the strict form left
+ * a one-minute hole where the event was under way and the app still said it
+ * hadn't begun — most visible on a contact logged at the moment it happened,
+ * which was created already in progress.
+ */
 export function hasEventStartPassed(event: CalendarEvent): boolean {
   const now = new Date();
   const todayStr = format(now, 'yyyy-MM-dd');
   if (event.date < todayStr) return true;
   if (event.date > todayStr) return false;
   const nowMins = now.getHours() * 60 + now.getMinutes();
-  return nowMins > timeToMinutes(event.startTime);
+  return nowMins >= timeToMinutes(event.startTime);
 }
 
-// Checkbox events (task, prayer) store no duration — their start and end times are equal.
-// For overlap/column packing they still need a footprint, so they occupy a slice matching
-// their fixed block size. This is layout geometry only; it is never their real time.
+// An event with no duration still needs a footprint for overlap/column packing,
+// so it occupies a slice matching its fixed block size. This is layout geometry
+// only; it is never its real time.
 const CHECKBOX_LAYOUT_MINUTES = 30;
 
 function layoutEndMinutes(event: CalendarEvent): number {
-  if (isCheckboxType(event.type)) return timeToMinutes(event.startTime) + CHECKBOX_LAYOUT_MINUTES;
+  if (!hasEndTime(event)) return timeToMinutes(event.startTime) + CHECKBOX_LAYOUT_MINUTES;
   return timeToMinutes(event.endTime);
 }
 

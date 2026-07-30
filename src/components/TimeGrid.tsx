@@ -203,6 +203,8 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
         ref={scrollViewRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
         scrollEventThrottle={16}
         onLayout={() => { measureViewport(); handleInitScroll(); }}
         onScroll={(e) => {

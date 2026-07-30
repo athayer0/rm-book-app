@@ -72,7 +72,7 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
         {unreported.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="checkmark-circle" size={48} color={Colors.statusCompleted} />
