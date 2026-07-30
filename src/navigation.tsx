@@ -4,12 +4,23 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from './hooks/useColors';
+import { withTabSwipe } from './components/TabSwipe';
 import { HomeScreen } from './screens/HomeScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { PeopleScreen } from './screens/PeopleScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
+
+// Which tabs answer to a horizontal swipe. Calendar is the deliberate omission:
+// it already owns that gesture for day navigation, so it can be swiped *to* from
+// either neighbour but only left through the tab bar.
+//
+// Wrapped at module scope — doing it inline in the render would hand
+// <Tab.Screen> a fresh component type on every pass and remount the screen.
+const HomeTab = withTabSwipe(HomeScreen);
+const PeopleTab = withTabSwipe(PeopleScreen);
+const SettingsTab = withTabSwipe(SettingsScreen);
 
 export function AppNavigation() {
   const Colors = useColors();
@@ -62,10 +73,10 @@ export function AppNavigation() {
           },
         })}
       >
-        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Home" component={HomeTab} />
         <Tab.Screen name="Calendar" component={CalendarScreen} />
-        <Tab.Screen name="People" component={PeopleScreen} />
-        <Tab.Screen name="Settings" component={SettingsScreen} />
+        <Tab.Screen name="People" component={PeopleTab} />
+        <Tab.Screen name="Settings" component={SettingsTab} />
       </Tab.Navigator>
     </NavigationContainer>
   );

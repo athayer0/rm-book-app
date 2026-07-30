@@ -12,6 +12,8 @@ TO DO
 [ ] make friends and districts, be able to view each others KIs
 [ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
 [ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
+[x] wiped the old local data and deleted the legacy-key migration - no more indicator_* keys or schema_version anywhere
+[ ] fold EXPORT_KEYS/EXPORT_PREFIXES in SettingsScreen into APP_DATA_KEYS/APP_DATA_PREFIXES in storageKeys - identical lists today, will drift the next time a key is added
 [ ] security audit
 [ ] dont get sued
 [ ] deploy to google play store
