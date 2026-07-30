@@ -1,5 +1,6 @@
 import { useCallback, createContext, useContext } from 'react';
 import { EventSize, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
+import { MapsApp, DEFAULT_MAPS_APP } from '../utils/mapUtils';
 import { SETTINGS_KEY } from '../constants/storageKeys';
 import { useStoredState } from './useStoredState';
 import { enqueueUpsert } from '../lib/syncQueue';
@@ -15,6 +16,8 @@ export interface AppSettings {
   eventSize: EventSize;
   /** Prepended to local numbers when building a WhatsApp link. */
   defaultCountryCode: string;
+  /** iOS only — Android opens addresses in Google Maps regardless. */
+  mapsApp: MapsApp;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -26,6 +29,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   gridEndHour: 24,
   eventSize: DEFAULT_EVENT_SIZE,
   defaultCountryCode: '+1',
+  mapsApp: DEFAULT_MAPS_APP,
 };
 
 type SettingsContextValue = {

@@ -18,6 +18,8 @@ export interface Person {
   whatsapp?: string;
   /** Whatever identifies the Facebook profile — see toMessengerHandle(). */
   messenger?: string;
+  /** Free text, handed to the maps app as typed — see toMapQuery(). */
+  address?: string;
   notes?: string;
   starred: boolean;
   createdAt: string;

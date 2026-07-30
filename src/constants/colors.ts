@@ -48,6 +48,9 @@ export const LightColors = {
   statusCompleted: '#1A7A40',
   statusFailed: '#B03030',
   statusPending: '#E8980E',
+  // The filled star on a favourited person. Amber rather than `control` so a
+  // favourite reads at a glance against a row of blue action glyphs.
+  favorite: '#E8980E',
 };
 
 export const DarkColors: typeof LightColors = {
@@ -86,6 +89,8 @@ export const DarkColors: typeof LightColors = {
   statusCompleted: '#3FB56B',
   statusFailed: '#E36A6A',
   statusPending: '#F5B33C',
+  // Same lift as statusPending: the light amber goes muddy on a dark card.
+  favorite: '#F5B33C',
 };
 
 export type ColorPalette = typeof LightColors;

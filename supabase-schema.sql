@@ -40,6 +40,10 @@ create table if not exists people (
   -- Parsed into an m.me handle client-side by
   -- toMessengerHandle() in phoneUtils.ts.
   messenger text,
+  -- Free-text postal address, opened in a maps
+  -- app as typed. Same NULL/'' convention as
+  -- the contact methods above.
+  address text,
   notes text,
   starred boolean default false,
   created_at timestamptz default now(),
@@ -54,6 +58,8 @@ alter table people
   add column if not exists whatsapp text;
 alter table people
   add column if not exists messenger text;
+alter table people
+  add column if not exists address text;
 alter table people enable row level security;
 drop policy if exists "users own their people"
   on people;
@@ -283,11 +289,17 @@ create table if not exists settings (
   event_type_default_minutes jsonb
     default '{}'::jsonb,
   default_country_code text default '+1',
+  -- iOS only: which app an address opens in.
+  -- Android always uses Google Maps.
+  maps_app text default 'apple',
   updated_at timestamptz default now()
 );
 alter table settings
   add column if not exists
   default_country_code text default '+1';
+alter table settings
+  add column if not exists
+  maps_app text default 'apple';
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

@@ -31,14 +31,15 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     eventTypeColors: 'event_type_colors',
     eventTypeDefaultMinutes: 'event_type_default_minutes',
     defaultCountryCode: 'default_country_code',
+    mapsApp: 'maps_app',
   },
 };
 
 /** Every column that actually exists on each table. Anything else is dropped. */
 const COLUMNS: Record<string, string[]> = {
   people: [
-    'user_id', 'id', 'name', 'status', 'phone', 'whatsapp', 'messenger', 'notes',
-    'starred', 'created_at', 'updated_at', 'deleted_at',
+    'user_id', 'id', 'name', 'status', 'phone', 'whatsapp', 'messenger', 'address',
+    'notes', 'starred', 'created_at', 'updated_at', 'deleted_at',
   ],
   calendar_events: [
     'user_id', 'id', 'title', 'type', 'color', 'date', 'start_time', 'end_time',
@@ -58,7 +59,7 @@ const COLUMNS: Record<string, string[]> = {
   settings: [
     'user_id', 'week_start', 'theme', 'grid_start_hour', 'grid_end_hour',
     'event_size', 'event_type_colors', 'event_type_default_minutes',
-    'default_country_code', 'updated_at',
+    'default_country_code', 'maps_app', 'updated_at',
   ],
 };
 

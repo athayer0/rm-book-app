@@ -20,6 +20,7 @@ import {
   callNumber, isFacebookShareLink, messageNumber, openMessenger, openWhatsApp,
   toDialable, toMessengerHandle,
 } from '../utils/phoneUtils';
+import { openMaps, toMapQuery } from '../utils/mapUtils';
 
 interface Props {
   visible: boolean;
@@ -39,6 +40,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   // null means the section is not on this person. '' means it is, but empty.
   const [whatsapp, setWhatsapp] = useState<string | null>(null);
   const [messenger, setMessenger] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [starred, setStarred] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -52,6 +54,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setPhone(person.phone ?? '');
       setWhatsapp(person.whatsapp ?? null);
       setMessenger(person.messenger ?? null);
+      setAddress(person.address ?? null);
       setNotes(person.notes ?? '');
       setStarred(person.starred);
     } else {
@@ -60,6 +63,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setPhone('');
       setWhatsapp(null);
       setMessenger(null);
+      setAddress(null);
       setNotes('');
       setStarred(false);
     }
@@ -73,6 +77,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const dialable = toDialable(phone);
   const whatsappDialable = toDialable(whatsapp);
   const messengerHandle = toMessengerHandle(messenger);
+  const mapQuery = toMapQuery(address);
 
   /**
    * Leave a note that a contact is being made, then hand off to the other app.
@@ -131,6 +136,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       // so the removal reaches the other devices instead of leaving a blank behind.
       whatsapp: whatsapp === null ? undefined : whatsapp.trim(),
       messenger: messenger === null ? undefined : messenger.trim(),
+      address: address === null ? undefined : address.trim(),
       notes: notes.trim(),
       starred,
     });
@@ -185,13 +191,31 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           )}
           <View style={styles.section}>
             <Text style={styles.label}>Name</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Full name"
-              placeholderTextColor={Colors.textLight}
-            />
+            <View style={styles.fieldRow}>
+              <TextInput
+                style={[styles.input, styles.fieldInput]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Full name"
+                placeholderTextColor={Colors.textLight}
+              />
+              {/* The favourite toggle lives on the name row rather than in a
+                  labelled section of its own — it is one bit about the person,
+                  and the filled star already says which way it is set. */}
+              <TouchableOpacity
+                onPress={() => setStarred(!starred)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: starred }}
+                accessibilityLabel={starred ? 'Remove from favorites' : 'Mark as favorite'}
+              >
+                <Ionicons
+                  name={starred ? 'star' : 'star-outline'}
+                  size={22}
+                  color={starred ? Colors.favorite : Colors.textLight}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={[styles.section, styles.pickerRow]}>
@@ -224,23 +248,10 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </View>
 
           <View style={styles.section}>
-            <TouchableOpacity style={styles.starRow} onPress={() => setStarred(!starred)}>
-              <Ionicons
-                name={starred ? 'star' : 'star-outline'}
-                size={20}
-                color={starred ? '#E8980E' : Colors.textLight}
-              />
-              <Text style={styles.starText}>
-                {starred ? 'Favorited' : 'Mark as favorite'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.section}>
             <Text style={styles.label}>Phone</Text>
-            <View style={styles.phoneRow}>
+            <View style={styles.fieldRow}>
               <TextInput
-                style={[styles.input, styles.phoneInput]}
+                style={[styles.input, styles.fieldInput]}
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="Phone number"
@@ -283,9 +294,9 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   <Ionicons name="close" size={18} color={Colors.textLight} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.phoneRow}>
+              <View style={styles.fieldRow}>
                 <TextInput
-                  style={[styles.input, styles.phoneInput]}
+                  style={[styles.input, styles.fieldInput]}
                   value={whatsapp}
                   onChangeText={setWhatsapp}
                   placeholder="WhatsApp number"
@@ -319,9 +330,9 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   <Ionicons name="close" size={18} color={Colors.textLight} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.phoneRow}>
+              <View style={styles.fieldRow}>
                 <TextInput
-                  style={[styles.input, styles.phoneInput]}
+                  style={[styles.input, styles.fieldInput]}
                   value={messenger}
                   onChangeText={setMessenger}
                   placeholder="Profile link or username"
@@ -399,6 +410,63 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   </View>
                 )}
               </View>
+            </View>
+          )}
+
+          {/* Address sits below the contact methods and their picker, so the
+              section it opens takes the place the button occupied rather than
+              appearing somewhere further up the form. */}
+          {address !== null && (
+            <View style={styles.section}>
+              <View style={styles.methodHeader}>
+                <Text style={styles.label}>Address</Text>
+                <TouchableOpacity
+                  onPress={() => setAddress(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove address"
+                >
+                  <Ionicons name="close" size={18} color={Colors.textLight} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.fieldRow}>
+                <TextInput
+                  style={[styles.input, styles.fieldInput]}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Street, city, state"
+                  placeholderTextColor={Colors.textLight}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+                {/* Not routed through contactVia: looking up where someone
+                    lives isn't a contact, and often isn't even a visit. */}
+                {mapQuery.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.contactBtn}
+                    onPress={() => openMaps(address, settings.mapsApp)}
+                    accessibilityRole="button"
+                    accessibilityLabel={name.trim() ? `Open ${name.trim()}’s address in Maps` : 'Open this address in Maps'}
+                  >
+                    <Ionicons name="location" size={19} color={Colors.control} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Its own row, not an entry in the dropdown above: there is only ever
+              one address, so there is nothing to choose between. */}
+          {address === null && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.addMethodRow}
+                onPress={() => setAddress('')}
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
+                <Text style={styles.addMethodText}>Add address</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -521,12 +589,14 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       paddingVertical: 4,
     },
-    phoneRow: {
+    // An input with its actions beside it — the name row's star, the phone
+    // row's call and message buttons, the address row's pin.
+    fieldRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
     },
-    phoneInput: {
+    fieldInput: {
       flex: 1,
     },
     fieldHint: {
@@ -618,15 +688,6 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
     },
     dropdownText: { flex: 1, fontSize: 15, color: C.text },
-    starRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    starText: {
-      fontSize: 15,
-      color: C.textSecondary,
-    },
     deleteBtn: {
       flexDirection: 'row',
       alignItems: 'center',

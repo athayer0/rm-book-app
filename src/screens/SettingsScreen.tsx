@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert, TextInput,
+  SafeAreaView, Alert, TextInput, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -18,6 +18,7 @@ import { isCheckboxType, hasOptionalEnd } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
 import { drainThenClear } from '../lib/localData';
 import { pullAll } from '../lib/sync';
+import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
@@ -305,6 +306,31 @@ export function SettingsScreen() {
             Used for WhatsApp numbers saved without a + code.
           </Text>
         </View>
+
+        {/* Maps — iOS only. Android has no choice to offer: an address there
+            always opens in Google Maps. */}
+        {Platform.OS === 'ios' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>MAPS</Text>
+            <View style={styles.card}>
+              {MAPS_APP_OPTIONS.map((option, i, arr) => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.row, i === arr.length - 1 && styles.rowLast]}
+                  onPress={() => updateSettings({ mapsApp: option.key })}
+                >
+                  <Text style={styles.rowLabel}>{option.label}</Text>
+                  {settings.mapsApp === option.key && (
+                    <Ionicons name="checkmark" size={18} color={Colors.control} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.sectionFootnote}>
+              Which app opens when you tap a person’s address.
+            </Text>
+          </View>
+        )}
 
         {/* Theme */}
         <View style={styles.section}>
