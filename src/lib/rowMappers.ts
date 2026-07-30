@@ -25,12 +25,14 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
   event_statuses: {},
   settings: {
     weekStart: 'week_start',
+    themeColor: 'theme_color',
     gridStartHour: 'grid_start_hour',
     gridEndHour: 'grid_end_hour',
     eventSize: 'event_size',
     eventTypeColors: 'event_type_colors',
     eventTypeDefaultMinutes: 'event_type_default_minutes',
     defaultCountryCode: 'default_country_code',
+    defaultContactMethod: 'default_contact_method',
     mapsApp: 'maps_app',
   },
 };
@@ -57,9 +59,9 @@ const COLUMNS: Record<string, string[]> = {
     'user_id', 'event_id', 'occurrence_date', 'status', 'updated_at', 'deleted_at',
   ],
   settings: [
-    'user_id', 'week_start', 'theme', 'grid_start_hour', 'grid_end_hour',
+    'user_id', 'week_start', 'theme', 'theme_color', 'grid_start_hour', 'grid_end_hour',
     'event_size', 'event_type_colors', 'event_type_default_minutes',
-    'default_country_code', 'maps_app', 'updated_at',
+    'default_country_code', 'default_contact_method', 'maps_app', 'updated_at',
   ],
 };
 

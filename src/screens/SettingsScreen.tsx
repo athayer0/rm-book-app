@@ -9,8 +9,10 @@ import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels, EventTypeConfig, SwatchColors } from '../constants/colors';
+import { EventColors, EventTypeLabels, EventTypeConfig, DEFAULT_THEME_COLOR } from '../constants/colors';
 import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize } from '../constants/eventSizes';
+import { GradientColorPicker } from '../components/GradientColorPicker';
+import { DurationSlider, durationLabel } from '../components/DurationSlider';
 import { useSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
@@ -20,8 +22,9 @@ import { drainThenClear } from '../lib/localData';
 import { isAppDataKey } from '../constants/storageKeys';
 import { pullAll } from '../lib/sync';
 import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
+import { CONTACT_METHODS, DEFAULT_CONTACT_METHOD, DEFAULT_METHOD_CHOICES } from '../constants/contactMethods';
+import { GoalIcon } from '../components/GoalIcon';
 
-const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
 const END_HOUR_OPTIONS = [21, 22, 23, 24];
 
@@ -30,8 +33,6 @@ function hourLabel(h: number): string {
   if (h === 12) return '12 PM';
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
-
-const COLOR_SWATCHES = SwatchColors;
 
 const EVENT_TYPES = Object.keys(EventColors);
 
@@ -46,6 +47,11 @@ export function SettingsScreen() {
   const [resetting, setResetting] = useState(false);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [hourDropdown, setHourDropdown] = useState<'start' | 'end' | null>(null);
+  const [methodDropdown, setMethodDropdown] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
+  const [colorResetOpen, setColorResetOpen] = useState(false);
+  // The types deliberately spared, so everything listed starts checked.
+  const [keptTypes, setKeptTypes] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
@@ -63,6 +69,10 @@ export function SettingsScreen() {
     }, 250);
   }
   const selectedEventSize = resolveEventSize(settings.eventSize);
+  // Settings persist, so a stored method may name a choice this build no longer has.
+  const selectedMethod = CONTACT_METHODS[settings.defaultContactMethod]
+    ? settings.defaultContactMethod
+    : DEFAULT_CONTACT_METHOD;
 
   async function handleSignOut() {
     const { cleared, pending } = await signOut();
@@ -142,6 +152,21 @@ export function SettingsScreen() {
 
   function setDuration(type: string, minutes: number) {
     updateSettings({ eventTypeDefaultMinutes: { ...settings.eventTypeDefaultMinutes, [type]: minutes } });
+  }
+
+  // A type is "customized" by what it resolves to, not by whether it has an
+  // override: one set back to the stock colour by hand has nothing to reset.
+  const customizedTypes = EVENT_TYPES.filter(type => effectiveColor(type) !== EventColors[type]);
+  const typesToReset = customizedTypes.filter(type => !keptTypes.includes(type));
+
+  function resetEventColors() {
+    // Deleting the override is the reset — effectiveColor then falls through to
+    // EventColors. Writing the stock colour in would leave it looking custom.
+    const next = { ...settings.eventTypeColors };
+    typesToReset.forEach(type => { delete next[type]; });
+    updateSettings({ eventTypeColors: next });
+    setColorResetOpen(false);
+    setKeptTypes([]);
   }
 
   return (
@@ -299,11 +324,64 @@ export function SettingsScreen() {
           </Text>
         </View>
 
+        {/* Default Contact Method. The section title names the setting, so the
+            row carries the value alone rather than repeating it as a label. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>DEFAULT CONTACT METHOD</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, !methodDropdown && styles.rowLast]}
+              onPress={() => setMethodDropdown(v => !v)}
+            >
+              <View style={styles.methodIcon}>
+                <GoalIcon
+                  icon={CONTACT_METHODS[selectedMethod].icon}
+                  iconFamily={CONTACT_METHODS[selectedMethod].iconFamily}
+                  size={18}
+                  color={Colors.textSecondary}
+                />
+              </View>
+              <Text style={styles.rowLabel}>{CONTACT_METHODS[selectedMethod].label}</Text>
+              <Ionicons
+                name={methodDropdown ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+              />
+            </TouchableOpacity>
+            {methodDropdown && (
+              <View style={[styles.dropdownList, styles.dropdownListLast]}>
+                {DEFAULT_METHOD_CHOICES.map((key, i, arr) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.dropdownItem, i === arr.length - 1 && styles.dropdownItemLast]}
+                    onPress={() => { updateSettings({ defaultContactMethod: key }); setMethodDropdown(false); }}
+                  >
+                    <View style={styles.methodIcon}>
+                      <GoalIcon
+                        icon={CONTACT_METHODS[key].icon}
+                        iconFamily={CONTACT_METHODS[key].iconFamily}
+                        size={18}
+                        color={selectedMethod === key ? Colors.control : Colors.textSecondary}
+                      />
+                    </View>
+                    <Text style={[styles.dropdownItemText, selectedMethod === key && styles.dropdownItemActive]}>
+                      {CONTACT_METHODS[key].label}
+                    </Text>
+                    {selectedMethod === key && (
+                      <Ionicons name="checkmark" size={16} color={Colors.control} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Maps — iOS only. Android has no choice to offer: an address there
             always opens in Google Maps. */}
         {Platform.OS === 'ios' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>MAPS</Text>
+            <Text style={styles.sectionTitle}>PREFERRED MAPS APP</Text>
             <View style={styles.card}>
               {MAPS_APP_OPTIONS.map((option, i, arr) => (
                 <TouchableOpacity
@@ -318,9 +396,6 @@ export function SettingsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.sectionFootnote}>
-              Which app opens when you tap a person’s address.
-            </Text>
           </View>
         )}
 
@@ -343,25 +418,61 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* App Color — `primary`, so this repaints every header, the active tab
+            pill and the calendar's now-line in one go. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>APP COLOR</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, !colorOpen && styles.rowLast]}
+              onPress={() => setColorOpen(v => !v)}
+            >
+              <View style={[styles.colorDot, { backgroundColor: Colors.primary }]} />
+              <Text style={styles.rowLabel}>App Color</Text>
+              <Text style={styles.rowValue}>{Colors.primary}</Text>
+              <Ionicons
+                name={colorOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+            {colorOpen && (
+              <View style={[styles.expandedPanel, styles.expandedPanelLast]}>
+                <GradientColorPicker
+                  color={Colors.primary}
+                  onChange={themeColor => updateSettings({ themeColor })}
+                />
+                <TouchableOpacity
+                  style={styles.resetColorBtn}
+                  onPress={() => updateSettings({ themeColor: DEFAULT_THEME_COLOR })}
+                >
+                  <Ionicons name="refresh" size={15} color={Colors.control} />
+                  <Text style={styles.resetColorText}>Reset to Default Color</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Event Types */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>EVENT TYPES</Text>
           <View style={styles.card}>
-            {EVENT_TYPES.map((type, i) => {
-              const isLast = i === EVENT_TYPES.length - 1;
+            {EVENT_TYPES.map(type => {
               const isExpanded = expandedType === type;
               const mins = effectiveMinutes(type);
               const color = effectiveColor(type);
               return (
                 <View key={type}>
                   <TouchableOpacity
-                    style={[styles.row, isLast && !isExpanded && styles.rowLast]}
+                    style={styles.row}
                     onPress={() => setExpandedType(isExpanded ? null : type)}
                   >
                     <View style={[styles.colorDot, { backgroundColor: color }]} />
                     <Text style={styles.rowLabel}>{EventTypeLabels[type]}</Text>
                     <Text style={styles.durationBadge}>
-                      {mins !== null ? `${mins} min` : hasOptionalEnd(type) ? 'Optional' : 'Fixed'}
+                      {mins !== null ? durationLabel(mins) : hasOptionalEnd(type) ? 'Optional' : 'Fixed'}
                     </Text>
                     <Ionicons
                       name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -372,53 +483,103 @@ export function SettingsScreen() {
                   </TouchableOpacity>
 
                   {isExpanded && (
-                    <View style={[styles.expandedPanel, isLast && styles.expandedPanelLast]}>
+                    <View style={styles.expandedPanel}>
                       <Text style={styles.panelLabel}>Color</Text>
-                      {[COLOR_SWATCHES.slice(0, 8), COLOR_SWATCHES.slice(8, 16)].map((row, ri) => (
-                        <View key={ri} style={styles.swatchGrid}>
-                          {row.map(swatch => (
-                            <TouchableOpacity
-                              key={swatch}
-                              style={[
-                                styles.swatch,
-                                { backgroundColor: swatch },
-                                color === swatch && styles.swatchSelected,
-                              ]}
-                              onPress={() => setColor(type, swatch)}
-                            />
-                          ))}
-                        </View>
-                      ))}
+                      <GradientColorPicker color={color} onChange={c => setColor(type, c)} />
 
-                      {mins !== null ? (
+                      {/* Types with no duration to set get no duration section —
+                          the collapsed row already says "Optional" or "Fixed". */}
+                      {mins !== null && (
                         <>
-                          <Text style={[styles.panelLabel, { marginTop: 12 }]}>Default Duration</Text>
-                          <View style={styles.pillRow}>
-                            {DURATION_OPTIONS.map(d => (
-                              <TouchableOpacity
-                                key={d}
-                                style={[styles.pill, mins === d && styles.pillActive]}
-                                onPress={() => setDuration(type, d)}
-                              >
-                                <Text style={[styles.pillText, mins === d && styles.pillTextActive]}>
-                                  {d < 60 ? `${d}m` : `${d / 60}h`}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
+                          <Text style={[styles.panelLabel, { marginTop: 16 }]}>Default Duration</Text>
+                          <DurationSlider minutes={mins} onChange={d => setDuration(type, d)} />
                         </>
-                      ) : (
-                        <Text style={styles.fixedLabel}>
-                          {hasOptionalEnd(type)
-                            ? 'No end time unless you add one'
-                            : 'Fixed – 15 min block'}
-                        </Text>
                       )}
                     </View>
                   )}
                 </View>
               );
             })}
+
+            {/* Reset colors. Lists only the types actually off their default —
+                the rest have nothing to undo, and padding the list with them
+                would hide the ones that do behind fourteen no-ops. */}
+            <TouchableOpacity
+              style={[styles.row, !colorResetOpen && styles.rowLast]}
+              disabled={customizedTypes.length === 0}
+              onPress={() => { setColorResetOpen(v => !v); setKeptTypes([]); }}
+            >
+              <Text
+                style={[
+                  styles.rowLabel,
+                  { color: customizedTypes.length ? Colors.control : Colors.textLight },
+                ]}
+              >
+                Reset Colors to Default
+              </Text>
+              {customizedTypes.length === 0 ? (
+                <Text style={styles.rowValue}>All default</Text>
+              ) : (
+                <Ionicons
+                  name={colorResetOpen ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                />
+              )}
+            </TouchableOpacity>
+
+            {colorResetOpen && customizedTypes.length > 0 && (
+              <View style={[styles.expandedPanel, styles.expandedPanelLast]}>
+                <Text style={styles.panelLabel}>Uncheck any you want to keep</Text>
+                {customizedTypes.map(type => {
+                  const checked = !keptTypes.includes(type);
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      style={styles.resetItem}
+                      onPress={() =>
+                        setKeptTypes(prev =>
+                          prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name={checked ? 'checkbox' : 'square-outline'}
+                        size={20}
+                        color={checked ? Colors.control : Colors.textLight}
+                      />
+                      <View style={[styles.colorDot, { backgroundColor: effectiveColor(type), marginLeft: 10 }]} />
+                      <Text style={styles.resetItemLabel}>{EventTypeLabels[type]}</Text>
+                      {/* The colour it would go back to, so the choice is visible
+                          rather than something you have to remember. */}
+                      <View style={[styles.colorDot, { backgroundColor: EventColors[type], marginRight: 0 }]} />
+                    </TouchableOpacity>
+                  );
+                })}
+
+                <TouchableOpacity
+                  style={[styles.resetColorBtn, typesToReset.length === 0 && styles.resetColorBtnDisabled]}
+                  disabled={typesToReset.length === 0}
+                  onPress={resetEventColors}
+                >
+                  <Ionicons
+                    name="refresh"
+                    size={15}
+                    color={typesToReset.length ? Colors.control : Colors.textLight}
+                  />
+                  <Text
+                    style={[
+                      styles.resetColorText,
+                      typesToReset.length === 0 && { color: Colors.textLight },
+                    ]}
+                  >
+                    {typesToReset.length === 1
+                      ? 'Reset 1 Color'
+                      : `Reset ${typesToReset.length} Colors`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
 
@@ -439,7 +600,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset all event colors, default durations, schedule hours, event size, and the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
+                  'This will reset the app color, all event colors, default durations, the default contact method, schedule hours, event size, and the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
@@ -447,6 +608,8 @@ export function SettingsScreen() {
                       style: 'destructive',
                       onPress: () => {
                         updateSettings({
+                          themeColor: DEFAULT_THEME_COLOR,
+                          defaultContactMethod: DEFAULT_CONTACT_METHOD,
                           eventTypeColors: {},
                           eventTypeDefaultMinutes: {},
                           gridStartHour: 6,
@@ -578,7 +741,7 @@ function makeStyles(C: ColorPalette) {
       minHeight: 60,
       backgroundColor: C.primary,
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
     scroll: { flex: 1, backgroundColor: C.background },
     section: { marginTop: 20, paddingHorizontal: 16 },
     sectionTitle: {
@@ -625,15 +788,19 @@ function makeStyles(C: ColorPalette) {
       marginLeft: 4,
     },
     colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
+    // Fixed width so the labels line up despite the glyphs differing in width.
+    methodIcon: { width: 24, alignItems: 'center', marginRight: 6 },
     durationBadge: {
       fontSize: 12,
       color: C.textLight,
       marginRight: 4,
     },
+    // Everything that opens out of a row stays on the card's own surface — the
+    // hairline rules and the indent separate it, not a change of background.
     expandedPanel: {
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: C.background,
+      backgroundColor: C.card,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
     },
@@ -648,41 +815,29 @@ function makeStyles(C: ColorPalette) {
       letterSpacing: 0.5,
       marginBottom: 8,
     },
-    swatchGrid: {
+    // Undoes a colour choice only, so it reads as an action rather than taking
+    // the red the destructive Data rows use.
+    resetColorBtn: {
       flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      marginBottom: 6,
-    },
-    swatch: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    swatchSelected: {
-      borderColor: C.text,
-    },
-    pillRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    pill: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      alignSelf: 'center',
+      marginTop: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: C.border,
-      backgroundColor: C.card,
-    },
-    pillActive: {
       borderColor: C.control,
-      backgroundColor: C.control + '20',
     },
-    pillText: { fontSize: 13, color: C.textSecondary },
-    pillTextActive: { color: C.control, fontWeight: '600' },
+    resetColorText: { fontSize: 13, fontWeight: '600', color: C.control },
+    resetColorBtnDisabled: { borderColor: C.border },
+    resetItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 9,
+    },
+    resetItemLabel: { flex: 1, fontSize: 15, color: C.text },
     dropdownList: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
@@ -697,7 +852,7 @@ function makeStyles(C: ColorPalette) {
       paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
-      backgroundColor: C.background,
+      backgroundColor: C.card,
     },
     dropdownItemLast: {
       borderBottomWidth: 0,
@@ -710,12 +865,6 @@ function makeStyles(C: ColorPalette) {
     dropdownItemActive: {
       color: C.control,
       fontWeight: '600',
-    },
-    fixedLabel: {
-      fontSize: 13,
-      color: C.textLight,
-      marginTop: 4,
-      fontStyle: 'italic',
     },
     scriptureRow: {
       flexDirection: 'column',

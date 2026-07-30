@@ -119,7 +119,7 @@ function makeStyles(C: ColorPalette) {
     dayCellSelected: { backgroundColor: C.primary, borderRadius: 18 },
     dayText: { fontSize: 13, color: C.text },
     dayTextToday: { color: C.primary, fontWeight: '700' },
-    dayTextSelected: { color: C.white, fontWeight: '700' },
+    dayTextSelected: { color: C.onPrimary, fontWeight: '700' },
     dayTextDisabled: { color: C.textLight, opacity: 0.4 },
   });
 }

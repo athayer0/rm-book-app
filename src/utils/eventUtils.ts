@@ -132,13 +132,17 @@ function eventHeight(startTime: string, endTime: string, slotHeight: number = DE
 }
 
 // The rendered height of a block, minus the 1px gap that separates neighbours.
-// Floored at a 15-minute row so the shortest events stay tappable at any density.
+// Floored at COMPACT_EVENT_HEIGHT: a short event is drawn no smaller than a
+// contact or a task, which is the least a block can be and still be read and
+// tapped. At the larger densities a 15-minute block already clears that, so the
+// floor only binds on the smaller ones.
 function eventBlockHeight(startTime: string, endTime: string, slotHeight: number = DEFAULT_SLOT_HEIGHT): number {
-  return Math.max(eventHeight(startTime, endTime, slotHeight) - 1, slotHeight / 2 - 1);
+  return Math.max(eventHeight(startTime, endTime, slotHeight) - 1, COMPACT_EVENT_HEIGHT);
 }
 
-// Events with no duration render at a fixed compact size — a 30-minute block at the
-// smallest density — no matter the calendar's size setting. Exported because
+// The smallest a block ever gets: what an event with no duration renders at — a
+// contact logged without an end time, or a task — whatever the calendar's size
+// setting, and the floor under every other block too. Exported because
 // EventBlock derives its padding from it: the padding that centres a title inside
 // this height is the padding every block gets.
 export const COMPACT_EVENT_HEIGHT = EventSizes.sm.slotHeight - 1;
@@ -190,6 +194,9 @@ function durationHours(event: CalendarEvent): number {
 
 export function getGoalContribution(event: CalendarEvent): { goalId: string; delta: number } | null {
   switch (event.type) {
+    // Which of the two prayer goals a prayer counts toward is decided by when it
+    // starts, not how long it ran: a prayer is one prayer whatever its duration,
+    // and 2pm is the line between the morning one and the nightly one.
     case 'prayer': {
       const { hour } = parseTime(event.startTime);
       return { goalId: hour < 14 ? 'morning_prayer' : 'nightly_prayer', delta: 1 };
@@ -243,10 +250,10 @@ export const UNREPORTED_LOOKBACK_DAYS = 30;
  * same value. Callers that need to know whether something is outstanding ask this
  * rather than reassembling it from a type check, a clock check and a status check.
  *
- * Deliberately says nothing about how the state is drawn. A prayer renders a
+ * Deliberately says nothing about how the state is drawn. A task renders a
  * checkbox rather than a badge, but it is still pending until it is ticked, and
  * letting that presentation choice reach back into the meaning is what previously
- * forced the unreported sweep to special-case prayers and tasks.
+ * forced the unreported sweep to special-case checkbox types.
  *
  * Types that cannot be reported resolve to undefined even if a status is somehow
  * stored against them — there is no UI that can produce one, and a status on an

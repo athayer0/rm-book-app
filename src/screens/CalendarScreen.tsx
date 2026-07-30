@@ -194,18 +194,18 @@ function CalendarContent() {
           <Text style={styles.headerDate}>{format(selectedDate, 'MMM d')}</Text>
           <Text style={styles.headerYear}>{format(selectedDate, 'yyyy')}</Text>
           <TouchableOpacity onPress={() => setShowMonthPicker(v => !v)} style={styles.chevronBtn}>
-            <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.85)" />
+            <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.onPrimaryMuted} />
           </TouchableOpacity>
           <TouchableOpacity onPress={goToToday} style={styles.calendarIconBtn}>
-            <Ionicons name="calendar-outline" size={20} color="rgba(255,255,255,0.85)" />
+            <Ionicons name="calendar-outline" size={20} color={Colors.onPrimaryMuted} />
           </TouchableOpacity>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setSelectedDate(d => subDays(d, 1))} style={styles.navBtn}>
-            <Ionicons name="chevron-back" size={22} color={Colors.white} />
+            <Ionicons name="chevron-back" size={22} color={Colors.onPrimary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setSelectedDate(d => addDays(d, 1))} style={styles.navBtn}>
-            <Ionicons name="chevron-forward" size={22} color={Colors.white} />
+            <Ionicons name="chevron-forward" size={22} color={Colors.onPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -381,11 +381,11 @@ function makeStyles(C: ColorPalette) {
     headerDate: {
       fontSize: 20,
       fontWeight: '700',
-      color: C.white,
+      color: C.onPrimary,
     },
     headerYear: {
       fontSize: 14,
-      color: 'rgba(255,255,255,0.7)',
+      color: C.onPrimaryMuted,
       fontWeight: '400',
     },
     calendarIconBtn: {
@@ -469,7 +469,8 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '700',
     },
     pickerDayTextSelected: {
-      color: C.white,
+      // Sits on a `primary` pill, so it follows the theme colour's ink.
+      color: C.onPrimary,
       fontWeight: '700',
     },
     gridContainer: {

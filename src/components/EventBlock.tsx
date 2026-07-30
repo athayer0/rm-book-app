@@ -102,7 +102,7 @@ export function EventBlock({
   const isBeingDragged = active && draggingEvent?.id === event.id;
 
   const isBackup = !!event.backup;
-  // Checkbox types (task, prayer) carry a binary checked/unchecked status instead of the
+  // Checkbox types (task) carry a binary checked/unchecked status instead of the
   // three-state badge, and only when they aren't a backup.
   const isCheckbox = !isBackup && isCheckboxType(event.type);
   const isChecked = status === 'completed';

@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 
-// The check/uncheck box used by checkbox events (task, prayer), both on the calendar block
+// The check/uncheck box used by checkbox events (task), both on the calendar block
 // and in the edit modal. `color` is the event type's own colour: unchecked is a plain square
 // outlined in it with nothing inside; checked fills the box with it and shows a white check.
 export function StatusCheckbox({ checked, size, color }: { checked: boolean; size: number; color: string }) {

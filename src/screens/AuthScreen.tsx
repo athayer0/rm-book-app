@@ -77,7 +77,7 @@ export function AuthScreen() {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color={Colors.white} />
+          <ActivityIndicator color={Colors.onPrimary} />
         ) : (
           <Text style={styles.buttonText}>
             {mode === 'signin' ? 'Sign In' : 'Create Account'}
@@ -138,7 +138,7 @@ function makeStyles(C: ColorPalette) {
       marginBottom: 16,
     },
     buttonText: {
-      color: C.white,
+      color: C.onPrimary,
       fontSize: 16,
       fontWeight: '600',
     },

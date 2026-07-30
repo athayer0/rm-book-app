@@ -149,7 +149,7 @@ function makeStyles(C: ColorPalette) {
     headerTitle: {
       fontSize: 20,
       fontWeight: '700',
-      color: C.white,
+      color: C.onPrimary,
     },
     scroll: {
       flex: 1,

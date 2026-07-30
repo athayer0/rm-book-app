@@ -12,7 +12,7 @@ import {
   isCheckboxType, hasOptionalEnd, resolveEventStatus,
 } from '../utils/eventUtils';
 import {
-  CONTACT_METHODS, DEFAULT_CONTACT_METHOD, contactMethodLabel, methodFieldLabel,
+  CONTACT_METHODS, contactMethodLabel, methodFieldLabel,
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
 import { InlineDatePicker } from '../components/InlineDatePicker';
@@ -66,7 +66,7 @@ function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
 }
 
-// Checkbox events (task, prayer) have no duration, so they contribute no minutes; every
+// Checkbox events (task) have no duration, so they contribute no minutes; every
 // other type falls back to its configured default. No type is treated as a 15-minute event.
 // An optional-end type starts at zero too — it gets an end only if one is asked for.
 function resolvedDefaultMinutes(type: string, settings: AppSettings): number {
@@ -126,7 +126,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [isBackup, setIsBackup] = useState(false);
   const [attendees, setAttendees] = useState<string[]>([]);
-  const [contactMethod, setContactMethod] = useState(DEFAULT_CONTACT_METHOD);
+  const [contactMethod, setContactMethod] = useState(settings.defaultContactMethod);
   // One picker open at a time — a single value makes that structural instead of
   // something six separate booleans have to agree on.
   const [openPicker, setOpenPicker] = useState<PickerId | null>(null);
@@ -180,7 +180,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setRecurringDays([]);
       setIsBackup(false);
       setAttendees(prefill?.people ?? []);
-      setContactMethod(resolveContactMethod(prefill?.contactMethod, initialType));
+      // New event, so the user's default seeds it — unlike the branch above,
+      // where an existing event's stored method is the whole answer.
+      setContactMethod(resolveContactMethod(prefill?.contactMethod, initialType, settings.defaultContactMethod));
     }
     setOpenPicker(null);
     setShowPersonPicker(false);
@@ -235,7 +237,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     setEndTime(addMinutesToTimeString(startTime, resolvedDefaultMinutes(newType, settings)));
     // Types offer different methods, so a retype can strand the current one on a
     // list that no longer contains it.
-    setContactMethod(resolveContactMethod(contactMethod, newType));
+    // Retyping is a fresh choice of method, so the default applies again: the
+    // current one carries over only where the new type also offers it.
+    setContactMethod(resolveContactMethod(contactMethod, newType, settings.defaultContactMethod));
     closePickers();
   }
 

@@ -51,6 +51,7 @@ Colors are entirely dynamic — **every component resolves its palette at render
 
 - `src/constants/colors.ts` exports `LightColors`, `DarkColors`, and the `ColorPalette` type.
 - `src/hooks/useColors.ts` — call `const Colors = useColors()` inside every component. It reads `settings.theme` ('light' | 'dark' | 'system') and React Native's `useColorScheme()` for system detection.
+- `primary` is user-chosen (`settings.themeColor`, picked on the Settings screen), so `useColors` overrides it on top of the base palette. **Anything drawn on a `primary` background must use `onPrimary` / `onPrimaryMuted`, never `white`** — those two are recomputed from the chosen colour's luminance, so a pale header gets dark lettering instead of invisible white. The returned palette is memoized on `[isDark, themeColor]`; keep it that way, since every `useMemo(() => makeStyles(Colors), [Colors])` in the tree depends on the reference being stable.
 - Styles must be computed inside the component: `const styles = useMemo(() => makeStyles(Colors), [Colors])` with a module-level `function makeStyles(C: ColorPalette) { return StyleSheet.create({...}); }`.
 
 **Dark mode requirements — apply to every visual change:**

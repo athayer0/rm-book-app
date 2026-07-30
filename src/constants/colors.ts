@@ -1,5 +1,18 @@
+/**
+ * The maroon the app shipped with. `primary` is now a setting, so this is only
+ * the starting point — `useColors` swaps in the user's choice, and everything
+ * that reads `primary` (headers, the active tab pill, the now-line) follows.
+ */
+export const DEFAULT_THEME_COLOR = '#8B1A4A';
+
 export const LightColors = {
-  primary: '#8B1A4A',
+  primary: DEFAULT_THEME_COLOR,
+  // Ink for anything sitting on `primary`: header titles, the active tab icon.
+  // `useColors` recomputes both from the chosen theme colour's luminance, so a
+  // pale header gets dark lettering instead of unreadable white. The values here
+  // are what the default maroon resolves to.
+  onPrimary: '#FFFFFF',
+  onPrimaryMuted: 'rgba(255, 255, 255, 0.8)',
   // Cyan, now reserved for committing and emphasis: Save, Done, EDIT, and the
   // goal counts. Everything that merely selects or toggles uses `control`.
   accent: '#00B5C8',
@@ -54,7 +67,11 @@ export const LightColors = {
 };
 
 export const DarkColors: typeof LightColors = {
-  primary: '#8B1A4A',
+  // Not lifted for dark mode: the header is a filled band, so it carries its own
+  // contrast, and the user picks this colour to be the same in both themes.
+  primary: DEFAULT_THEME_COLOR,
+  onPrimary: '#FFFFFF',
+  onPrimaryMuted: 'rgba(255, 255, 255, 0.8)',
   accent: '#00B5C8',
   control: '#8AAFC8',
   background: '#111111',
@@ -95,9 +112,11 @@ export const DarkColors: typeof LightColors = {
 
 export type ColorPalette = typeof LightColors;
 
-// The palette offered by every colour picker (goal icons, event types). Ordered by hue —
-// red through violet — with the low-saturation browns and grey trailing, since they have
-// no place on the spectrum. Rendered as two rows of eight.
+// The stock colours: what the built-in event types and goals are born with, and
+// where a new goal's colour starts. No longer a picker — colours are chosen off a
+// gradient now — so this is a set of defaults rather than the set of choices.
+// Ordered by hue, red through violet, with the low-saturation browns and grey
+// trailing, since they have no place on the spectrum.
 export const SwatchColors: string[] = [
   '#E74C3C', // red
   '#E05C6B', // rose
@@ -122,8 +141,8 @@ export const SwatchColors: string[] = [
 // EventTypeConfig are kept in the same order so the three read as one table.
 //
 // The order tracks each type's colour through SwatchColors — warm through cool,
-// then the browns and greys — so the picker reads as a spectrum rather than an
-// arbitrary list. A new type belongs wherever its swatch falls, not at the end.
+// then the browns and greys — so the list reads as a spectrum rather than an
+// arbitrary order. A new type belongs wherever its colour falls, not at the end.
 export const EventColors: Record<string, string> = {
   church:    '#E05C6B',
   travel:    '#800000',
@@ -167,7 +186,7 @@ export const EventTypeLabels: Record<string, string> = {
  * from 2:14 to 2:31, it just usually isn't worth saying so.
  */
 export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckbox: boolean; optionalEnd?: boolean }> = {
-  church:    { defaultMinutes: 30, hasCheckbox: false },
+  church:    { defaultMinutes: 120, hasCheckbox: false },
   travel:    { defaultMinutes: 30, hasCheckbox: false },
   meal:      { defaultMinutes: 30, hasCheckbox: false },
   activity:  { defaultMinutes: 30, hasCheckbox: false },
@@ -176,8 +195,8 @@ export const EventTypeConfig: Record<string, { defaultMinutes: number; hasCheckb
   work:      { defaultMinutes: 30, hasCheckbox: false },
   service:   { defaultMinutes: 30, hasCheckbox: false },
   school:    { defaultMinutes: 30, hasCheckbox: false },
-  temple:    { defaultMinutes: 30, hasCheckbox: false },
-  prayer:    { defaultMinutes: 0, hasCheckbox: true },
+  temple:    { defaultMinutes: 120, hasCheckbox: false },
+  prayer:    { defaultMinutes: 15, hasCheckbox: false },
   scripture: { defaultMinutes: 30, hasCheckbox: false },
   task:      { defaultMinutes: 0, hasCheckbox: true },
   exercise:  { defaultMinutes: 30, hasCheckbox: false },

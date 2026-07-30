@@ -12,9 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { GoalDefinition } from '../constants/defaultGoals';
 import { GoalIcon } from '../components/GoalIcon';
 import { IconPicker, ICON_OPTIONS, IconOption } from '../components/IconPicker';
+import { GradientColorPicker } from '../components/GradientColorPicker';
 import { SheetModal } from '../components/SheetModal';
 
-const COLOR_OPTIONS = SwatchColors;
+/** Where a new goal's colour starts before the picker is touched. */
+const NEW_GOAL_COLOR = SwatchColors[0];
 
 interface Props {
   visible: boolean;
@@ -31,7 +33,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   const [localDefs, setLocalDefs] = useState<GoalDefinition[]>(definitions);
   const [newName, setNewName] = useState('');
   const [selectedIconOpt, setSelectedIconOpt] = useState<IconOption>(ICON_OPTIONS[0]);
-  const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
+  const [selectedColor, setSelectedColor] = useState(NEW_GOAL_COLOR);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -47,7 +49,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
       setLocalDefs(definitions);
       setNewName('');
       setSelectedIconOpt(ICON_OPTIONS[0]);
-      setSelectedColor(COLOR_OPTIONS[0]);
+      setSelectedColor(NEW_GOAL_COLOR);
       setExpandedId(null);
       setAddOpen(false);
     }
@@ -84,7 +86,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
     setLocalDefs(prev => [...prev, newDef]);
     setNewName('');
     setSelectedIconOpt(ICON_OPTIONS[0]);
-    setSelectedColor(COLOR_OPTIONS[0]);
+    setSelectedColor(NEW_GOAL_COLOR);
     setAddOpen(false);
   }
 
@@ -184,25 +186,10 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
                     />
 
                     <Text style={styles.pickerLabel}>Color</Text>
-                    {[COLOR_OPTIONS.slice(0, 8), COLOR_OPTIONS.slice(8, 16)].map((row, ri) => (
-                      <View key={ri} style={styles.colorRow}>
-                        {row.map(color => (
-                          <TouchableOpacity
-                            key={color}
-                            onPress={() => patchGoal(def.id, { color })}
-                            style={[
-                              styles.colorDot,
-                              { backgroundColor: color },
-                              def.color === color && styles.colorDotSelected,
-                            ]}
-                          >
-                            {def.color === color && (
-                              <Ionicons name="checkmark" size={13} color="#fff" />
-                            )}
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    ))}
+                    <GradientColorPicker
+                      color={def.color}
+                      onChange={color => patchGoal(def.id, { color })}
+                    />
                   </View>
                 )}
               </View>
@@ -244,25 +231,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
           />
 
           <Text style={styles.pickerLabel}>Color</Text>
-          {[COLOR_OPTIONS.slice(0, 8), COLOR_OPTIONS.slice(8, 16)].map((row, ri) => (
-            <View key={ri} style={styles.colorRow}>
-              {row.map(color => (
-                <TouchableOpacity
-                  key={color}
-                  onPress={() => setSelectedColor(color)}
-                  style={[
-                    styles.colorDot,
-                    { backgroundColor: color },
-                    selectedColor === color && styles.colorDotSelected,
-                  ]}
-                >
-                  {selectedColor === color && (
-                    <Ionicons name="checkmark" size={13} color="#fff" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
+          <GradientColorPicker color={selectedColor} onChange={setSelectedColor} />
 
           <TouchableOpacity
             style={[styles.addBtn, !newName.trim() && styles.addBtnDisabled]}
@@ -411,23 +380,6 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '600',
       color: C.textSecondary,
       marginBottom: 8,
-    },
-    colorRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 6,
-      marginBottom: 6,
-    },
-    colorDot: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    colorDotSelected: {
-      borderWidth: 2,
-      borderColor: C.text,
     },
     addBtn: {
       flexDirection: 'row',

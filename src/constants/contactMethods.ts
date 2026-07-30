@@ -25,7 +25,7 @@ export const CONTACT_METHODS: Record<string, ContactMethodConfig> = {
 
 /**
  * Which methods each event type offers, in dropdown order. The first entry is
- * that type's default, so both lists lead with in_person.
+ * that type's fallback — what it lands on when nothing else applies.
  *
  * Membership here is also what decides whether a type has a method at all — a
  * type absent from this table shows no picker and stores nothing.
@@ -35,7 +35,20 @@ const METHOD_OPTIONS_BY_TYPE: Record<string, string[]> = {
   date: ['in_person', 'video', 'other'],
 };
 
-export const DEFAULT_CONTACT_METHOD = 'in_person';
+/** What a new contact starts as before the user has chosen otherwise. */
+export const DEFAULT_CONTACT_METHOD = 'phone';
+
+/** The choices the setting offers — a contact's own list, since that is what it governs. */
+export const DEFAULT_METHOD_CHOICES = METHOD_OPTIONS_BY_TYPE.contact;
+
+/**
+ * Types the user's default applies to.
+ *
+ * Contacts only. A date's "how" is really what kind of date it was — a different
+ * question off a different list, so it keeps its own first entry however the
+ * contact default is set.
+ */
+const PREFERENCE_APPLIES_TO = new Set(['contact']);
 
 export function usesContactMethod(type: string): boolean {
   return type in METHOD_OPTIONS_BY_TYPE;
@@ -60,10 +73,22 @@ export function contactMethodLabel(method: string | undefined): string {
  * Falls back rather than returning undefined, so callers never render a blank
  * row. Checking against the type's own options is what handles retyping: a
  * contact made on WhatsApp that is changed into a date can't stay a WhatsApp
- * date, so it lands on that type's default instead.
+ * date, so it lands on that type's fallback instead.
+ *
+ * `preferred` is the user's setting, and callers pass it only where it belongs:
+ * seeding a method the user has yet to choose. Reading an event that already has
+ * one back out is not that — a stored method wins outright, and an event saved
+ * before the field existed keeps answering the same way rather than shifting
+ * because a preference about new events changed.
  */
-export function resolveContactMethod(method: string | undefined, type: string): string {
+export function resolveContactMethod(
+  method: string | undefined,
+  type: string,
+  preferred?: string,
+): string {
   const options = methodOptionsFor(type);
   if (options.length === 0) return DEFAULT_CONTACT_METHOD;
-  return method && options.includes(method) ? method : options[0];
+  if (method && options.includes(method)) return method;
+  if (preferred && PREFERENCE_APPLIES_TO.has(type) && options.includes(preferred)) return preferred;
+  return options[0];
 }

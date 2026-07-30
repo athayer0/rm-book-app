@@ -116,7 +116,7 @@ export function PeopleScreen() {
             onPress={() => setShowFilterDropdown(v => !v)}
             activeOpacity={0.7}
           >
-            <Ionicons name="options-outline" size={26} color={Colors.white} />
+            <Ionicons name="options-outline" size={26} color={Colors.onPrimary} />
           </TouchableOpacity>
 
           {showFilterDropdown && (
@@ -249,7 +249,7 @@ function makeStyles(C: ColorPalette) {
       zIndex: 20,
       elevation: 20,
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
     filterChip: {
       width: 36,
       height: 36,

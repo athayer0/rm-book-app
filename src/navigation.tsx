@@ -55,7 +55,7 @@ export function AppNavigation() {
                 <Ionicons
                   name={iconName as any}
                   size={22}
-                  color={focused ? Colors.white : Colors.tabBarInactive}
+                  color={focused ? Colors.onPrimary : Colors.tabBarInactive}
                 />
               </View>
             );

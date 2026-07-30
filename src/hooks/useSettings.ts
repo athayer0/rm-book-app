@@ -1,4 +1,6 @@
 import { useCallback, createContext, useContext } from 'react';
+import { DEFAULT_THEME_COLOR } from '../constants/colors';
+import { DEFAULT_CONTACT_METHOD } from '../constants/contactMethods';
 import { EventSize, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 import { MapsApp, DEFAULT_MAPS_APP } from '../utils/mapUtils';
 import { SETTINGS_KEY } from '../constants/storageKeys';
@@ -9,6 +11,8 @@ import { useAuth } from '../lib/AuthContext';
 export interface AppSettings {
   weekStart: 'sunday' | 'monday';
   theme: 'light' | 'dark' | 'system';
+  /** Drives `primary` — the header band and everything else tinted with it. */
+  themeColor: string;
   eventTypeColors: Record<string, string>;
   eventTypeDefaultMinutes: Record<string, number>;
   gridStartHour: number;
@@ -16,6 +20,8 @@ export interface AppSettings {
   eventSize: EventSize;
   /** Prepended to local numbers when building a WhatsApp link. */
   defaultCountryCode: string;
+  /** What a new contact event's method starts as. Dates keep their own list. */
+  defaultContactMethod: string;
   /** iOS only — Android opens addresses in Google Maps regardless. */
   mapsApp: MapsApp;
 }
@@ -23,12 +29,14 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   weekStart: 'monday',
   theme: 'light',
+  themeColor: DEFAULT_THEME_COLOR,
   eventTypeColors: {},
   eventTypeDefaultMinutes: {},
   gridStartHour: 6,
   gridEndHour: 24,
   eventSize: DEFAULT_EVENT_SIZE,
   defaultCountryCode: '+1',
+  defaultContactMethod: DEFAULT_CONTACT_METHOD,
   mapsApp: DEFAULT_MAPS_APP,
 };
 
