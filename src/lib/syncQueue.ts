@@ -26,8 +26,30 @@ async function writeQueue(queue: SyncOperation[]): Promise<void> {
   await setItem(QUEUE_KEY, queue);
 }
 
+/**
+ * Stamp an op with its id, and turn every `undefined` field into `null`.
+ *
+ * The queue is persisted, and JSON.stringify drops keys whose value is
+ * `undefined` — so a field cleared locally arrived at the drainer as an absent
+ * key rather than an empty one. PostgREST builds an upsert's SET list from the
+ * keys present, which meant the column kept its old server-side value and the
+ * next pull handed it straight back: taking the last person off an event, or
+ * switching a series off, undid itself on reload.
+ *
+ * `null` survives the round-trip and is what toRow would have produced anyway.
+ * The "send only the columns you own" rule is untouched — a key the caller never
+ * passed is still absent, and only goal_entries relies on that.
+ */
+function stamp(op: Omit<SyncOperation, 'opId'>): SyncOperation {
+  const row: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(op.row)) {
+    row[key] = value === undefined ? null : value;
+  }
+  return { ...op, row, opId: nextOpId() };
+}
+
 export async function enqueue(op: Omit<SyncOperation, 'opId'>): Promise<void> {
-  await writeQueue([...(await peekQueue()), { ...op, opId: nextOpId() }]);
+  await writeQueue([...(await peekQueue()), stamp(op)]);
 }
 
 /**
@@ -57,7 +79,7 @@ async function replaceTagged(op: Omit<SyncOperation, 'opId'>): Promise<void> {
   const queue = await peekQueue();
   await writeQueue([
     ...queue.filter(existing => existing.tag !== op.tag),
-    { ...op, opId: nextOpId() },
+    stamp(op),
   ]);
 }
 

@@ -4,6 +4,7 @@ import { PEOPLE_KEY } from '../constants/storageKeys';
 import { useStoredState } from './useStoredState';
 import { enqueueDelete, enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
+import { detachPersonFromEvents } from './useCalendarEvents';
 
 export interface Person {
   id: string;
@@ -58,6 +59,8 @@ export function usePeople() {
   const deletePerson = useCallback(async (id: string) => {
     await write(current => current.filter(p => p.id !== id));
     if (user) await enqueueDelete('people', id, { user_id: user.id, id });
+    // The events they were on outlive them, so the id has to come off those too.
+    await detachPersonFromEvents(id, user?.id);
   }, [write, user]);
 
   const toggleStar = useCallback(async (id: string) => {

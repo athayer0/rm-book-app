@@ -2,13 +2,49 @@ import { useCallback } from 'react';
 import { format, parseISO, subDays } from 'date-fns';
 import { CalendarEvent, generateId, getEventsForDate } from '../utils/eventUtils';
 import { CALENDAR_EVENTS_KEY, EVENT_STATUSES_KEY } from '../constants/storageKeys';
-import { multiSet } from '../utils/storage';
+import { getItem, multiSet, setItem } from '../utils/storage';
 import { useStoredState } from './useStoredState';
 import { useEventStatuses } from './useEventStatuses';
 import { enqueueDelete, enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
 const EMPTY: CalendarEvent[] = [];
+
+/**
+ * Take a person off every event they were on.
+ *
+ * An id with no person behind it renders as "Unknown person" — a real state, since
+ * it also covers someone who simply hasn't synced yet, but not one a delete should
+ * be leaving behind.
+ *
+ * A plain function rather than part of the hook: usePeople is the caller, and
+ * mounting this whole hook there would subscribe every People screen to the event
+ * list and its statuses to do one write. Writing the key directly is the route
+ * pullAll already takes — useStoredState's subscription hands the new list to any
+ * live calendar screen, so this needs no hook mounted to be seen.
+ *
+ * Empty becomes `undefined`, matching what the edit form stores, so the last
+ * person coming off an event syncs as a cleared column rather than an empty array.
+ */
+export async function detachPersonFromEvents(personId: string, userId?: string): Promise<void> {
+  const events = (await getItem<CalendarEvent[]>(CALENDAR_EVENTS_KEY)) ?? [];
+  const changed: CalendarEvent[] = [];
+
+  const next = events.map(e => {
+    if (!e.people?.includes(personId)) return e;
+    const remaining = e.people.filter(id => id !== personId);
+    const updated = { ...e, people: remaining.length ? remaining : undefined };
+    changed.push(updated);
+    return updated;
+  });
+
+  if (changed.length === 0) return;
+  await setItem(CALENDAR_EVENTS_KEY, next);
+  if (!userId) return;
+  for (const e of changed) {
+    await enqueueUpsert('calendar_events', e.id, { ...e, user_id: userId });
+  }
+}
 
 export function useCalendarEvents() {
   const { user } = useAuth();
