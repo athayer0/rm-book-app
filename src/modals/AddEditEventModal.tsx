@@ -25,6 +25,7 @@ import { usePeople, Person } from '../hooks/usePeople';
 import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
 import { PersonPickerModal } from './PersonPickerModal';
+import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { format } from 'date-fns';
 
 interface Props {
@@ -49,6 +50,12 @@ interface Props {
 }
 
 const EVENT_TYPES = Object.keys(EventColors);
+
+// Must match dropdownItem's rendered row height exactly — the open-picker
+// effects scroll by idx * DROPDOWN_ITEM_HEIGHT to land the selected row at the
+// top, and any drift between this and the real row height compounds with idx,
+// walking the "selected" row further off the top the deeper it sits in the list.
+const DROPDOWN_ITEM_HEIGHT = 40;
 
 const TIME_OPTIONS: string[] = [];
 for (let h = 0; h <= 23; h++) {
@@ -144,9 +151,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
    */
   const [mode, setMode] = useState<'view' | 'edit'>(event ? 'view' : 'edit');
   const [error, setError] = useState('');
+  const typeScrollRef = useRef<ScrollView>(null);
   const startScrollRef = useRef<ScrollView>(null);
   const endScrollRef = useRef<ScrollView>(null);
-  const DROPDOWN_ITEM_HEIGHT = 40;
+  const typeScrollEdges = useScrollEdges();
+  const startScrollEdges = useScrollEdges();
+  const endScrollEdges = useScrollEdges();
 
   /**
    * Seed every field from the event, or from the defaults for a new one.
@@ -219,6 +229,17 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     // everything that can actually change the answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, currentStatus, visible]);
+
+  useEffect(() => {
+    if (showTypePicker) {
+      const idx = EVENT_TYPES.findIndex(t => t === type);
+      if (idx >= 0) {
+        requestAnimationFrame(() => {
+          typeScrollRef.current?.scrollTo({ y: idx * DROPDOWN_ITEM_HEIGHT, animated: false });
+        });
+      }
+    }
+  }, [showTypePicker]);
 
   useEffect(() => {
     if (showStartPicker) {
@@ -326,8 +347,19 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   function handleDelete() {
     if (!event || !onDelete) return;
     if (!event.recurring) {
-      onDelete(event.id, event.date, 'single');
-      onClose();
+      Alert.alert(
+        'Delete Event',
+        'Are you sure you want to delete this event?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => { onDelete(event.id, event.date, 'single'); onClose(); },
+          },
+        ],
+        { cancelable: true }
+      );
       return;
     }
     Alert.alert(
@@ -337,6 +369,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'This event only',
+          style: 'destructive',
           onPress: () => { onDelete(event.id, event.date, 'single'); onClose(); },
         },
         {
@@ -483,6 +516,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             settings={settings}
             status={localStatus}
             onStatusChange={onStatusChange ? handleStatusTap : undefined}
+            onDelete={onDelete ? handleDelete : undefined}
           />
         ) : (
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
@@ -493,14 +527,26 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           <View style={styles.card}>
           <View style={styles.group}>
             <Text style={styles.label}>Title</Text>
-            <TextInput
-              style={styles.input}
-              value={title}
-              onChangeText={setTitle}
-              onFocus={closePickers}
-              placeholder={EventTypeLabels[type] ?? 'Event title'}
-              placeholderTextColor={Colors.textLight}
-            />
+            <View style={styles.titleRow}>
+              <TextInput
+                style={[styles.input, styles.titleInput]}
+                value={title}
+                onChangeText={setTitle}
+                onFocus={closePickers}
+                placeholder={EventTypeLabels[type] ?? 'Event title'}
+                placeholderTextColor={Colors.textLight}
+              />
+              {event && onDelete && (
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete event"
+                >
+                  <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           <View style={[styles.group, styles.columns, styles.pickerRow, showTypePicker && styles.openPickerRow]}>
@@ -514,7 +560,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 </TouchableOpacity>
                 {showTypePicker && (
                   <View style={[styles.dropdown, styles.dropdownFloating]}>
-                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled bounces={false} overScrollMode="never">
+                    <ScrollView
+                      ref={typeScrollRef}
+                      style={{ maxHeight: 185 }}
+                      nestedScrollEnabled
+                      bounces={false}
+                      overScrollMode="never"
+                      {...typeScrollEdges.scrollViewProps}
+                    >
                       {EVENT_TYPES.map(t => (
                         <TouchableOpacity
                           key={t}
@@ -527,6 +580,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
+                    <ScrollEdgeFade edge="top" color={Colors.card} visible={typeScrollEdges.showTopFade} />
+                    <ScrollEdgeFade edge="bottom" color={Colors.card} visible={typeScrollEdges.showBottomFade} />
                   </View>
                 )}
               </View>
@@ -562,7 +617,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 </TouchableOpacity>
                 {showStartPicker && (
                   <View style={[styles.dropdown, styles.dropdownFloating]}>
-                    <ScrollView ref={startScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled bounces={false} overScrollMode="never">
+                    <ScrollView
+                      ref={startScrollRef}
+                      style={{ maxHeight: 185 }}
+                      nestedScrollEnabled
+                      bounces={false}
+                      overScrollMode="never"
+                      {...startScrollEdges.scrollViewProps}
+                    >
                       {TIME_OPTIONS.map((t, i) => (
                         <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
                           <Text style={styles.dropdownText}>{t}</Text>
@@ -570,6 +632,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
+                    <ScrollEdgeFade edge="top" color={Colors.card} visible={startScrollEdges.showTopFade} />
+                    <ScrollEdgeFade edge="bottom" color={Colors.card} visible={startScrollEdges.showBottomFade} />
                   </View>
                 )}
               </View>
@@ -607,7 +671,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   </TouchableOpacity>
                   {showEndPicker && (
                     <View style={[styles.dropdown, styles.dropdownFloating]}>
-                      <ScrollView ref={endScrollRef} style={{ maxHeight: 180 }} nestedScrollEnabled bounces={false} overScrollMode="never">
+                      <ScrollView
+                        ref={endScrollRef}
+                        style={{ maxHeight: 185 }}
+                        nestedScrollEnabled
+                        bounces={false}
+                        overScrollMode="never"
+                        {...endScrollEdges.scrollViewProps}
+                      >
                         {TIME_OPTIONS.map((t, i) => (
                           <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => { setEndTime(t); closePickers(); }}>
                             <Text style={styles.dropdownText}>{t}</Text>
@@ -615,6 +686,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                           </TouchableOpacity>
                         ))}
                       </ScrollView>
+                      <ScrollEdgeFade edge="top" color={Colors.card} visible={endScrollEdges.showTopFade} />
+                      <ScrollEdgeFade edge="bottom" color={Colors.card} visible={endScrollEdges.showBottomFade} />
                     </View>
                   )}
                 </View>
@@ -827,16 +900,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           </View>
           </View>
 
-          {event && onDelete && (
-            <TouchableOpacity
-              style={styles.deleteBtn}
-              onPress={handleDelete}
-            >
-              <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-              <Text style={styles.deleteText}>Delete Event</Text>
-            </TouchableOpacity>
-          )}
-
           <View style={{ height: 40 }} />
         </ScrollView>
         )}
@@ -926,6 +989,16 @@ function makeStyles(C: ColorPalette) {
       paddingVertical: 4,
     },
     notesInput: { minHeight: 56, textAlignVertical: 'top', paddingTop: 4 },
+    // The hairline moves here so it still runs the field's full width — including
+    // under the delete icon — instead of stopping where the input itself ends.
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    titleInput: { flex: 1, borderBottomWidth: 0 },
     picker: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -966,7 +1039,10 @@ function makeStyles(C: ColorPalette) {
     addPersonBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      // Shrunk to its own width and left-aligned, so it starts on the same edge
+      // as the PEOPLE label and the names above it, and the tap target is the
+      // link rather than the full width of the card.
+      alignSelf: 'flex-start',
       gap: 6,
       marginTop: 8,
       paddingVertical: 6,
@@ -1005,8 +1081,8 @@ function makeStyles(C: ColorPalette) {
     dropdownItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      height: DROPDOWN_ITEM_HEIGHT,
       paddingHorizontal: 12,
-      paddingVertical: 10,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
     },
@@ -1038,17 +1114,6 @@ function makeStyles(C: ColorPalette) {
     dayCircleTextActive: {
       color: C.white,
     },
-    deleteBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      margin: 16,
-      padding: 14,
-      borderRadius: 12,
-      backgroundColor: C.danger + '12',
-    },
-    deleteText: { fontSize: 15, fontWeight: '600', color: C.danger },
     errorBanner: { fontSize: 13, color: C.danger, textAlign: 'center', paddingVertical: 8, backgroundColor: C.danger + '12' },
   });
 }

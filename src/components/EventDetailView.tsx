@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
+import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels } from '../constants/colors';
@@ -29,6 +30,8 @@ interface Props {
   status: EventStatus | undefined;
   /** Absent when the caller doesn't track status, which makes the row read-only. */
   onStatusChange?: (status: EventStatus | undefined) => void;
+  /** Absent hides the trash icon — the caller owns confirmation and the actual delete. */
+  onDelete?: () => void;
 }
 
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -68,7 +71,7 @@ function recurrenceSummary(event: CalendarEvent): string {
  * Empty fields are dropped rather than shown blank, so what's here is what the
  * event actually has.
  */
-export function EventDetailView({ event, settings, status, onStatusChange }: Props) {
+export function EventDetailView({ event, settings, status, onStatusChange, onDelete }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people: allPeople } = usePeople();
@@ -98,6 +101,33 @@ export function EventDetailView({ event, settings, status, onStatusChange }: Pro
    * one or below the last as soon as a neighbour dropped out.
    */
   const groups: { key: string; node: React.ReactNode }[] = [];
+
+  groups.push({
+    key: 'name',
+    node: (
+      <>
+        <Text style={styles.label}>Name</Text>
+        <View style={styles.nameRow}>
+          <Text style={[styles.value, styles.nameValue]}>{event.title}</Text>
+          {isBackup && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Backup</Text>
+            </View>
+          )}
+          {onDelete && (
+            <TouchableOpacity
+              onPress={onDelete}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete event"
+            >
+              <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </>
+    ),
+  });
 
   if (!isBackup && TRACKABLE_TYPES.has(event.type)) {
     groups.push({
@@ -223,16 +253,8 @@ export function EventDetailView({ event, settings, status, onStatusChange }: Pro
   return (
     <ScrollView style={styles.scroll} bounces={false} overScrollMode="never">
       <View style={styles.card}>
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>{event.title}</Text>
-          {isBackup && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Backup</Text>
-            </View>
-          )}
-        </View>
-        {groups.map((group) => (
-          <View key={group.key} style={[styles.group, styles.groupDivided]}>
+        {groups.map((group, i) => (
+          <View key={group.key} style={[styles.group, i > 0 && styles.groupDivided]}>
             {group.node}
           </View>
         ))}
@@ -246,17 +268,8 @@ export function EventDetailView({ event, settings, status, onStatusChange }: Pro
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     scroll: { flex: 1, backgroundColor: C.background },
-    // The card's own first row rather than a group, so the title can run larger
-    // and centered while still sharing the card's rounded corners and background.
-    hero: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      padding: 12,
-      paddingTop: 16,
-      paddingBottom: 14,
-    },
-    heroTitle: { flex: 1, fontSize: 24, fontWeight: '600', color: C.text, textAlign: 'center' },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    nameValue: { flex: 1 },
     badge: {
       paddingHorizontal: 8,
       paddingVertical: 2,

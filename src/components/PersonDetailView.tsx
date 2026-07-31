@@ -196,7 +196,7 @@ export function PersonDetailView({
                 accessibilityRole="button"
                 accessibilityLabel={trimmedName ? `Open ${trimmedName}’s address in Maps` : 'Open this address in Maps'}
               >
-                <Ionicons name="location" size={19} color={Colors.control} />
+                <MaterialCommunityIcons name="map-marker" size={20} color={Colors.control} />
               </TouchableOpacity>
             )}
           </View>
@@ -251,7 +251,7 @@ function makeStyles(C: ColorPalette) {
       paddingTop: 16,
       paddingBottom: 14,
     },
-    heroName: { flex: 1, fontSize: 24, fontWeight: '600', color: C.text, textAlign: 'center' },
+    heroName: { flex: 1, fontSize: 24, fontWeight: '600', color: C.text },
     // One card for the whole person. The padding lives on the groups instead, so
     // the rules between them run the full width and read as divisions of one
     // thing rather than as gaps between several.
