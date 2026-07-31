@@ -162,7 +162,7 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     headerLabels: { alignItems: 'center' },
-    headerTitle: { fontSize: 17, fontWeight: '600', color: C.text },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
     headerCount: { fontSize: 12, color: C.textSecondary, marginTop: 2 },
     cancel: { fontSize: 16, color: C.textSecondary },
     done: { fontSize: 16, fontWeight: '600', color: C.accent },

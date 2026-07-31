@@ -18,11 +18,33 @@ export function useColors(): ColorPalette {
     const base = isDark ? DarkColors : LightColors;
     const primary = normalizeHex(settings.themeColor) ?? base.primary;
     const onPrimary = contrastInk(primary);
+    const accent =
+      normalizeHex(isDark ? settings.secondaryColorDark : settings.secondaryColorLight) ??
+      base.accent;
+    const control =
+      normalizeHex(isDark ? settings.tertiaryColorDark : settings.tertiaryColorLight) ??
+      base.control;
     return {
       ...base,
       primary,
       onPrimary,
       onPrimaryMuted: withAlpha(onPrimary, 0.8),
+      accent,
+      control,
+      // These three are hardcoded duplicates of `control`'s value in both
+      // LightColors and DarkColors today — deriving them keeps every
+      // navy-tinted surface (calendar day-selection border, goal-sheet "add a
+      // thing" links, the selected-row tint) in step with the new setting.
+      goalTextAction: control,
+      selectedDayBorder: control,
+      rowSelectedBg: withAlpha(control, isDark ? 0.2 : 0.1),
     };
-  }, [isDark, settings.themeColor]);
+  }, [
+    isDark,
+    settings.themeColor,
+    settings.secondaryColorLight,
+    settings.secondaryColorDark,
+    settings.tertiaryColorLight,
+    settings.tertiaryColorDark,
+  ]);
 }

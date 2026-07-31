@@ -1,5 +1,11 @@
 import { useCallback, createContext, useContext } from 'react';
-import { DEFAULT_THEME_COLOR } from '../constants/colors';
+import {
+  DEFAULT_THEME_COLOR,
+  DEFAULT_SECONDARY_COLOR_LIGHT,
+  DEFAULT_SECONDARY_COLOR_DARK,
+  DEFAULT_TERTIARY_COLOR_LIGHT,
+  DEFAULT_TERTIARY_COLOR_DARK,
+} from '../constants/colors';
 import { DEFAULT_CONTACT_METHOD } from '../constants/contactMethods';
 import { EventSize, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
 import { MapsApp, DEFAULT_MAPS_APP } from '../utils/mapUtils';
@@ -13,6 +19,12 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   /** Drives `primary` — the header band and everything else tinted with it. */
   themeColor: string;
+  /** Drives `accent` (Save/Done/EDIT, goal counts) — light and dark set independently. */
+  secondaryColorLight: string;
+  secondaryColorDark: string;
+  /** Drives `control` (checkmarks, switches, active pills/tabs, the FAB, links). */
+  tertiaryColorLight: string;
+  tertiaryColorDark: string;
   eventTypeColors: Record<string, string>;
   eventTypeDefaultMinutes: Record<string, number>;
   gridStartHour: number;
@@ -30,6 +42,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   weekStart: 'monday',
   theme: 'light',
   themeColor: DEFAULT_THEME_COLOR,
+  secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
+  secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,
+  tertiaryColorLight: DEFAULT_TERTIARY_COLOR_LIGHT,
+  tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
   eventTypeColors: {},
   eventTypeDefaultMinutes: {},
   gridStartHour: 6,

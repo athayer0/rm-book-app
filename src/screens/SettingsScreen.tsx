@@ -9,11 +9,16 @@ import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels, EventTypeConfig, DEFAULT_THEME_COLOR } from '../constants/colors';
+import {
+  EventColors, EventTypeLabels, EventTypeConfig, DEFAULT_THEME_COLOR,
+  DEFAULT_SECONDARY_COLOR_LIGHT, DEFAULT_SECONDARY_COLOR_DARK,
+  DEFAULT_TERTIARY_COLOR_LIGHT, DEFAULT_TERTIARY_COLOR_DARK,
+} from '../constants/colors';
 import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
 import { GradientColorPicker } from '../components/GradientColorPicker';
 import { DurationSlider, durationLabel } from '../components/DurationSlider';
-import { useSettings } from '../hooks/useSettings';
+import { normalizeHex } from '../utils/colorUtils';
+import { useSettings, type AppSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { isCheckboxType, hasOptionalEnd } from '../utils/eventUtils';
@@ -36,6 +41,29 @@ function hourLabel(h: number): string {
 
 const EVENT_TYPES = Object.keys(EventColors);
 
+type ThemeColorRowKey = 'primary' | 'secondaryLight' | 'secondaryDark' | 'tertiaryLight' | 'tertiaryDark';
+type ThemeColorSettingKey =
+  | 'themeColor' | 'secondaryColorLight' | 'secondaryColorDark'
+  | 'tertiaryColorLight' | 'tertiaryColorDark';
+
+// Primary repaints headers/tabs/now-line. Secondary drives `accent` (Save,
+// Done, EDIT, goal counts). Tertiary drives `control` (checkmarks, switches,
+// active pills/tabs, the FAB, "add a thing" links). Light/dark variants of
+// secondary and tertiary are independent settings — no auto dark-mode lift —
+// so both need their own row even though only one is visible at a time.
+const THEME_COLOR_ROWS: {
+  key: ThemeColorRowKey;
+  label: string;
+  settingKey: ThemeColorSettingKey;
+  defaultValue: string;
+}[] = [
+  { key: 'primary', label: 'Primary Color', settingKey: 'themeColor', defaultValue: DEFAULT_THEME_COLOR },
+  { key: 'secondaryLight', label: 'Secondary Color (Light)', settingKey: 'secondaryColorLight', defaultValue: DEFAULT_SECONDARY_COLOR_LIGHT },
+  { key: 'secondaryDark', label: 'Secondary Color (Dark)', settingKey: 'secondaryColorDark', defaultValue: DEFAULT_SECONDARY_COLOR_DARK },
+  { key: 'tertiaryLight', label: 'Tertiary Color (Light)', settingKey: 'tertiaryColorLight', defaultValue: DEFAULT_TERTIARY_COLOR_LIGHT },
+  { key: 'tertiaryDark', label: 'Tertiary Color (Dark)', settingKey: 'tertiaryColorDark', defaultValue: DEFAULT_TERTIARY_COLOR_DARK },
+];
+
 export function SettingsScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -48,7 +76,7 @@ export function SettingsScreen() {
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [hourDropdown, setHourDropdown] = useState<'start' | 'end' | null>(null);
   const [methodDropdown, setMethodDropdown] = useState(false);
-  const [colorOpen, setColorOpen] = useState(false);
+  const [expandedColor, setExpandedColor] = useState<ThemeColorRowKey | null>(null);
   const [colorResetOpen, setColorResetOpen] = useState(false);
   // The types deliberately spared, so everything listed starts checked.
   const [keptTypes, setKeptTypes] = useState<string[]>([]);
@@ -418,41 +446,53 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* App Color — `primary`, so this repaints every header, the active tab
-            pill and the calendar's now-line in one go. */}
+        {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>APP COLOR</Text>
+          <Text style={styles.sectionTitle}>THEME COLORS</Text>
           <View style={styles.card}>
-            <TouchableOpacity
-              style={[styles.row, !colorOpen && styles.rowLast]}
-              onPress={() => setColorOpen(v => !v)}
-            >
-              {/* The dot is the value; the hex it happens to have said nothing
-                  the colour itself doesn't. */}
-              <View style={[styles.colorDot, { backgroundColor: Colors.primary }]} />
-              <Text style={styles.rowLabel}>App Color</Text>
-              <Ionicons
-                name={colorOpen ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={Colors.textLight}
-                style={{ marginLeft: 6 }}
-              />
-            </TouchableOpacity>
-            {colorOpen && (
-              <View style={[styles.expandedPanel, styles.expandedPanelLast]}>
-                <GradientColorPicker
-                  color={Colors.primary}
-                  onChange={themeColor => updateSettings({ themeColor })}
-                />
-                <TouchableOpacity
-                  style={styles.resetColorBtn}
-                  onPress={() => updateSettings({ themeColor: DEFAULT_THEME_COLOR })}
-                >
-                  <Ionicons name="refresh" size={15} color={Colors.control} />
-                  <Text style={styles.resetColorText}>Reset to Default Color</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            {THEME_COLOR_ROWS.map((row, i) => {
+              const isOpen = expandedColor === row.key;
+              const isLastRow = i === THEME_COLOR_ROWS.length - 1;
+              // The dot is the value; the hex it happens to have said nothing
+              // the colour itself doesn't.
+              const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
+              return (
+                <View key={row.key}>
+                  <TouchableOpacity
+                    style={[styles.row, !isOpen && isLastRow && styles.rowLast]}
+                    onPress={() => setExpandedColor(isOpen ? null : row.key)}
+                  >
+                    <View style={[styles.colorDot, { backgroundColor: value }]} />
+                    <Text style={styles.rowLabel}>{row.label}</Text>
+                    <Ionicons
+                      name={isOpen ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={Colors.textLight}
+                      style={{ marginLeft: 6 }}
+                    />
+                  </TouchableOpacity>
+                  {isOpen && (
+                    <View style={[styles.expandedPanel, isLastRow && styles.expandedPanelLast]}>
+                      <GradientColorPicker
+                        color={value}
+                        onChange={hex =>
+                          updateSettings({ [row.settingKey]: hex } as Partial<AppSettings>)
+                        }
+                      />
+                      <TouchableOpacity
+                        style={styles.resetColorBtn}
+                        onPress={() =>
+                          updateSettings({ [row.settingKey]: row.defaultValue } as Partial<AppSettings>)
+                        }
+                      >
+                        <Ionicons name="refresh" size={15} color={Colors.control} />
+                        <Text style={styles.resetColorText}>Reset to Default Color</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -601,7 +641,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset the app color, all event colors, default durations, the default contact method, schedule hours, event size, and the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
+                  'This will reset the theme colors, all event colors, default durations, the default contact method, schedule hours, event size, and the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
@@ -610,6 +650,10 @@ export function SettingsScreen() {
                       onPress: () => {
                         updateSettings({
                           themeColor: DEFAULT_THEME_COLOR,
+                          secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
+                          secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,
+                          tertiaryColorLight: DEFAULT_TERTIARY_COLOR_LIGHT,
+                          tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
                           defaultContactMethod: DEFAULT_CONTACT_METHOD,
                           eventTypeColors: {},
                           eventTypeDefaultMinutes: {},

@@ -59,6 +59,9 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
   return (
     <SheetModal visible={visible} onClose={onClose}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
+          <Ionicons name="close" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
         <View style={styles.headerLabels}>
           <Text style={styles.headerTitle}>Unreported Events</Text>
           <Text style={styles.headerCount}>
@@ -67,9 +70,6 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
               : `${unreported.length} waiting · last 30 days`}
           </Text>
         </View>
-        <TouchableOpacity onPress={onClose} hitSlop={10}>
-          <Ionicons name="close" size={26} color={Colors.textSecondary} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
@@ -135,11 +135,16 @@ function makeStyles(C: ColorPalette) {
     header: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 12,
-      borderBottomWidth: 1,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: C.border,
+      backgroundColor: C.card,
+    },
+    closeBtn: {
+      width: 44,
+      alignItems: 'flex-start',
     },
     headerLabels: {
       flex: 1,

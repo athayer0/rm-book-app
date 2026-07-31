@@ -26,6 +26,10 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
   settings: {
     weekStart: 'week_start',
     themeColor: 'theme_color',
+    secondaryColorLight: 'secondary_color_light',
+    secondaryColorDark: 'secondary_color_dark',
+    tertiaryColorLight: 'tertiary_color_light',
+    tertiaryColorDark: 'tertiary_color_dark',
     gridStartHour: 'grid_start_hour',
     gridEndHour: 'grid_end_hour',
     eventSize: 'event_size',
@@ -59,7 +63,10 @@ const COLUMNS: Record<string, string[]> = {
     'user_id', 'event_id', 'occurrence_date', 'status', 'updated_at', 'deleted_at',
   ],
   settings: [
-    'user_id', 'week_start', 'theme', 'theme_color', 'grid_start_hour', 'grid_end_hour',
+    'user_id', 'week_start', 'theme', 'theme_color',
+    'secondary_color_light', 'secondary_color_dark',
+    'tertiary_color_light', 'tertiary_color_dark',
+    'grid_start_hour', 'grid_end_hour',
     'event_size', 'event_type_colors', 'event_type_default_minutes',
     'default_country_code', 'default_contact_method', 'maps_app', 'updated_at',
   ],

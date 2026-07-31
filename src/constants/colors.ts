@@ -7,6 +7,15 @@
  */
 export const DEFAULT_THEME_COLOR = '#1B5E3F';
 
+// Defaults for the other two user-editable theme colors — light/dark are
+// independent settings, not a lift computed from one value, so each needs its
+// own default. These match today's hardcoded `accent`/`control` values exactly,
+// so picking neither leaves the app looking exactly as it does today.
+export const DEFAULT_SECONDARY_COLOR_LIGHT = '#00B5C8';
+export const DEFAULT_SECONDARY_COLOR_DARK = '#00B5C8';
+export const DEFAULT_TERTIARY_COLOR_LIGHT = '#1A3A6B';
+export const DEFAULT_TERTIARY_COLOR_DARK = '#8AAFC8';
+
 export const LightColors = {
   primary: DEFAULT_THEME_COLOR,
   // Ink for anything sitting on `primary`: header titles, the active tab icon.

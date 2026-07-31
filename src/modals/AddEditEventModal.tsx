@@ -866,7 +866,7 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       backgroundColor: C.card,
     },
-    headerTitle: { fontSize: 17, fontWeight: '600', color: C.text },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
     // The display header's ×-and-Edit pair, sized the way WeeklyPlanningModal
     // sizes its close button: equal 60pt slots on both ends so the title sits
     // centred whatever the right-hand label says.

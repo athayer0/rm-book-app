@@ -328,7 +328,7 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       backgroundColor: C.card,
     },
-    headerTitle: { fontSize: 17, fontWeight: '600', color: C.text },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
     closeBtn: { width: 44, alignItems: 'flex-start' },
     tabBar: {
       flexDirection: 'row',

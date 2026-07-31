@@ -287,6 +287,15 @@ create table if not exists settings (
   -- DEFAULT_THEME_COLOR. fromRow skips nulls,
   -- so a null lands on the client default.
   theme_color text,
+  -- Same reasoning as theme_color: light/dark are
+  -- independent settings (no auto dark-mode lift),
+  -- so each gets its own undefaulted column mirroring
+  -- DEFAULT_SECONDARY_COLOR_LIGHT/DARK and
+  -- DEFAULT_TERTIARY_COLOR_LIGHT/DARK in useSettings.ts.
+  secondary_color_light text,
+  secondary_color_dark text,
+  tertiary_color_light text,
+  tertiary_color_dark text,
   grid_start_hour int default 6,
   grid_end_hour int default 24,
   event_size text,
@@ -315,6 +324,18 @@ alter table settings
   add column if not exists
   default_contact_method text
   default 'phone';
+alter table settings
+  add column if not exists
+  secondary_color_light text;
+alter table settings
+  add column if not exists
+  secondary_color_dark text;
+alter table settings
+  add column if not exists
+  tertiary_color_light text;
+alter table settings
+  add column if not exists
+  tertiary_color_dark text;
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

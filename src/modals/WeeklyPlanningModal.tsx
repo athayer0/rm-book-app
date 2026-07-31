@@ -263,8 +263,8 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     headerTitle: {
-      fontSize: 17,
-      fontWeight: '600',
+      fontSize: 18,
+      fontWeight: '700',
       color: C.text,
     },
     closeBtn: {
