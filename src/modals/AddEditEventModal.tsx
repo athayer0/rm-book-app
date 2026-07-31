@@ -16,6 +16,7 @@ import {
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
 import { InlineDatePicker } from '../components/InlineDatePicker';
+import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
@@ -56,17 +57,6 @@ const EVENT_TYPES = Object.keys(EventColors);
 // top, and any drift between this and the real row height compounds with idx,
 // walking the "selected" row further off the top the deeper it sits in the list.
 const DROPDOWN_ITEM_HEIGHT = 40;
-
-const TIME_OPTIONS: string[] = [];
-for (let h = 0; h <= 23; h++) {
-  for (let m = 0; m < 60; m += 30) {
-    const h12 = h % 12 || 12;
-    const mm = String(m).padStart(2, '0');
-    const ampm = h < 12 ? 'AM' : 'PM';
-    TIME_OPTIONS.push(`${h12}:${mm} ${ampm}`);
-  }
-}
-TIME_OPTIONS.push('12:00 AM');
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
@@ -152,11 +142,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [mode, setMode] = useState<'view' | 'edit'>(event ? 'view' : 'edit');
   const [error, setError] = useState('');
   const typeScrollRef = useRef<ScrollView>(null);
-  const startScrollRef = useRef<ScrollView>(null);
-  const endScrollRef = useRef<ScrollView>(null);
   const typeScrollEdges = useScrollEdges();
-  const startScrollEdges = useScrollEdges();
-  const endScrollEdges = useScrollEdges();
 
   /**
    * Seed every field from the event, or from the defaults for a new one.
@@ -241,28 +227,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     }
   }, [showTypePicker]);
 
-  useEffect(() => {
-    if (showStartPicker) {
-      const idx = TIME_OPTIONS.findIndex(t => t === startTime);
-      if (idx >= 0) {
-        requestAnimationFrame(() => {
-          startScrollRef.current?.scrollTo({ y: idx * DROPDOWN_ITEM_HEIGHT, animated: false });
-        });
-      }
-    }
-  }, [showStartPicker]);
-
-  useEffect(() => {
-    if (showEndPicker) {
-      const idx = TIME_OPTIONS.findIndex(t => t === endTime);
-      if (idx >= 0) {
-        requestAnimationFrame(() => {
-          endScrollRef.current?.scrollTo({ y: idx * DROPDOWN_ITEM_HEIGHT, animated: false });
-        });
-      }
-    }
-  }, [showEndPicker]);
-
   // Reporting happens on the display view now. Both controls there hand back the
   // status they resolve to, including undefined when the active one is tapped
   // again, so this just adopts it and passes it on.
@@ -287,6 +251,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   // added by hand is not a default, so it slides with the start instead of being
   // discarded — otherwise the only way to correct a contact's start time is to
   // re-enter its end time afterwards.
+  //
+  // Doesn't close the picker: the wheel commits on every column it settles
+  // (hour, then minute, then period), so closing after the first would strand
+  // the other two at their old values.
   function handleStartTimeChange(t: string) {
     const keepDuration = hasOptionalEnd(type) && endTime !== startTime;
     setStartTime(t);
@@ -294,7 +262,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       t,
       keepDuration ? minutesBetween(startTime, endTime) : resolvedDefaultMinutes(type, settings),
     ));
-    closePickers();
   }
 
   // End equal to start is how "no end time" is stored, so adding and removing one
@@ -419,6 +386,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     setError('');
     try {
       await onSave(buildEventData());
+      // Otherwise a picker left open (Start Time, End Time) is still open
+      // underneath when Edit reopens the form, since switching to 'view'
+      // doesn't tear the form down.
+      closePickers();
       // An existing event has a page to go back to; a new one does not.
       if (event) setMode('view'); else onClose();
     } catch (e) {
@@ -526,7 +497,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={styles.card}>
           <View style={styles.group}>
-            <Text style={styles.label}>Title</Text>
+            <Text style={styles.label}>Name</Text>
             <View style={styles.titleRow}>
               <TextInput
                 style={[styles.input, styles.titleInput]}
@@ -610,33 +581,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           <View style={[styles.group, styles.columns, styles.pickerRow, (showStartPicker || showEndPicker) && styles.openPickerRow]}>
             <View style={styles.column}>
               <Text style={styles.label}>Start Time</Text>
-              <View>
-                <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
-                  <Text style={styles.pickerText}>{startTime}</Text>
-                  <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-                </TouchableOpacity>
-                {showStartPicker && (
-                  <View style={[styles.dropdown, styles.dropdownFloating]}>
-                    <ScrollView
-                      ref={startScrollRef}
-                      style={{ maxHeight: 185 }}
-                      nestedScrollEnabled
-                      bounces={false}
-                      overScrollMode="never"
-                      {...startScrollEdges.scrollViewProps}
-                    >
-                      {TIME_OPTIONS.map((t, i) => (
-                        <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => handleStartTimeChange(t)}>
-                          <Text style={styles.dropdownText}>{t}</Text>
-                          {startTime === t && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                    <ScrollEdgeFade edge="top" color={Colors.card} visible={startScrollEdges.showTopFade} />
-                    <ScrollEdgeFade edge="bottom" color={Colors.card} visible={startScrollEdges.showBottomFade} />
-                  </View>
-                )}
-              </View>
+              <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
+                <Text style={styles.pickerText}>{startTime}</Text>
+                <Ionicons name={showStartPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+              </TouchableOpacity>
             </View>
 
             {!fixed && endOmitted && (
@@ -664,36 +612,22 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     </TouchableOpacity>
                   )}
                 </View>
-                <View>
-                  <TouchableOpacity style={styles.picker} onPress={() => togglePicker('end')}>
-                    <Text style={styles.pickerText}>{endTime}</Text>
-                    <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-                  </TouchableOpacity>
-                  {showEndPicker && (
-                    <View style={[styles.dropdown, styles.dropdownFloating]}>
-                      <ScrollView
-                        ref={endScrollRef}
-                        style={{ maxHeight: 185 }}
-                        nestedScrollEnabled
-                        bounces={false}
-                        overScrollMode="never"
-                        {...endScrollEdges.scrollViewProps}
-                      >
-                        {TIME_OPTIONS.map((t, i) => (
-                          <TouchableOpacity key={i} style={styles.dropdownItem} onPress={() => { setEndTime(t); closePickers(); }}>
-                            <Text style={styles.dropdownText}>{t}</Text>
-                            {endTime === t && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                      <ScrollEdgeFade edge="top" color={Colors.card} visible={endScrollEdges.showTopFade} />
-                      <ScrollEdgeFade edge="bottom" color={Colors.card} visible={endScrollEdges.showBottomFade} />
-                    </View>
-                  )}
-                </View>
+                <TouchableOpacity style={styles.picker} onPress={() => togglePicker('end')}>
+                  <Text style={styles.pickerText}>{endTime}</Text>
+                  <Ionicons name={showEndPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                </TouchableOpacity>
               </View>
             )}
           </View>
+
+          {(showStartPicker || showEndPicker) && (
+            <View style={[styles.group, { paddingTop: 4 }, styles.openPickerRow]}>
+              <TimeWheelPicker
+                value={showStartPicker ? startTime : endTime}
+                onChange={showStartPicker ? handleStartTimeChange : setEndTime}
+              />
+            </View>
+          )}
 
           {/* Half a row, with the other half left empty: the value is a short
               label off a fixed list, and stretching it the full width made it
@@ -989,16 +923,12 @@ function makeStyles(C: ColorPalette) {
       paddingVertical: 4,
     },
     notesInput: { minHeight: 56, textAlignVertical: 'top', paddingTop: 4 },
-    // The hairline moves here so it still runs the field's full width — including
-    // under the delete icon — instead of stopping where the input itself ends.
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
     },
-    titleInput: { flex: 1, borderBottomWidth: 0 },
+    titleInput: { flex: 1 },
     picker: {
       flexDirection: 'row',
       alignItems: 'center',
