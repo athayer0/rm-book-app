@@ -16,7 +16,7 @@ TO DO
 [ ] selecting a person to add to an event has some lag after tapping it. invesifate further and make it snappy
 [ ] make it so that relevant menus dont just say edit (blank) at the top and have cancel and save buttons, have them have an x that saves or maybe a delete button with an are you sure popup
 [ ] Fix up the weekly Planning goals menu so that future events when the goals are set display zero out of and then the side goal instead of justice the set goal and when moving back to the current week from a future week There is a flash of it still saying set goals I think before correcting to the current week's key indicators
-[ ] tapping the event + gives aestetic event selecter bubbles
+[ ] tapping the event + gives aestetic event selecter bubbles that
 [ ] be able to import people from contacts app on your phone
 [ ] be able to sign in/make an account with apple and google and facebook?
 [ ] add more hideable kis for the other event types (hours worked, hours of school, etc.) or add the ability to tie custom events to kis so that reporting them makes them 

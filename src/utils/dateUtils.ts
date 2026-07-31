@@ -51,6 +51,23 @@ export function parseTimeString(timeStr: string): { hour: number; minute: number
   return { hour, minute };
 }
 
+/**
+ * The next half-hour mark on or after `now`, in the "9:30 AM" form the event
+ * modal speaks. 9:29 gives 9:30 and 9:31 gives 10:00; a time already sitting on
+ * the mark stays there, and seconds count, so 9:30:01 has missed it and rolls on
+ * to 10:00.
+ *
+ * The last half hour of the day has no later mark to reach, so it holds at 11:30
+ * PM rather than wrapping to a midnight that reads as the *start* of the day
+ * being viewed — the caller supplies the date separately, and rolling the clock
+ * would not roll that with it.
+ */
+export function nextHalfHour(now: Date = new Date()): string {
+  const elapsed = now.getHours() * 60 + now.getMinutes() + (now.getSeconds() > 0 ? 1 : 0);
+  const mark = Math.min(Math.ceil(elapsed / 30) * 30, 23 * 60 + 30);
+  return formatTime(Math.floor(mark / 60), mark % 60);
+}
+
 export function timeToMinutes(hour: number, minute: number): number {
   return hour * 60 + minute;
 }

@@ -6,22 +6,31 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
-import type { ColorPalette } from '../constants/colors';
+import { EventTypeIcons, EventTypeLabels, type ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useSettings } from '../hooks/useSettings';
 import { TimeGrid } from '../components/TimeGrid';
 import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
-import { FAB } from '../components/FAB';
+import { FAB, type FABAction } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
 import { CalendarEvent, renderedEventHeight, hasEndTime } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventReport } from '../hooks/useEventReport';
-import { addMinutesToTimeString, formatTime, parseTimeString } from '../utils/dateUtils';
+import { addMinutesToTimeString, formatTime, nextHalfHour, parseTimeString } from '../utils/dateUtils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
+
+/**
+ * The types that earn a bubble off the +, in stack order — first entry nearest
+ * the thumb, climbing from there. A hand-picked list rather than a usage count
+ * on purpose: the value is that the same type is always in the same place under
+ * your thumb, which an order that recomputes itself can't promise. Add or drop
+ * entries here — anything left off is still one long press on the + away.
+ */
+const QUICK_ADD_TYPES = ['travel', 'activity', 'date', 'temple', 'contact', 'task'];
 
 function CalendarContent() {
   const Colors = useColors();
@@ -31,6 +40,10 @@ function CalendarContent() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [defaultStartTime, setDefaultStartTime] = useState<string | undefined>();
+  // Only ever set by a quick-add bubble, and replaced wholesale each time: the
+  // modal resets off this prop's identity, so it has to be a fresh object per
+  // pick and the same one for as long as that pick's form is open.
+  const [prefill, setPrefill] = useState<Partial<CalendarEvent> | null>(null);
   const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
   const { getStatus, report } = useEventReport();
@@ -45,6 +58,19 @@ function CalendarContent() {
 
   const { slotHeight: SLOT_HEIGHT, fontSize: eventFontSize } = EventSizes[resolveEventSize(settings.eventSize)];
   const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
+
+  // Nothing here varies at runtime — the bubbles take their colour from the
+  // button, not from the type — so this is built once and handed down stable.
+  const quickActions = useMemo<FABAction[]>(
+    () =>
+      QUICK_ADD_TYPES.map(type => ({
+        key: type,
+        label: EventTypeLabels[type] ?? type,
+        icon: EventTypeIcons[type]?.icon ?? 'ellipse',
+        iconFamily: EventTypeIcons[type]?.iconFamily,
+      })),
+    [],
+  );
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const events = getForDate(dateStr);
@@ -99,18 +125,32 @@ function CalendarContent() {
   function handleEventPress(event: CalendarEvent) {
     setEditingEvent(event);
     setDefaultStartTime(undefined);
+    setPrefill(null);
     setShowEventModal(true);
   }
 
   function handleAddEvent() {
     setEditingEvent(null);
     setDefaultStartTime(undefined);
+    setPrefill(null);
+    setShowEventModal(true);
+  }
+
+  // Read at tap rather than kept in state: the stack can sit open for a while,
+  // and the time that matters is the one at the moment the type is chosen.
+  // The date still comes from the day on screen, so picking a bubble while
+  // looking at next Tuesday puts the event on next Tuesday at this hour.
+  function handleQuickAdd(type: string) {
+    setEditingEvent(null);
+    setDefaultStartTime(undefined);
+    setPrefill({ type, startTime: nextHalfHour() });
     setShowEventModal(true);
   }
 
   function handleTapEmpty(timeStr: string) {
     setEditingEvent(null);
     setDefaultStartTime(timeStr);
+    setPrefill(null);
     setShowEventModal(true);
   }
 
@@ -330,13 +370,14 @@ function CalendarContent() {
         </>
       )}
 
-      <FAB onPress={handleAddEvent} />
+      <FAB onPress={handleAddEvent} actions={quickActions} onSelectAction={handleQuickAdd} />
 
       <AddEditEventModal
         visible={showEventModal}
         event={editingEvent}
         defaultDate={dateStr}
         defaultStartTime={defaultStartTime}
+        prefill={prefill}
         settings={settings}
         currentStatus={editingEvent ? getStatus(editingEvent.id, editingEvent.date) : undefined}
         onStatusChange={editingEvent ? (s) => report(editingEvent, s) : undefined}

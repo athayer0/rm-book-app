@@ -15,6 +15,7 @@ import {
   PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus,
 } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
+import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 
 type FilterSelection =
   | { kind: 'all' }
@@ -65,6 +66,7 @@ export function PeopleScreen() {
   // notch can't skew the ratio the dropdown's height is worked out from.
   const [pageHeight, setPageHeight] = useState(0);
   const [headerBottom, setHeaderBottom] = useState(0);
+  const filterScrollEdges = useScrollEdges();
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
@@ -126,6 +128,7 @@ export function PeopleScreen() {
                 nestedScrollEnabled
                 bounces={false}
                 overScrollMode="never"
+                {...filterScrollEdges.scrollViewProps}
               >
                 <TouchableOpacity
                   style={styles.filterDropdownItem}
@@ -164,6 +167,8 @@ export function PeopleScreen() {
                   );
                 })}
               </ScrollView>
+              <ScrollEdgeFade edge="top" color={Colors.card} visible={filterScrollEdges.showTopFade} />
+              <ScrollEdgeFade edge="bottom" color={Colors.card} visible={filterScrollEdges.showBottomFade} />
             </View>
           )}
         </View>

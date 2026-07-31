@@ -66,6 +66,10 @@ export const LightColors = {
   // The filled star on a favourited person. Amber rather than `control` so a
   // favourite reads at a glance against a row of blue action glyphs.
   favorite: '#E8980E',
+  // Dimmed behind the FAB's quick-add stack. Lighter than modalBackdrop: the
+  // stack is a menu hanging off a button, not a sheet, so the calendar under it
+  // should still read as the thing you are adding to.
+  fabScrim: 'rgba(0,0,0,0.20)',
 };
 
 export const DarkColors: typeof LightColors = {
@@ -110,6 +114,9 @@ export const DarkColors: typeof LightColors = {
   statusPending: '#F5B33C',
   // Same lift as statusPending: the light amber goes muddy on a dark card.
   favorite: '#F5B33C',
+  // Deeper than the light value for the same reason modalBackdrop is: the same
+  // alpha that dims a white calendar leaves a near-black one looking untouched.
+  fabScrim: 'rgba(0,0,0,0.50)',
 };
 
 export type ColorPalette = typeof LightColors;
@@ -182,6 +189,36 @@ export const EventTypeLabels: Record<string, string> = {
   task:      'Task',
   exercise:  'Exercise',
   other:     'Other',
+};
+
+/**
+ * A glyph per type, for the places a colour alone can't carry the meaning — the
+ * quick-add bubbles rising off the calendar's + are five coloured circles, and
+ * nobody reads chocolate-vs-rose as meal-vs-church.
+ *
+ * Families are mixed on purpose: Ionicons covers most of it, and the few that
+ * only MaterialCommunityIcons draws well (a chapel, folded hands) are worth the
+ * dispatch. `GoalIcon` handles both, so pass `iconFamily` through with `icon`.
+ */
+export const EventTypeIcons: Record<string, { icon: string; iconFamily?: string }> = {
+  church:    { icon: 'church', iconFamily: 'MaterialCommunityIcons' },
+  travel:    { icon: 'car' },
+  meal:      { icon: 'restaurant' },
+  activity:  { icon: 'people' },
+  date:      { icon: 'heart' },
+  contact:   { icon: 'chatbubble-ellipses' },
+  work:      { icon: 'briefcase' },
+  // The same chapel as `church`, and deliberately: the Church Hours and Temple
+  // Attendance goals already share it, so a temple drawn as anything else here
+  // would be the odd one out against the goal it feeds.
+  temple:    { icon: 'church', iconFamily: 'MaterialCommunityIcons' },
+  school:    { icon: 'school' },
+  service:   { icon: 'hand-heart', iconFamily: 'MaterialCommunityIcons' },
+  prayer:    { icon: 'hands-pray', iconFamily: 'MaterialCommunityIcons' },
+  scripture: { icon: 'book' },
+  task:      { icon: 'checkbox' },
+  exercise:  { icon: 'barbell' },
+  other:     { icon: 'ellipsis-horizontal' },
 };
 
 /**
