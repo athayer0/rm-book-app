@@ -14,7 +14,7 @@ TO DO
 [x] cant exit dropdown while momentum scrolling
 [x] I added a person to a date event and then deleted that person before removing them from the event and now it displays that an unknown person was is in that event and I can remove them and I remove them and then save but then if I refresh Expo go then the person is still there in the event
 [ ] change color and home setup to avoid copyright
-[ ] selecting a person to add to an event has some lag after tapping it. invesifate further and make it snappy
+[x] selecting a person to add to an event has some lag after tapping it. invesifate further and make it snappy
 [ ] make it so that relevant menus dont just say edit (blank) at the top and have cancel and save buttons, have them have an x that saves or maybe a delete button with an are you sure popup
 [ ] Fix up the weekly Planning goals menu so that future events when the goals are set display zero out of and then the side goal instead of justice the set goal and when moving back to the current week from a future week There is a flash of it still saying set goals I think before correcting to the current week's key indicators
 [x] tapping the event + gives aestetic event selecter bubbles
@@ -22,7 +22,7 @@ TO DO
 [ ] be able to sign in/make an account with apple and google and facebook?
 [ ] add more hideable kis for the other event types (hours worked, hours of school, etc.) or add the ability to tie custom events to kis so that reporting them makes them 
 [ ] add spanish portuguese and french
-[ ] add color picker for event colors and a different way to select default duration for events
+[x] add color picker for event colors and a different way to select default duration for events
 [ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
 [ ] daily review notification
@@ -34,6 +34,7 @@ TO DO
 [ ] dont get sued
 [ ] deploy to google play store
 [ ] deploy to app store
+[ ] FIGURE OUT THE MONEY MAKER $$$
 
 
 BUGS

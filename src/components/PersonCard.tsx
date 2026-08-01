@@ -27,8 +27,10 @@ export function PersonCard({ person, onPress, isFirst, selected }: Props) {
   const statusConfig = PERSON_STATUSES[person.status] ?? { color: Colors.textLight, icon: 'ellipse' };
 
   function handlePress() {
-    setPressed(true);
-    setTimeout(() => setPressed(false), 500);
+    if (selected === undefined) {
+      setPressed(true);
+      setTimeout(() => setPressed(false), 500);
+    }
     onPress();
   }
 
@@ -66,7 +68,6 @@ function makeStyles(C: ColorPalette) {
     rowSelected: {
       backgroundColor: C.rowSelectedBg,
     },
-    // Listed after rowSelected so a touch still reads on an already-picked row.
     rowPressed: {
       backgroundColor: C.rowPressedBg,
     },
