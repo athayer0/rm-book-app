@@ -44,7 +44,7 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { getWeekData, saveCountForWeek, saveGoalForWeek } = useWeeklyGoals();
+  const { getWeekData, saveCountForWeek, saveGoalForWeek, counts, goals } = useWeeklyGoals();
 
   const [activeTab, setActiveTab] = useState<'graph' | 'goals'>('goals');
   const [weekOffset, setWeekOffset] = useState(0);
@@ -65,18 +65,23 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
   const isFuture = weekOffset > 0;
   const weekLabel = formatWeekLabel(weekKey);
 
+  // The current week's counts/goals are already resolved synchronously by the hook —
+  // reading them directly (instead of round-tripping through getWeekData's AsyncStorage
+  // reads) is what stops a stale future week's row data from flashing on screen while
+  // navigating back to the current week.
   const loadWeek = useCallback(async (offset: number) => {
-    const wk = getWeekKeyByOffset(offset);
-    const { counts, goals } = await getWeekData(wk);
+    const { counts: wkCounts, goals: wkGoals } = offset === 0
+      ? { counts, goals }
+      : await getWeekData(getWeekKeyByOffset(offset));
     const next: Record<string, RowData> = {};
     for (const def of definitions) {
       next[def.id] = {
-        actual: counts[def.id] ?? 0,
-        goal: resolveGoal(goals[def.id], offset > 0),
+        actual: wkCounts[def.id] ?? 0,
+        goal: resolveGoal(wkGoals[def.id], offset > 0),
       };
     }
     setRowData(next);
-  }, [definitions, getWeekData]);
+  }, [definitions, getWeekData, counts, goals]);
 
   useEffect(() => {
     if (visible) {
@@ -227,8 +232,10 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
 
                   {/* Grouped so the row's gap applies before the numbers, not between them. */}
                   <View style={styles.numGroup}>
-                    {/* A future week has no actual to report yet — show the goal alone. */}
-                    {!isFuture && (
+                    {/* A future week with no goal set yet has nothing to show a ratio
+                        against — just the "Set goals" prompt. Once a goal exists, show
+                        it as 0/goal like any other week. */}
+                    {row.goal !== null && (
                       <>
                         <TouchableOpacity
                           onPress={() => openEdit(def.id, 'actual')}
