@@ -4,12 +4,13 @@ import {
   SafeAreaView, TextInput, Pressable,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { usePeople, Person } from '../hooks/usePeople';
 import { PersonCard } from '../components/PersonCard';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
+import { ImportContactsModal } from '../modals/ImportContactsModal';
 import { FAB } from '../components/FAB';
 import {
   PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus,
@@ -58,6 +59,7 @@ export function PeopleScreen() {
 
   const { people, addPerson, updatePerson, deletePerson, reload } = usePeople();
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [search, setSearch] = useState('');
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({ kind: 'all' });
@@ -112,7 +114,16 @@ export function PeopleScreen() {
         onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
       >
         <Text style={styles.headerTitle}>People</Text>
-        <View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.filterChip}
+            onPress={() => setShowImportModal(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Import from Contacts"
+          >
+            <MaterialCommunityIcons name="account-arrow-down-outline" size={24} color={Colors.onPrimary} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.filterChip}
             onPress={() => setShowFilterDropdown(v => !v)}
@@ -236,6 +247,11 @@ export function PeopleScreen() {
         onDelete={deletePerson}
         onClose={() => setShowModal(false)}
       />
+
+      <ImportContactsModal
+        visible={showImportModal}
+        onClose={() => setShowImportModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -255,6 +271,7 @@ function makeStyles(C: ColorPalette) {
       elevation: 20,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     filterChip: {
       width: 36,
       height: 36,
