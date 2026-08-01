@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 import { useSettings } from './useSettings';
 import { LightColors, DarkColors, type ColorPalette } from '../constants/colors';
-import { contrastInk, normalizeHex, withAlpha } from '../utils/colorUtils';
+import { contrastInk, normalizeHex, withAlpha, lightenColor, darkenColor } from '../utils/colorUtils';
 
 export function useColors(): ColorPalette {
   const { settings } = useSettings();
@@ -37,6 +37,13 @@ export function useColors(): ColorPalette {
       // thing" links, the selected-row tint) in step with the new setting.
       goalTextAction: control,
       selectedDayBorder: control,
+      // The fill behind the selected day on the week strip. `base.selectedDayBg`
+      // was hand-picked as a pale wash of the *default* tertiary colour — this
+      // reproduces that same wash/dim relationship off whatever tertiary the
+      // user actually has set, in each theme, instead of a value frozen at the
+      // default. Amounts are tuned so a default tertiary reproduces the
+      // original hardcoded hex almost exactly.
+      selectedDayBg: isDark ? darkenColor(control, 0.7) : lightenColor(control, 0.87),
       rowSelectedBg: withAlpha(control, isDark ? 0.2 : 0.1),
     };
   }, [

@@ -8,6 +8,17 @@ export function lightenColor(hex: string, amount = 0.80): string {
   return `rgb(${lr}, ${lg}, ${lb})`;
 }
 
+/** Mixes `hex` toward black by `amount` — the dark-mode counterpart to
+ * `lightenColor`, for fills that need to read as tinted-but-dim rather than
+ * washed-out-pale against a dark background. */
+export function darkenColor(hex: string, amount = 0.55): string {
+  const { r, g, b } = hexToRgb(hex);
+  const dr = Math.round(r * (1 - amount));
+  const dg = Math.round(g * (1 - amount));
+  const db = Math.round(b * (1 - amount));
+  return `rgb(${dr}, ${dg}, ${db})`;
+}
+
 export interface HSV {
   /** Degrees, 0–360. */
   h: number;

@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert, TextInput, Platform,
+  SafeAreaView, Alert, TextInput, Platform, useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -50,18 +50,23 @@ type ThemeColorSettingKey =
 // Done, EDIT, goal counts). Tertiary drives `control` (checkmarks, switches,
 // active pills/tabs, the FAB, "add a thing" links). Light/dark variants of
 // secondary and tertiary are independent settings — no auto dark-mode lift —
-// so both need their own row even though only one is visible at a time.
+// so each needs its own entry. `mode` is undefined for primary (it applies to
+// both themes at once) and 'light'/'dark' for the rest, so the settings
+// screen can only surface the variant that's actually in effect right now —
+// editing the dark accent while looking at the light theme would be editing
+// a colour you can't see change.
 const THEME_COLOR_ROWS: {
   key: ThemeColorRowKey;
   label: string;
   settingKey: ThemeColorSettingKey;
   defaultValue: string;
+  mode?: 'light' | 'dark';
 }[] = [
   { key: 'primary', label: 'Primary Color', settingKey: 'themeColor', defaultValue: DEFAULT_THEME_COLOR },
-  { key: 'secondaryLight', label: 'Secondary Color (Light)', settingKey: 'secondaryColorLight', defaultValue: DEFAULT_SECONDARY_COLOR_LIGHT },
-  { key: 'secondaryDark', label: 'Secondary Color (Dark)', settingKey: 'secondaryColorDark', defaultValue: DEFAULT_SECONDARY_COLOR_DARK },
-  { key: 'tertiaryLight', label: 'Tertiary Color (Light)', settingKey: 'tertiaryColorLight', defaultValue: DEFAULT_TERTIARY_COLOR_LIGHT },
-  { key: 'tertiaryDark', label: 'Tertiary Color (Dark)', settingKey: 'tertiaryColorDark', defaultValue: DEFAULT_TERTIARY_COLOR_DARK },
+  { key: 'secondaryLight', label: 'Secondary Color (Light)', settingKey: 'secondaryColorLight', defaultValue: DEFAULT_SECONDARY_COLOR_LIGHT, mode: 'light' },
+  { key: 'secondaryDark', label: 'Secondary Color (Dark)', settingKey: 'secondaryColorDark', defaultValue: DEFAULT_SECONDARY_COLOR_DARK, mode: 'dark' },
+  { key: 'tertiaryLight', label: 'Tertiary Color (Light)', settingKey: 'tertiaryColorLight', defaultValue: DEFAULT_TERTIARY_COLOR_LIGHT, mode: 'light' },
+  { key: 'tertiaryDark', label: 'Tertiary Color (Dark)', settingKey: 'tertiaryColorDark', defaultValue: DEFAULT_TERTIARY_COLOR_DARK, mode: 'dark' },
 ];
 
 export function SettingsScreen() {
@@ -72,10 +77,20 @@ export function SettingsScreen() {
   const { resetAll, resetBuiltInDefinitions } = useWeeklyGoals();
   const { deleteAllEvents } = useCalendarEvents();
   const { signOut, user } = useAuth();
+  // Same resolution useColors() does internally — needed here too so the
+  // theme-color list can show only the variant that's actually in effect.
+  const systemScheme = useColorScheme();
+  const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
+  // Primary always shows; secondary/tertiary show only their current-theme variant.
+  const visibleColorRows = THEME_COLOR_ROWS.filter(row => !row.mode || row.mode === (isDark ? 'dark' : 'light'));
   const [resetting, setResetting] = useState(false);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [hourDropdown, setHourDropdown] = useState<'start' | 'end' | null>(null);
   const [methodDropdown, setMethodDropdown] = useState(false);
+  const [sizeDropdown, setSizeDropdown] = useState(false);
+  const [themeDropdown, setThemeDropdown] = useState(false);
+  const [colorsListOpen, setColorsListOpen] = useState(false);
+  const [typesListOpen, setTypesListOpen] = useState(false);
   const [expandedColor, setExpandedColor] = useState<ThemeColorRowKey | null>(null);
   const [colorResetOpen, setColorResetOpen] = useState(false);
   // The types deliberately spared, so everything listed starts checked.
@@ -83,6 +98,13 @@ export function SettingsScreen() {
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
+
+  // A row that's mid-edit can go out of view when the theme flips (e.g. the
+  // Theme section further down this same screen) — close it rather than
+  // leave a picker open for a variant no longer shown.
+  useEffect(() => {
+    setExpandedColor(null);
+  }, [isDark]);
 
   /**
    * Put the country-code section a fixed distance below the top of the viewport
@@ -303,54 +325,335 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Event Size */}
+        {/* Event Size — collapsed to one row and expanded on tap, the same
+            shape as Start Time / End Time above, instead of every option
+            sitting on the screen at once. */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>EVENT SIZE</Text>
           <View style={styles.card}>
-            {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
-              <TouchableOpacity
-                key={size}
-                style={[styles.row, i === arr.length - 1 && styles.rowLast]}
-                onPress={() => updateSettings({ eventSize: size })}
-              >
-                <Text style={styles.rowLabel}>{EventSizes[size].label} ({eventSizePercent(size)}%)</Text>
-                {selectedEventSize === size && (
-                  <Ionicons name="checkmark" size={18} color={Colors.control} />
-                )}
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={[styles.row, !sizeDropdown && styles.rowLast]}
+              onPress={() => setSizeDropdown(v => !v)}
+            >
+              <Text style={styles.rowLabel}>Size</Text>
+              <Text style={styles.rowValue}>
+                {EventSizes[selectedEventSize].label} ({eventSizePercent(selectedEventSize)}%)
+              </Text>
+              <Ionicons
+                name={sizeDropdown ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+            {sizeDropdown && (
+              <View style={[styles.dropdownList, styles.dropdownListLast]}>
+                {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
+                  <TouchableOpacity
+                    key={size}
+                    style={[styles.dropdownItem, i === arr.length - 1 && styles.dropdownItemLast]}
+                    onPress={() => { updateSettings({ eventSize: size }); setSizeDropdown(false); }}
+                  >
+                    <Text style={[styles.dropdownItemText, selectedEventSize === size && styles.dropdownItemActive]}>
+                      {EventSizes[size].label} ({eventSizePercent(size)}%)
+                    </Text>
+                    {selectedEventSize === size && (
+                      <Ionicons name="checkmark" size={16} color={Colors.control} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Default Country Code */}
-        <View
-          style={styles.section}
-          onLayout={e => { codeSectionY.current = e.nativeEvent.layout.y; }}
-        >
-          <Text style={styles.sectionTitle}>DEFAULT COUNTRY CODE</Text>
+        {/* Theme — collapsed to one row, same shape as Event Size / Contact
+            Method, instead of all three options sitting on the screen. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>THEME</Text>
           <View style={styles.card}>
-            <View style={[styles.row, styles.rowLast]}>
-              <TextInput
-                style={styles.codeInput}
-                value={settings.defaultCountryCode}
-                onChangeText={text => {
-                  // Normalised on the way in so the stored value is always the
-                  // '+NN' the hint in the person editor claims it is.
-                  const digits = text.replace(/\D/g, '').slice(0, 4);
-                  updateSettings({ defaultCountryCode: digits ? `+${digits}` : '' });
-                }}
-                placeholder="+1"
-                placeholderTextColor={Colors.textLight}
-                keyboardType="phone-pad"
-                maxLength={5}
-                onFocus={revealCodeField}
+            <TouchableOpacity
+              style={[styles.row, !themeDropdown && styles.rowLast]}
+              onPress={() => setThemeDropdown(v => !v)}
+            >
+              <Text style={styles.rowLabel}>Appearance</Text>
+              <Text style={styles.rowValue}>
+                {settings.theme.charAt(0).toUpperCase() + settings.theme.slice(1)}
+              </Text>
+              <Ionicons
+                name={themeDropdown ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
               />
+            </TouchableOpacity>
+            {themeDropdown && (
+              <View style={[styles.dropdownList, styles.dropdownListLast]}>
+                {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
+                  <TouchableOpacity
+                    key={theme}
+                    style={[styles.dropdownItem, i === arr.length - 1 && styles.dropdownItemLast]}
+                    onPress={() => { updateSettings({ theme }); setThemeDropdown(false); }}
+                  >
+                    <Text style={[styles.dropdownItemText, settings.theme === theme && styles.dropdownItemActive]}>
+                      {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                    </Text>
+                    {settings.theme === theme && (
+                      <Ionicons name="checkmark" size={16} color={Colors.control} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives.
+            Collapsed behind one summary row (dot strip previews all five),
+            expanding into the same indented dropdown-item list Schedule
+            Hours and Contact Method use. Each item still opens its own
+            picker panel underneath, exactly as before. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>THEME COLORS</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, !colorsListOpen && styles.rowLast]}
+              onPress={() => setColorsListOpen(v => !v)}
+            >
+              <Text style={styles.rowLabel}>Customize Colors</Text>
+              <View style={styles.dotPreviewRow}>
+                {visibleColorRows.map(row => (
+                  <View
+                    key={row.key}
+                    style={[styles.dotPreview, { backgroundColor: normalizeHex(settings[row.settingKey]) ?? row.defaultValue }]}
+                  />
+                ))}
+              </View>
+              <Ionicons
+                name={colorsListOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+            {colorsListOpen && (
+              <View style={[styles.dropdownList, !expandedColor && styles.dropdownListLast]}>
+                {visibleColorRows.map((row, i, arr) => {
+                  const isOpen = expandedColor === row.key;
+                  const isLastRow = i === arr.length - 1;
+                  // The dot is the value; the hex it happens to have said
+                  // nothing the colour itself doesn't.
+                  const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
+                  return (
+                    <View key={row.key}>
+                      <TouchableOpacity
+                        style={[styles.dropdownItem, !isOpen && isLastRow && styles.dropdownItemLast]}
+                        onPress={() => setExpandedColor(isOpen ? null : row.key)}
+                      >
+                        <View style={[styles.colorDot, { backgroundColor: value }]} />
+                        <Text style={styles.dropdownItemText}>{row.label}</Text>
+                        <Ionicons
+                          name={isOpen ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color={Colors.textLight}
+                        />
+                      </TouchableOpacity>
+                      {isOpen && (
+                        <View style={[styles.expandedPanel, isLastRow && styles.expandedPanelLast]}>
+                          <GradientColorPicker
+                            color={value}
+                            onChange={hex =>
+                              updateSettings({ [row.settingKey]: hex } as Partial<AppSettings>)
+                            }
+                          />
+                          <TouchableOpacity
+                            style={styles.resetColorBtn}
+                            onPress={() =>
+                              updateSettings({ [row.settingKey]: row.defaultValue } as Partial<AppSettings>)
+                            }
+                          >
+                            <Ionicons name="refresh" size={15} color={Colors.control} />
+                            <Text style={styles.resetColorText}>Reset to Default Color</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Event Types — collapsed behind one summary row, same as Theme
+            Colors above. What expands underneath is the original per-type
+            row + panel design (color dot, label, duration badge, its own
+            expand), unchanged apart from now sitting inside a dropdownList
+            instead of directly in the card. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, !typesListOpen && styles.rowLast]}
+              onPress={() => setTypesListOpen(v => !v)}
+            >
+              <Text style={styles.rowLabel}>Customize Types</Text>
+              <Ionicons
+                name={typesListOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+
+            {typesListOpen && (
+              <View style={[styles.dropdownList, styles.dropdownListLast]}>
+                {EVENT_TYPES.map(type => {
+                  const isExpanded = expandedType === type;
+                  const mins = effectiveMinutes(type);
+                  const color = effectiveColor(type);
+                  return (
+                    <View key={type}>
+                      <TouchableOpacity
+                        style={styles.dropdownItem}
+                        onPress={() => setExpandedType(isExpanded ? null : type)}
+                      >
+                        <View style={[styles.colorDot, { backgroundColor: color }]} />
+                        <Text style={styles.dropdownItemText}>{EventTypeLabels[type]}</Text>
+                        <Text style={styles.durationBadge}>
+                          {mins !== null ? durationLabel(mins) : hasOptionalEnd(type) ? 'Optional' : 'Fixed'}
+                        </Text>
+                        <Ionicons
+                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color={Colors.textLight}
+                        />
+                      </TouchableOpacity>
+
+                      {isExpanded && (
+                        <View style={styles.expandedPanel}>
+                          <Text style={styles.panelLabel}>Color</Text>
+                          <GradientColorPicker color={color} onChange={c => setColor(type, c)} />
+
+                          {/* Types with no duration to set get no duration section —
+                              the collapsed row already says "Optional" or "Fixed". */}
+                          {mins !== null && (
+                            <>
+                              <Text style={[styles.panelLabel, { marginTop: 16 }]}>Default Duration</Text>
+                              <DurationSlider minutes={mins} onChange={d => setDuration(type, d)} />
+                            </>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+
+                {/* Reset colors. Lists only the types actually off their default —
+                    the rest have nothing to undo, and padding the list with them
+                    would hide the ones that do behind fourteen no-ops. */}
+                <TouchableOpacity
+                  style={[styles.dropdownItem, !colorResetOpen && styles.dropdownItemLast]}
+                  disabled={customizedTypes.length === 0}
+                  onPress={() => { setColorResetOpen(v => !v); setKeptTypes([]); }}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      { color: customizedTypes.length ? Colors.control : Colors.textLight },
+                    ]}
+                  >
+                    Reset Colors to Default
+                  </Text>
+                  {customizedTypes.length === 0 ? (
+                    <Text style={styles.rowValue}>All default</Text>
+                  ) : (
+                    <Ionicons
+                      name={colorResetOpen ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={Colors.textLight}
+                    />
+                  )}
+                </TouchableOpacity>
+
+                {colorResetOpen && customizedTypes.length > 0 && (
+                  <View style={[styles.expandedPanel, styles.expandedPanelLast]}>
+                    <Text style={styles.panelLabel}>Uncheck any you want to keep</Text>
+                    {customizedTypes.map(type => {
+                      const checked = !keptTypes.includes(type);
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={styles.resetItem}
+                          onPress={() =>
+                            setKeptTypes(prev =>
+                              prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                            )
+                          }
+                        >
+                          <Ionicons
+                            name={checked ? 'checkbox' : 'square-outline'}
+                            size={20}
+                            color={checked ? Colors.control : Colors.textLight}
+                          />
+                          <View style={[styles.colorDot, { backgroundColor: effectiveColor(type), marginLeft: 10 }]} />
+                          <Text style={styles.resetItemLabel}>{EventTypeLabels[type]}</Text>
+                          {/* The colour it would go back to, so the choice is visible
+                              rather than something you have to remember. */}
+                          <View style={[styles.colorDot, { backgroundColor: EventColors[type], marginRight: 0 }]} />
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    <TouchableOpacity
+                      style={[styles.resetColorBtn, typesToReset.length === 0 && styles.resetColorBtnDisabled]}
+                      disabled={typesToReset.length === 0}
+                      onPress={resetEventColors}
+                    >
+                      <Ionicons
+                        name="refresh"
+                        size={15}
+                        color={typesToReset.length ? Colors.control : Colors.textLight}
+                      />
+                      <Text
+                        style={[
+                          styles.resetColorText,
+                          typesToReset.length === 0 && { color: Colors.textLight },
+                        ]}
+                      >
+                        {typesToReset.length === 1
+                          ? 'Reset 1 Color'
+                          : `Reset ${typesToReset.length} Colors`}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Maps — iOS only. Android has no choice to offer: an address there
+            always opens in Google Maps. */}
+        {Platform.OS === 'ios' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>PREFERRED MAPS APP</Text>
+            <View style={styles.card}>
+              {MAPS_APP_OPTIONS.map((option, i, arr) => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.row, i === arr.length - 1 && styles.rowLast]}
+                  onPress={() => updateSettings({ mapsApp: option.key })}
+                >
+                  <Text style={styles.rowLabel}>{option.label}</Text>
+                  {settings.mapsApp === option.key && (
+                    <Ionicons name="checkmark" size={18} color={Colors.control} />
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-          <Text style={styles.sectionFootnote}>
-            Used for WhatsApp numbers saved without a + code.
-          </Text>
-        </View>
+        )}
 
         {/* Default Contact Method. The section title names the setting, so the
             row carries the value alone rather than repeating it as a label. */}
@@ -405,223 +708,34 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Maps — iOS only. Android has no choice to offer: an address there
-            always opens in Google Maps. */}
-        {Platform.OS === 'ios' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>PREFERRED MAPS APP</Text>
-            <View style={styles.card}>
-              {MAPS_APP_OPTIONS.map((option, i, arr) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[styles.row, i === arr.length - 1 && styles.rowLast]}
-                  onPress={() => updateSettings({ mapsApp: option.key })}
-                >
-                  <Text style={styles.rowLabel}>{option.label}</Text>
-                  {settings.mapsApp === option.key && (
-                    <Ionicons name="checkmark" size={18} color={Colors.control} />
-                  )}
-                </TouchableOpacity>
-              ))}
+        {/* Default Country Code */}
+        <View
+          style={styles.section}
+          onLayout={e => { codeSectionY.current = e.nativeEvent.layout.y; }}
+        >
+          <Text style={styles.sectionTitle}>DEFAULT COUNTRY CODE</Text>
+          <View style={styles.card}>
+            <View style={[styles.row, styles.rowLast]}>
+              <TextInput
+                style={styles.codeInput}
+                value={settings.defaultCountryCode}
+                onChangeText={text => {
+                  // Normalised on the way in so the stored value is always the
+                  // '+NN' the hint in the person editor claims it is.
+                  const digits = text.replace(/\D/g, '').slice(0, 4);
+                  updateSettings({ defaultCountryCode: digits ? `+${digits}` : '' });
+                }}
+                placeholder="+1"
+                placeholderTextColor={Colors.textLight}
+                keyboardType="phone-pad"
+                maxLength={5}
+                onFocus={revealCodeField}
+              />
             </View>
           </View>
-        )}
-
-        {/* Theme */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>THEME</Text>
-          <View style={styles.card}>
-            {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
-              <TouchableOpacity
-                key={theme}
-                style={[styles.row, i === arr.length - 1 && styles.rowLast]}
-                onPress={() => updateSettings({ theme })}
-              >
-                <Text style={styles.rowLabel}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</Text>
-                {settings.theme === theme && (
-                  <Ionicons name="checkmark" size={18} color={Colors.control} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>THEME COLORS</Text>
-          <View style={styles.card}>
-            {THEME_COLOR_ROWS.map((row, i) => {
-              const isOpen = expandedColor === row.key;
-              const isLastRow = i === THEME_COLOR_ROWS.length - 1;
-              // The dot is the value; the hex it happens to have said nothing
-              // the colour itself doesn't.
-              const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
-              return (
-                <View key={row.key}>
-                  <TouchableOpacity
-                    style={[styles.row, !isOpen && isLastRow && styles.rowLast]}
-                    onPress={() => setExpandedColor(isOpen ? null : row.key)}
-                  >
-                    <View style={[styles.colorDot, { backgroundColor: value }]} />
-                    <Text style={styles.rowLabel}>{row.label}</Text>
-                    <Ionicons
-                      name={isOpen ? 'chevron-up' : 'chevron-down'}
-                      size={16}
-                      color={Colors.textLight}
-                      style={{ marginLeft: 6 }}
-                    />
-                  </TouchableOpacity>
-                  {isOpen && (
-                    <View style={[styles.expandedPanel, isLastRow && styles.expandedPanelLast]}>
-                      <GradientColorPicker
-                        color={value}
-                        onChange={hex =>
-                          updateSettings({ [row.settingKey]: hex } as Partial<AppSettings>)
-                        }
-                      />
-                      <TouchableOpacity
-                        style={styles.resetColorBtn}
-                        onPress={() =>
-                          updateSettings({ [row.settingKey]: row.defaultValue } as Partial<AppSettings>)
-                        }
-                      >
-                        <Ionicons name="refresh" size={15} color={Colors.control} />
-                        <Text style={styles.resetColorText}>Reset to Default Color</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Event Types */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
-          <View style={styles.card}>
-            {EVENT_TYPES.map(type => {
-              const isExpanded = expandedType === type;
-              const mins = effectiveMinutes(type);
-              const color = effectiveColor(type);
-              return (
-                <View key={type}>
-                  <TouchableOpacity
-                    style={styles.row}
-                    onPress={() => setExpandedType(isExpanded ? null : type)}
-                  >
-                    <View style={[styles.colorDot, { backgroundColor: color }]} />
-                    <Text style={styles.rowLabel}>{EventTypeLabels[type]}</Text>
-                    <Text style={styles.durationBadge}>
-                      {mins !== null ? durationLabel(mins) : hasOptionalEnd(type) ? 'Optional' : 'Fixed'}
-                    </Text>
-                    <Ionicons
-                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                      size={16}
-                      color={Colors.textLight}
-                      style={{ marginLeft: 4 }}
-                    />
-                  </TouchableOpacity>
-
-                  {isExpanded && (
-                    <View style={styles.expandedPanel}>
-                      <Text style={styles.panelLabel}>Color</Text>
-                      <GradientColorPicker color={color} onChange={c => setColor(type, c)} />
-
-                      {/* Types with no duration to set get no duration section —
-                          the collapsed row already says "Optional" or "Fixed". */}
-                      {mins !== null && (
-                        <>
-                          <Text style={[styles.panelLabel, { marginTop: 16 }]}>Default Duration</Text>
-                          <DurationSlider minutes={mins} onChange={d => setDuration(type, d)} />
-                        </>
-                      )}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-
-            {/* Reset colors. Lists only the types actually off their default —
-                the rest have nothing to undo, and padding the list with them
-                would hide the ones that do behind fourteen no-ops. */}
-            <TouchableOpacity
-              style={[styles.row, !colorResetOpen && styles.rowLast]}
-              disabled={customizedTypes.length === 0}
-              onPress={() => { setColorResetOpen(v => !v); setKeptTypes([]); }}
-            >
-              <Text
-                style={[
-                  styles.rowLabel,
-                  { color: customizedTypes.length ? Colors.control : Colors.textLight },
-                ]}
-              >
-                Reset Colors to Default
-              </Text>
-              {customizedTypes.length === 0 ? (
-                <Text style={styles.rowValue}>All default</Text>
-              ) : (
-                <Ionicons
-                  name={colorResetOpen ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                />
-              )}
-            </TouchableOpacity>
-
-            {colorResetOpen && customizedTypes.length > 0 && (
-              <View style={[styles.expandedPanel, styles.expandedPanelLast]}>
-                <Text style={styles.panelLabel}>Uncheck any you want to keep</Text>
-                {customizedTypes.map(type => {
-                  const checked = !keptTypes.includes(type);
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={styles.resetItem}
-                      onPress={() =>
-                        setKeptTypes(prev =>
-                          prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-                        )
-                      }
-                    >
-                      <Ionicons
-                        name={checked ? 'checkbox' : 'square-outline'}
-                        size={20}
-                        color={checked ? Colors.control : Colors.textLight}
-                      />
-                      <View style={[styles.colorDot, { backgroundColor: effectiveColor(type), marginLeft: 10 }]} />
-                      <Text style={styles.resetItemLabel}>{EventTypeLabels[type]}</Text>
-                      {/* The colour it would go back to, so the choice is visible
-                          rather than something you have to remember. */}
-                      <View style={[styles.colorDot, { backgroundColor: EventColors[type], marginRight: 0 }]} />
-                    </TouchableOpacity>
-                  );
-                })}
-
-                <TouchableOpacity
-                  style={[styles.resetColorBtn, typesToReset.length === 0 && styles.resetColorBtnDisabled]}
-                  disabled={typesToReset.length === 0}
-                  onPress={resetEventColors}
-                >
-                  <Ionicons
-                    name="refresh"
-                    size={15}
-                    color={typesToReset.length ? Colors.control : Colors.textLight}
-                  />
-                  <Text
-                    style={[
-                      styles.resetColorText,
-                      typesToReset.length === 0 && { color: Colors.textLight },
-                    ]}
-                  >
-                    {typesToReset.length === 1
-                      ? 'Reset 1 Color'
-                      : `Reset ${typesToReset.length} Colors`}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+          <Text style={styles.sectionFootnote}>
+            Used for WhatsApp numbers saved without a + code.
+          </Text>
         </View>
 
         {/* Data */}
@@ -839,6 +953,17 @@ function makeStyles(C: ColorPalette) {
       fontSize: 12,
       color: C.textLight,
       marginRight: 4,
+    },
+    // Theme Colors summary row — a small dot per colour, so the collapsed
+    // row still previews all five without expanding.
+    dotPreviewRow: { flexDirection: 'row', marginRight: 4 },
+    dotPreview: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginLeft: 4,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
     },
     // Everything that opens out of a row stays on the card's own surface — the
     // hairline rules and the indent separate it, not a change of background.
