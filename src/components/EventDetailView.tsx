@@ -6,7 +6,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeLabels } from '../constants/colors';
 import {
-  CalendarEvent, EventStatus, TRACKABLE_TYPES, isCheckboxType, hasEndTime,
+  CalendarEvent, EventStatus, isReportableType, isCheckboxType, hasEndTime,
 } from '../utils/eventUtils';
 import {
   CONTACT_METHODS, contactMethodLabel, methodFieldLabel, resolveContactMethod, usesContactMethod,
@@ -55,6 +55,10 @@ function recurrenceSummary(event: CalendarEvent): string {
     : [new Date(event.date + 'T12:00:00').getDay()];
   return `Every week on ${[...days].sort((a, b) => a - b).map(d => WEEKDAY_NAMES[d]).join(', ')}`;
 }
+
+// Smaller than StatusPicker's icons: a filled/outlined box reads heavier than a
+// glyph at the same size, so it needs to sit smaller to match their visual weight.
+const CHECKBOX_SIZE = 38;
 
 /**
  * An event as it stands, with nothing offering to be typed in.
@@ -129,7 +133,7 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
     ),
   });
 
-  if (!isBackup && TRACKABLE_TYPES.has(event.type)) {
+  if (!isBackup && isReportableType(event.type)) {
     groups.push({
       key: 'status',
       node: (
@@ -149,7 +153,7 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: status === 'completed' }}
               >
-                <StatusCheckbox checked={status === 'completed'} size={40} color={color} />
+                <StatusCheckbox checked={status === 'completed'} size={CHECKBOX_SIZE} color={color} />
               </TouchableOpacity>
             ) : (
               <StatusPicker value={status} onChange={s => onStatusChange?.(s)} />

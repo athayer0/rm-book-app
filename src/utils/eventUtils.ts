@@ -147,6 +147,13 @@ function eventBlockHeight(startTime: string, endTime: string, slotHeight: number
 // this height is the padding every block gets.
 export const COMPACT_EVENT_HEIGHT = EventSizes.sm.slotHeight - 1;
 
+// The size a task's checkbox draws at on a calendar block — a step down from
+// the badge slot it sits in, since a plain outline box reads bigger than a
+// glyph at the same size. The one place StatusCheckbox is drawn at its
+// "native" size; every other call site's outline thickness scales relative
+// to this, so the outline never reads a different weight between screens.
+export const CALENDAR_CHECKBOX_SIZE = Math.round(COMPACT_EVENT_HEIGHT * 0.75);
+
 export function isCheckboxType(type: string): boolean {
   return EventTypeConfig[type]?.hasCheckbox ?? false;
 }

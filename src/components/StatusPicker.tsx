@@ -22,7 +22,7 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
 };
 
 /** The size the event edit modal has always drawn these at. */
-const BASE_SIZE = 54;
+export const BASE_SIZE = 54;
 
 interface Props {
   value: EventStatus | undefined;
