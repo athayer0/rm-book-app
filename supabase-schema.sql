@@ -309,6 +309,11 @@ create table if not exists settings (
   -- iOS only: which app an address opens in.
   -- Android always uses Google Maps.
   maps_app text default 'apple',
+  daily_review_enabled boolean default false,
+  daily_review_hour int default 22,
+  daily_review_minute int default 0,
+  event_reminder_enabled boolean default false,
+  event_reminder_minutes int default 5,
   updated_at timestamptz default now()
 );
 alter table settings
@@ -336,6 +341,21 @@ alter table settings
 alter table settings
   add column if not exists
   tertiary_color_dark text;
+alter table settings
+  add column if not exists
+  daily_review_enabled boolean default false;
+alter table settings
+  add column if not exists
+  daily_review_hour int default 22;
+alter table settings
+  add column if not exists
+  daily_review_minute int default 0;
+alter table settings
+  add column if not exists
+  event_reminder_enabled boolean default false;
+alter table settings
+  add column if not exists
+  event_reminder_minutes int default 5;
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from './hooks/useColors';
@@ -11,11 +11,16 @@ import { SettingsScreen } from './screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
+// Lets code outside the navigation tree (the notification tap handler in
+// App.tsx) send the user to a tab without the modal it opens having to live
+// anywhere but HomeScreen, where the rest of its state already does.
+export const navigationRef = createNavigationContainerRef<any>();
+
 export function AppNavigation() {
   const Colors = useColors();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,

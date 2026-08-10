@@ -38,6 +38,11 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     defaultCountryCode: 'default_country_code',
     defaultContactMethod: 'default_contact_method',
     mapsApp: 'maps_app',
+    dailyReviewEnabled: 'daily_review_enabled',
+    dailyReviewHour: 'daily_review_hour',
+    dailyReviewMinute: 'daily_review_minute',
+    eventReminderEnabled: 'event_reminder_enabled',
+    eventReminderMinutes: 'event_reminder_minutes',
   },
 };
 
@@ -68,7 +73,9 @@ const COLUMNS: Record<string, string[]> = {
     'tertiary_color_light', 'tertiary_color_dark',
     'grid_start_hour', 'grid_end_hour',
     'event_size', 'event_type_colors', 'event_type_default_minutes',
-    'default_country_code', 'default_contact_method', 'maps_app', 'updated_at',
+    'default_country_code', 'default_contact_method', 'maps_app',
+    'daily_review_enabled', 'daily_review_hour', 'daily_review_minute',
+    'event_reminder_enabled', 'event_reminder_minutes', 'updated_at',
   ],
 };
 

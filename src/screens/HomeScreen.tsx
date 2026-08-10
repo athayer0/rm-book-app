@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
@@ -19,7 +19,7 @@ import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
 import { useUnreported } from '../hooks/useUnreported';
 import { Person } from '../hooks/usePeople';
 
-export function HomeScreen({ navigation }: any) {
+export function HomeScreen({ navigation, route }: any) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
@@ -33,6 +33,17 @@ export function HomeScreen({ navigation }: any) {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [personModalVisible, setPersonModalVisible] = useState(false);
   const [unreportedVisible, setUnreportedVisible] = useState(false);
+
+  // The daily-review notification tap navigates here with this param (set in
+  // App.tsx, since the tap handler lives outside the tab tree and this modal's
+  // open/close state does not). Consumed once and cleared, so returning to
+  // this tab later doesn't reopen it.
+  useEffect(() => {
+    if (route?.params?.openUnreported) {
+      setUnreportedVisible(true);
+      navigation.setParams({ openUnreported: undefined });
+    }
+  }, [route?.params?.openUnreported]);
 
   const featuredPeople = people.filter(p => p.starred);
 

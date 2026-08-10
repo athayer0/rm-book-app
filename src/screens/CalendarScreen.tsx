@@ -32,7 +32,7 @@ const EDGE_ZONE = 60;
  */
 const QUICK_ADD_TYPES = ['travel', 'activity', 'date', 'temple', 'contact', 'task'];
 
-function CalendarContent() {
+function CalendarContent({ route, navigation }: { route?: any; navigation?: any }) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
@@ -88,6 +88,17 @@ function CalendarContent() {
   useEffect(() => {
     if (!showMonthPicker) setPickerMonth(selectedDate);
   }, [selectedDate]);
+
+  // An event-reminder notification tap lands here (see App.tsx) with the
+  // occurrence's date — jump to that day. Consumed once and cleared, same as
+  // HomeScreen's openUnreported param.
+  useEffect(() => {
+    const eventDate = (route?.params as { eventDate?: string } | undefined)?.eventDate;
+    if (!eventDate) return;
+
+    setSelectedDate(new Date(eventDate + 'T12:00:00'));
+    navigation?.setParams({ eventDate: undefined });
+  }, [route?.params?.eventDate]);
 
   const goToToday = useCallback(() => setSelectedDate(new Date()), []);
   const edgeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -391,10 +402,10 @@ function CalendarContent() {
   );
 }
 
-export function CalendarScreen() {
+export function CalendarScreen({ route, navigation }: any) {
   return (
     <DragProvider>
-      <CalendarContent />
+      <CalendarContent route={route} navigation={navigation} />
     </DragProvider>
   );
 }

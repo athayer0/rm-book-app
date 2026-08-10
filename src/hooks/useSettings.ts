@@ -36,6 +36,16 @@ export interface AppSettings {
   defaultContactMethod: string;
   /** iOS only — Android opens addresses in Google Maps regardless. */
   mapsApp: MapsApp;
+  /** Whether the daily local notification reminding the user to report events is scheduled. */
+  dailyReviewEnabled: boolean;
+  /** 0-23, local device time. */
+  dailyReviewHour: number;
+  /** 0-59, local device time. */
+  dailyReviewMinute: number;
+  /** Whether a local notification fires ahead of every calendar event. */
+  eventReminderEnabled: boolean;
+  /** Minutes before an event's start the reminder fires. One of EVENT_REMINDER_MINUTE_OPTIONS. */
+  eventReminderMinutes: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -54,6 +64,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultCountryCode: '+1',
   defaultContactMethod: DEFAULT_CONTACT_METHOD,
   mapsApp: DEFAULT_MAPS_APP,
+  dailyReviewEnabled: false,
+  dailyReviewHour: 22,
+  dailyReviewMinute: 0,
+  eventReminderEnabled: false,
+  eventReminderMinutes: 5,
 };
 
 type SettingsContextValue = {

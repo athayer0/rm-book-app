@@ -23,10 +23,9 @@ FEATURES
 [x] tapping the event + gives aestetic event selecter bubbles
 [x] be able to import people from contacts app on your phone
 [x] add color picker for event colors and a different way to select default duration for events
+[x] daily review and event notifications
 
-[ ] widget for sm idk
 [ ] save recent convert info on where they are on the covenant path
-[ ] daily review notification
 [ ] onboarding
 [ ] make friends and districts, be able to view each others KIs
 [ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
@@ -35,6 +34,7 @@ FEATURES
 
 DEPLOYMENT TASKS
 [ ] Choose an official name and make support email. Then, be able to sign in/make an account with apple and google (and facebook?)
+[ ] widget for sm idk (requires apple dev license)
 [ ] change color and home setup to avoid copyright
 [ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
 [ ] security audit
