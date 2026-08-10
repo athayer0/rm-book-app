@@ -93,9 +93,10 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
                     event={occurrence}
                     status={statusOf(occurrence.id, occurrence.date)}
                     onPress={() => setEditing(occurrence)}
-                    // A checkbox event's tick target would otherwise swallow the
-                    // press and do nothing, leaving a dead patch on the block.
-                    onToggleStatus={() => setEditing(occurrence)}
+                    // The tick target is a task's own checkbox — tapping it reports
+                    // the occurrence directly, the same as the calendar's checkbox,
+                    // rather than opening the editor the rest of the block does.
+                    onToggleStatus={() => report(occurrence, 'completed')}
                     slotHeight={slotHeight}
                     fontSize={fontSize}
                   />
