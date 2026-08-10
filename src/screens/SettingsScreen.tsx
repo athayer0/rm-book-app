@@ -5,9 +5,6 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Sharing from 'expo-sharing';
-import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import {
@@ -24,9 +21,6 @@ import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { isCheckboxType, hasOptionalEnd } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
-import { drainThenClear } from '../lib/localData';
-import { isAppDataKey } from '../constants/storageKeys';
-import { pullAll } from '../lib/sync';
 import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
 import { CONTACT_METHODS, DEFAULT_CONTACT_METHOD, DEFAULT_METHOD_CHOICES } from '../constants/contactMethods';
 import { GoalIcon } from '../components/GoalIcon';
@@ -88,14 +82,13 @@ export function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
   const { resetAll, resetBuiltInDefinitions } = useWeeklyGoals();
   const { deleteAllEvents } = useCalendarEvents();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   // Same resolution useColors() does internally — needed here too so the
   // theme-color list can show only the variant that's actually in effect.
   const systemScheme = useColorScheme();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
   // Primary always shows; secondary/tertiary show only their current-theme variant.
   const visibleColorRows = THEME_COLOR_ROWS.filter(row => !row.mode || row.mode === (isDark ? 'dark' : 'light'));
-  const [resetting, setResetting] = useState(false);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
   const [expandedColor, setExpandedColor] = useState<ThemeColorRowKey | null>(null);
@@ -190,48 +183,6 @@ export function SettingsScreen() {
         'Signed out — local data kept',
         `${pending} change${pending === 1 ? '' : 's'} could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.`,
       );
-    }
-  }
-
-  async function handleResetLocal() {
-    if (!user) return;
-    setResetting(true);
-    try {
-      // Push first. Clearing with ops still queued would discard work that
-      // exists nowhere else — and if the push failed we are almost certainly
-      // offline, in which case the re-download would come back empty anyway.
-      const { cleared, pending } = await drainThenClear();
-      if (!cleared) {
-        Alert.alert(
-          'Nothing was cleared',
-          `${pending} change${pending === 1 ? '' : 's'} still need${pending === 1 ? 's' : ''} to sync, so your data was left alone. Reconnect and try again.`,
-        );
-        return;
-      }
-      await pullAll(user.id);
-    } catch (e) {
-      Alert.alert('Re-download failed', 'Local data was cleared but the download failed. Check your connection and relaunch the app.');
-      console.log('[reset] failed:', e);
-    } finally {
-      setResetting(false);
-    }
-  }
-
-  async function handleExport() {
-    try {
-      // Allowlisted: a blanket dump includes the `sb-<ref>-auth-token` key,
-      // which holds the access AND refresh tokens — anyone receiving the shared
-      // file would own the account until the refresh token is revoked.
-      const keys = (await AsyncStorage.getAllKeys()).filter(isAppDataKey);
-      const pairs = await AsyncStorage.multiGet(keys as string[]);
-      const data: Record<string, unknown> = {};
-      pairs.forEach(([k, v]) => { if (v) data[k] = JSON.parse(v); });
-      const json = JSON.stringify(data, null, 2);
-      const path = (cacheDirectory ?? '') + 'rm-book-export.json';
-      await writeAsStringAsync(path, json);
-      await Sharing.shareAsync(path, { mimeType: 'application/json' });
-    } catch {
-      Alert.alert('Export failed', 'Could not export data.');
     }
   }
 
@@ -362,6 +313,170 @@ export function SettingsScreen() {
           <Pressable style={styles.pickerBackdrop} onPress={() => setOpenDropdown(null)} />
         )}
 
+        {/* Theme — collapsed to one row, same shape as Event Size / Contact
+            Method, instead of all three options sitting on the screen. */}
+        <View style={[styles.section, openDropdown === 'theme' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>THEME</Text>
+          <View style={styles.card}>
+            <View style={[styles.fieldRow, openDropdown === 'theme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={[styles.row, styles.rowLast]}
+                onPress={() => toggleDropdown('theme')}
+              >
+                <Text style={styles.rowLabel}>Mode</Text>
+                <Text style={styles.rowValue}>
+                  {settings.theme.charAt(0).toUpperCase() + settings.theme.slice(1)}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'theme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              {openDropdown === 'theme' && (
+                <View style={styles.floatingDropdown}>
+                  {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
+                    <TouchableOpacity
+                      key={theme}
+                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
+                      onPress={() => { updateSettings({ theme }); setOpenDropdown(null); }}
+                    >
+                      <Text style={[styles.floatingDropdownText, settings.theme === theme && styles.floatingDropdownTextActive]}>
+                        {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                      </Text>
+                      {settings.theme === theme && (
+                        <Ionicons name="checkmark" size={16} color={Colors.control} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives.
+            Collapsed behind one summary row (dot strip previews all five),
+            expanding into the same indented dropdown-item list Schedule
+            Hours and Contact Method use. Each item still opens its own
+            picker panel underneath, exactly as before. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>THEME COLORS</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, openDropdown !== 'colors' && styles.rowLast]}
+              onPress={() => toggleDropdown('colors')}
+            >
+              <Text style={styles.rowLabel}>Customize Colors</Text>
+              <View style={styles.dotPreviewRow}>
+                {visibleColorRows.map(row => (
+                  <View
+                    key={row.key}
+                    style={[styles.dotPreview, { backgroundColor: normalizeHex(settings[row.settingKey]) ?? row.defaultValue }]}
+                  />
+                ))}
+              </View>
+              <Ionicons
+                name={openDropdown === 'colors' ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+            {openDropdown === 'colors' && (
+              <View style={[styles.dropdownList, !expandedColor && styles.dropdownListLast]}>
+                {visibleColorRows.map((row, i, arr) => {
+                  const isOpen = expandedColor === row.key;
+                  const isLastRow = i === arr.length - 1;
+                  // The dot is the value; the hex it happens to have said
+                  // nothing the colour itself doesn't.
+                  const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
+                  return (
+                    <View key={row.key}>
+                      <TouchableOpacity
+                        style={[styles.dropdownItem, !isOpen && isLastRow && styles.dropdownItemLast]}
+                        onPress={() => setExpandedColor(isOpen ? null : row.key)}
+                      >
+                        <View style={[styles.colorDot, { backgroundColor: value }]} />
+                        <Text style={styles.dropdownItemText}>{row.label}</Text>
+                        <Ionicons
+                          name={isOpen ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color={Colors.textLight}
+                        />
+                      </TouchableOpacity>
+                      {isOpen && (
+                        <View style={[styles.expandedPanel, isLastRow && styles.expandedPanelLast]}>
+                          <GradientColorPicker
+                            color={value}
+                            onChange={hex =>
+                              updateSettings({ [row.settingKey]: hex } as Partial<AppSettings>)
+                            }
+                          />
+                          <TouchableOpacity
+                            style={styles.resetColorBtn}
+                            onPress={() =>
+                              updateSettings({ [row.settingKey]: row.defaultValue } as Partial<AppSettings>)
+                            }
+                          >
+                            <Ionicons name="refresh" size={15} color={Colors.control} />
+                            <Text style={styles.resetColorText}>Reset to Default Color</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Event Size — collapsed to one row and expanded on tap, the same
+            shape as Start Time / End Time above, instead of every option
+            sitting on the screen at once. */}
+        <View style={[styles.section, openDropdown === 'size' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>EVENT SIZE</Text>
+          <View style={styles.card}>
+            <View style={[styles.fieldRow, openDropdown === 'size' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={[styles.row, styles.rowLast]}
+                onPress={() => toggleDropdown('size')}
+              >
+                <Text style={styles.rowLabel}>Size</Text>
+                <Text style={styles.rowValue}>
+                  {EventSizes[selectedEventSize].label} ({eventSizePercent(selectedEventSize)}%)
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'size' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              {openDropdown === 'size' && (
+                <View style={styles.floatingDropdown}>
+                  {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
+                    <TouchableOpacity
+                      key={size}
+                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
+                      onPress={() => { updateSettings({ eventSize: size }); setOpenDropdown(null); }}
+                    >
+                      <Text style={[styles.floatingDropdownText, selectedEventSize === size && styles.floatingDropdownTextActive]}>
+                        {EventSizes[size].label} ({eventSizePercent(size)}%)
+                      </Text>
+                      {selectedEventSize === size && (
+                        <Ionicons name="checkmark" size={16} color={Colors.control} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
         {/* Week Start */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>WEEK START</Text>
@@ -452,266 +567,6 @@ export function SettingsScreen() {
                 </View>
               )}
             </View>
-          </View>
-        </View>
-
-        {/* Event Size — collapsed to one row and expanded on tap, the same
-            shape as Start Time / End Time above, instead of every option
-            sitting on the screen at once. */}
-        <View style={[styles.section, openDropdown === 'size' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>EVENT SIZE</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldRow, openDropdown === 'size' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
-                onPress={() => toggleDropdown('size')}
-              >
-                <Text style={styles.rowLabel}>Size</Text>
-                <Text style={styles.rowValue}>
-                  {EventSizes[selectedEventSize].label} ({eventSizePercent(selectedEventSize)}%)
-                </Text>
-                <Ionicons
-                  name={openDropdown === 'size' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              {openDropdown === 'size' && (
-                <View style={styles.floatingDropdown}>
-                  {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
-                    <TouchableOpacity
-                      key={size}
-                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ eventSize: size }); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.floatingDropdownText, selectedEventSize === size && styles.floatingDropdownTextActive]}>
-                        {EventSizes[size].label} ({eventSizePercent(size)}%)
-                      </Text>
-                      {selectedEventSize === size && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Theme — collapsed to one row, same shape as Event Size / Contact
-            Method, instead of all three options sitting on the screen. */}
-        <View style={[styles.section, openDropdown === 'theme' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>THEME</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldRow, openDropdown === 'theme' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
-                onPress={() => toggleDropdown('theme')}
-              >
-                <Text style={styles.rowLabel}>Appearance</Text>
-                <Text style={styles.rowValue}>
-                  {settings.theme.charAt(0).toUpperCase() + settings.theme.slice(1)}
-                </Text>
-                <Ionicons
-                  name={openDropdown === 'theme' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              {openDropdown === 'theme' && (
-                <View style={styles.floatingDropdown}>
-                  {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
-                    <TouchableOpacity
-                      key={theme}
-                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ theme }); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.floatingDropdownText, settings.theme === theme && styles.floatingDropdownTextActive]}>
-                        {theme.charAt(0).toUpperCase() + theme.slice(1)}
-                      </Text>
-                      {settings.theme === theme && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Daily Review Reminder — a local notification, off by default, that
-            opens straight to the unreported-events backlog when tapped. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DAILY REVIEW</Text>
-          <View style={styles.card}>
-            <View style={[styles.row, !settings.dailyReviewEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>Notifications</Text>
-              <Switch
-                value={settings.dailyReviewEnabled}
-                onValueChange={handleToggleDailyReview}
-                trackColor={{ true: Colors.control }}
-                thumbColor={Colors.white}
-              />
-            </View>
-            {settings.dailyReviewEnabled && (
-              <>
-                <TouchableOpacity
-                  style={[styles.row, openDropdown !== 'dailyReviewTime' && styles.rowLast]}
-                  onPress={() => toggleDropdown('dailyReviewTime')}
-                >
-                  <Text style={styles.rowLabel}>Time</Text>
-                  <Text style={styles.rowValue}>
-                    {formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
-                  </Text>
-                  <Ionicons
-                    name={openDropdown === 'dailyReviewTime' ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color={Colors.textLight}
-                    style={{ marginLeft: 6 }}
-                  />
-                </TouchableOpacity>
-                {openDropdown === 'dailyReviewTime' && (
-                  <View style={styles.timeWheelPanel}>
-                    <TimeWheelPicker
-                      value={formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
-                      onChange={handleSelectDailyReviewTime}
-                    />
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Event Reminders — a second, independent local notification: one
-            per upcoming event occurrence rather than a single daily one. */}
-        <View style={[styles.section, openDropdown === 'eventReminderLead' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>EVENT REMINDERS</Text>
-          <View style={styles.card}>
-            <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>Notifications</Text>
-              <Switch
-                value={settings.eventReminderEnabled}
-                onValueChange={handleToggleEventReminders}
-                trackColor={{ true: Colors.control }}
-                thumbColor={Colors.white}
-              />
-            </View>
-            {settings.eventReminderEnabled && (
-              <View style={[styles.fieldRow, openDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
-                <TouchableOpacity
-                  style={[styles.row, styles.rowLast]}
-                  onPress={() => toggleDropdown('eventReminderLead')}
-                >
-                  <Text style={styles.rowLabel}>Time Before</Text>
-                  <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
-                  <Ionicons
-                    name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color={Colors.textLight}
-                    style={{ marginLeft: 6 }}
-                  />
-                </TouchableOpacity>
-                {openDropdown === 'eventReminderLead' && (
-                  <View style={styles.floatingDropdown}>
-                    {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
-                      <TouchableOpacity
-                        key={minutes}
-                        style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                        onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
-                      >
-                        <Text style={[styles.floatingDropdownText, settings.eventReminderMinutes === minutes && styles.floatingDropdownTextActive]}>
-                          {eventReminderLabel(minutes)}
-                        </Text>
-                        {settings.eventReminderMinutes === minutes && (
-                          <Ionicons name="checkmark" size={16} color={Colors.control} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives.
-            Collapsed behind one summary row (dot strip previews all five),
-            expanding into the same indented dropdown-item list Schedule
-            Hours and Contact Method use. Each item still opens its own
-            picker panel underneath, exactly as before. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>THEME COLORS</Text>
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={[styles.row, openDropdown !== 'colors' && styles.rowLast]}
-              onPress={() => toggleDropdown('colors')}
-            >
-              <Text style={styles.rowLabel}>Customize Colors</Text>
-              <View style={styles.dotPreviewRow}>
-                {visibleColorRows.map(row => (
-                  <View
-                    key={row.key}
-                    style={[styles.dotPreview, { backgroundColor: normalizeHex(settings[row.settingKey]) ?? row.defaultValue }]}
-                  />
-                ))}
-              </View>
-              <Ionicons
-                name={openDropdown === 'colors' ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={Colors.textLight}
-                style={{ marginLeft: 6 }}
-              />
-            </TouchableOpacity>
-            {openDropdown === 'colors' && (
-              <View style={[styles.dropdownList, !expandedColor && styles.dropdownListLast]}>
-                {visibleColorRows.map((row, i, arr) => {
-                  const isOpen = expandedColor === row.key;
-                  const isLastRow = i === arr.length - 1;
-                  // The dot is the value; the hex it happens to have said
-                  // nothing the colour itself doesn't.
-                  const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
-                  return (
-                    <View key={row.key}>
-                      <TouchableOpacity
-                        style={[styles.dropdownItem, !isOpen && isLastRow && styles.dropdownItemLast]}
-                        onPress={() => setExpandedColor(isOpen ? null : row.key)}
-                      >
-                        <View style={[styles.colorDot, { backgroundColor: value }]} />
-                        <Text style={styles.dropdownItemText}>{row.label}</Text>
-                        <Ionicons
-                          name={isOpen ? 'chevron-up' : 'chevron-down'}
-                          size={16}
-                          color={Colors.textLight}
-                        />
-                      </TouchableOpacity>
-                      {isOpen && (
-                        <View style={[styles.expandedPanel, isLastRow && styles.expandedPanelLast]}>
-                          <GradientColorPicker
-                            color={value}
-                            onChange={hex =>
-                              updateSettings({ [row.settingKey]: hex } as Partial<AppSettings>)
-                            }
-                          />
-                          <TouchableOpacity
-                            style={styles.resetColorBtn}
-                            onPress={() =>
-                              updateSettings({ [row.settingKey]: row.defaultValue } as Partial<AppSettings>)
-                            }
-                          >
-                            <Ionicons name="refresh" size={15} color={Colors.control} />
-                            <Text style={styles.resetColorText}>Reset to Default Color</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            )}
           </View>
         </View>
 
@@ -948,28 +803,6 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Maps — iOS only. Android has no choice to offer: an address there
-            always opens in Google Maps. */}
-        {Platform.OS === 'ios' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>PREFERRED MAPS APP</Text>
-            <View style={styles.card}>
-              {MAPS_APP_OPTIONS.map((option, i, arr) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[styles.row, i === arr.length - 1 && styles.rowLast]}
-                  onPress={() => updateSettings({ mapsApp: option.key })}
-                >
-                  <Text style={styles.rowLabel}>{option.label}</Text>
-                  {settings.mapsApp === option.key && (
-                    <Ionicons name="checkmark" size={18} color={Colors.control} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Default Contact Method. The section title names the setting, so the
             row carries the value alone rather than repeating it as a label. */}
         <View style={[styles.section, openDropdown === 'method' && styles.sectionFloating]}>
@@ -1055,14 +888,128 @@ export function SettingsScreen() {
           </Text>
         </View>
 
+        {/* Maps — iOS only. Android has no choice to offer: an address there
+            always opens in Google Maps. */}
+        {Platform.OS === 'ios' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>PREFERRED MAPS APP</Text>
+            <View style={styles.card}>
+              {MAPS_APP_OPTIONS.map((option, i, arr) => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.row, i === arr.length - 1 && styles.rowLast]}
+                  onPress={() => updateSettings({ mapsApp: option.key })}
+                >
+                  <Text style={styles.rowLabel}>{option.label}</Text>
+                  {settings.mapsApp === option.key && (
+                    <Ionicons name="checkmark" size={18} color={Colors.control} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Daily Review Reminder — a local notification, off by default, that
+            opens straight to the unreported-events backlog when tapped. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>DAILY REVIEW</Text>
+          <View style={styles.card}>
+            <View style={[styles.row, !settings.dailyReviewEnabled && styles.rowLast]}>
+              <Text style={styles.rowLabel}>Notifications</Text>
+              <Switch
+                value={settings.dailyReviewEnabled}
+                onValueChange={handleToggleDailyReview}
+                trackColor={{ true: Colors.control }}
+                thumbColor={Colors.white}
+              />
+            </View>
+            {settings.dailyReviewEnabled && (
+              <>
+                <TouchableOpacity
+                  style={[styles.row, openDropdown !== 'dailyReviewTime' && styles.rowLast]}
+                  onPress={() => toggleDropdown('dailyReviewTime')}
+                >
+                  <Text style={styles.rowLabel}>Time</Text>
+                  <Text style={styles.rowValue}>
+                    {formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
+                  </Text>
+                  <Ionicons
+                    name={openDropdown === 'dailyReviewTime' ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={Colors.textLight}
+                    style={{ marginLeft: 6 }}
+                  />
+                </TouchableOpacity>
+                {openDropdown === 'dailyReviewTime' && (
+                  <View style={styles.timeWheelPanel}>
+                    <TimeWheelPicker
+                      value={formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
+                      onChange={handleSelectDailyReviewTime}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Event Reminders — a second, independent local notification: one
+            per upcoming event occurrence rather than a single daily one. */}
+        <View style={[styles.section, openDropdown === 'eventReminderLead' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>EVENT REMINDERS</Text>
+          <View style={styles.card}>
+            <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
+              <Text style={styles.rowLabel}>Notifications</Text>
+              <Switch
+                value={settings.eventReminderEnabled}
+                onValueChange={handleToggleEventReminders}
+                trackColor={{ true: Colors.control }}
+                thumbColor={Colors.white}
+              />
+            </View>
+            {settings.eventReminderEnabled && (
+              <View style={[styles.fieldRow, openDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
+                <TouchableOpacity
+                  style={[styles.row, styles.rowLast]}
+                  onPress={() => toggleDropdown('eventReminderLead')}
+                >
+                  <Text style={styles.rowLabel}>Time Before</Text>
+                  <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
+                  <Ionicons
+                    name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={Colors.textLight}
+                    style={{ marginLeft: 6 }}
+                  />
+                </TouchableOpacity>
+                {openDropdown === 'eventReminderLead' && (
+                  <View style={styles.floatingDropdown}>
+                    {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
+                      <TouchableOpacity
+                        key={minutes}
+                        style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
+                        onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
+                      >
+                        <Text style={[styles.floatingDropdownText, settings.eventReminderMinutes === minutes && styles.floatingDropdownTextActive]}>
+                          {eventReminderLabel(minutes)}
+                        </Text>
+                        {settings.eventReminderMinutes === minutes && (
+                          <Ionicons name="checkmark" size={16} color={Colors.control} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Data */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>DATA</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.row} onPress={handleExport}>
-              <Text style={styles.rowLabel}>Export Data</Text>
-              <Ionicons name="share-outline" size={18} color={Colors.textLight} />
-            </TouchableOpacity>
             <TouchableOpacity style={styles.row} onPress={handleResetWeek}>
               <Text style={[styles.rowLabel, { color: Colors.danger }]}>Reset Current Week</Text>
               <Ionicons name="refresh" size={18} color={Colors.danger} />
@@ -1119,37 +1066,6 @@ export function SettingsScreen() {
             >
               <Text style={[styles.rowLabel, { color: Colors.danger }]}>Delete All Events</Text>
               <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Sync */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SYNC</Text>
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
-              disabled={resetting}
-              onPress={() =>
-                Alert.alert(
-                  'Re-download From Server',
-                  "Uploads anything still pending, then clears this device's copy and downloads everything again from your account.",
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Re-download', style: 'destructive', onPress: handleResetLocal },
-                  ],
-                  { cancelable: true }
-                )
-              }
-            >
-              <Text style={[styles.rowLabel, { color: resetting ? Colors.textLight : Colors.danger }]}>
-                {resetting ? 'Re-downloading…' : 'Re-download From Server'}
-              </Text>
-              <Ionicons
-                name="cloud-download-outline"
-                size={18}
-                color={resetting ? Colors.textLight : Colors.danger}
-              />
             </TouchableOpacity>
           </View>
         </View>
