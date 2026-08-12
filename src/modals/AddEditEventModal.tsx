@@ -482,7 +482,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                {/* 24, the same as the edit header's × and back arrow. The
+                    header has no fixed height, so it takes its size from the
+                    tallest thing in it — a glyph 2pt smaller here made the
+                    whole bar shorter than the edit one, and switching modes
+                    shifted everything below it. */}
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Event</Text>
               <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
@@ -503,7 +508,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               >
                 {event
                   ? <Ionicons name="arrow-back" size={24} color={Colors.textSecondary} />
-                  : <Ionicons name="close" size={22} color={Colors.textSecondary} />}
+                  : <Ionicons name="close" size={24} color={Colors.textSecondary} />}
               </TouchableOpacity>
               <Text style={styles.headerTitle}>{event ? 'Edit Event' : 'New Event'}</Text>
               <TouchableOpacity onPress={handleSave} style={styles.headerRightBtn}>
@@ -604,20 +609,26 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           {/* A group of its own rather than a panel hanging off the row: it
               belongs to the Date field above it, and reads that way sitting
               directly beneath it inside the same card. */}
-          {/* Deliberately not wrapped in Collapsible, unlike the time wheels
-              below. Animating this one cost it taps that used to land — and the
-              zIndex lift it needs is what a Collapsible's own wrapper gets in
-              the way of. Left as it was: mounted only while open, lifted over
-              its neighbours, no animation. */}
-          {showDatePicker && (
-            <View style={[styles.group, { paddingTop: 4 }, styles.openPickerRow]}>
+          {/* openPickerRow goes on the Collapsible itself, not the group inside
+              it: the zIndex has to land on the element that is actually a
+              sibling of the other groups, and the Collapsible's animated
+              container is now that element. */}
+          <Collapsible open={showDatePicker} style={styles.openPickerRow}>
+            <View style={[styles.group, { paddingTop: 4 }]}>
+              {/* Picking a day deliberately leaves the panel open — it closes
+                  from the Date row itself, by opening another picker, or on
+                  Save/back (handleSave and resetForm both clear openPicker).
+                  Same as the time wheels below, which have never closed on a
+                  value change either: a date is something you may well change
+                  twice, and snapping shut on the first tap makes correcting it
+                  a matter of reopening the panel. */}
               <InlineDatePicker
                 value={date}
                 weekStart={settings.weekStart}
-                onChange={ds => { setDate(ds); closePickers(); }}
+                onChange={setDate}
               />
             </View>
-          )}
+          </Collapsible>
 
           <View style={[styles.group, styles.columns, styles.pickerRow, (elevatedPicker === 'start' || elevatedPicker === 'end') && styles.openPickerRow]}>
             <View style={styles.column}>
@@ -665,7 +676,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               `showStartPicker`: the latter is already false for the whole
               collapse, so the wheel would flip to the end time and animate away
               showing the wrong number. elevatedPicker holds the last one opened. */}
-          <Collapsible open={showStartPicker || showEndPicker}>
+          <Collapsible open={showStartPicker || showEndPicker} style={styles.openPickerRow}>
             <View style={[styles.group, { paddingTop: 4 }]}>
               <TimeWheelPicker
                 value={elevatedPicker === 'start' ? startTime : endTime}
@@ -824,12 +835,17 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   </View>
                 </View>
 
-                <Collapsible open={showEndsOnPicker}>
+                {/* Same construction as the Date and time-wheel panels above:
+                    lifted over its neighbours from the Collapsible itself (the
+                    animated container is what's actually a sibling of the other
+                    groups), and left open when a day is picked so a date can be
+                    corrected without reopening the panel. */}
+                <Collapsible open={showEndsOnPicker} style={styles.openPickerRow}>
                   <InlineDatePicker
                     value={endsOn}
                     weekStart={settings.weekStart}
                     minDate={date}
-                    onChange={ds => { setEndsOn(ds); closePickers(); }}
+                    onChange={setEndsOn}
                   />
                 </Collapsible>
 

@@ -225,7 +225,12 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                {/* 24, the same as the edit header's × and back arrow. The
+                    header has no fixed height, so it takes its size from the
+                    tallest thing in it — a glyph 2pt smaller here made the
+                    whole bar shorter than the edit one, and switching modes
+                    shifted everything below it. */}
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Person</Text>
               <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
@@ -246,7 +251,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               >
                 {person
                   ? <Ionicons name="arrow-back" size={24} color={Colors.textSecondary} />
-                  : <Ionicons name="close" size={22} color={Colors.textSecondary} />}
+                  : <Ionicons name="close" size={24} color={Colors.textSecondary} />}
               </TouchableOpacity>
               <Text style={styles.headerTitle}>{person ? 'Edit Person' : 'Add Person'}</Text>
               <TouchableOpacity onPress={handleSave} style={styles.headerRightBtn}>
