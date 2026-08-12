@@ -34,6 +34,23 @@ const TOP_PAD = 22;
 const BOTTOM_PAD = 27;
 const CHART_H = 180;
 const N_WEEKS = 6;
+// Ten lines over CHART_H is ~18px apart, tight but legible at fontSize 9 — and
+// it's what keeps a max of 10 or under labelled by ones.
+const MAX_GRID_LINES = 10;
+
+// Walks a 1–2–5–10 sequence and takes the first step that fits the axis inside
+// MAX_GRID_LINES: ones up to 10, twos to 20, fives to 50, and so on. Taking
+// fractions of the max instead is what used to skip labels — a quarter of 5
+// rounds to 1 and half rounds to 3, so 2 never gets a line.
+function tickStep(max: number): number {
+  for (let pow = 0; pow < 12; pow++) {
+    for (const m of [1, 2, 5]) {
+      const step = m * 10 ** pow;
+      if (max / step <= MAX_GRID_LINES) return step;
+    }
+  }
+  return 10 ** 12;
+}
 
 export function GoalGraphTab({ definitions }: Props) {
   const Colors = useColors();
@@ -101,9 +118,9 @@ export function GoalGraphTab({ definitions }: Props) {
   function barX(i: number) { return LEFT_PAD + i * colW + (colW - barW) / 2; }
   function dotX(i: number) { return LEFT_PAD + i * colW + colW / 2; }
 
-  const gridLevels = [0.25, 0.5, 0.75, 1.0]
-    .map(f => Math.round(rawMax * f))
-    .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i);
+  const step = tickStep(rawMax);
+  const gridLevels: number[] = [];
+  for (let v = step; v <= rawMax; v += step) gridLevels.push(v);
 
   const linePoints = weekData
     .map((p, i) => `${dotX(i)},${yFor(p.actual)}`)
