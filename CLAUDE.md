@@ -63,6 +63,21 @@ Colors are entirely dynamic — **every component resolves its palette at render
 - Icons, images, and non-text elements that use color should also reference `ColorPalette` tokens rather than fixed values.
 - After any color/visual change, mentally verify both themes: does it look intentional in light mode **and** dark mode?
 
+### Dropdowns
+
+**Every dropdown in the app is `src/components/DropdownMenu.tsx`.** Do not hand-roll another one — four screens each had their own `dropdown`/`dropdownFloating`/`dropdownItem` styles before this, and they drifted apart. It exports four things:
+
+- `DropdownMenu` — the floating panel. Animates in (opacity + scale from `transformOrigin: top`) and, crucially, **stays mounted through its own exit**, which is why `open` is a prop rather than the caller writing `{open && <Menu/>}`. `align` is `'stretch'` (match the trigger's width — the default, right for a field) or `'left'`/`'right'` (size to content and pin — right for a menu hanging off an icon button).
+- `DropdownItem` — one row. Handles the press tint, the inset separator (`showSeparator={i < arr.length - 1}`), the selected checkmark, and the selection haptic. `leading` takes an icon or colour dot; that element owns its own right margin, since the row has no `gap`.
+- `MenuDivider` — full-bleed, for dividing a menu into sections. Distinct from a row separator, which is inset.
+- `Collapsible` — animated height, for panels that genuinely belong in the flow (a colour picker, a time wheel) where floating would tear the control away from the row it edits. Measures its content via `onLayout`, since `height: 'auto'` isn't animatable. Its content is **absolutely positioned, and must stay that way**: measuring it in normal flow measures it inside a box the component has just clamped to 0, so the height it reports is derived from the height being derived from it, and the panel can measure back as 0 and stay permanently blank. **Nothing containing an anchored `DropdownMenu` can go inside one** — its `overflow: 'hidden'` would clip the menu.
+
+Menus use their own palette tokens (`menuSurface`, `menuSeparator`, `menuBorder`, `menuPressedBg`, `menuShadow`), not `card`/`border`. A menu floats *above* a card, so in dark mode it is lighter than the surface it covers.
+
+`menuBorder` and `menuShadow` are a pair, and which one carries the edge flips with the theme. In light mode `menuSurface` is the same `#FFFFFF` as `card`, and nearly every menu opens over a card — so the surface distinguishes nothing, the hairline states where the panel starts, and the shadow only says how far above it floats. In dark mode a black shadow on a near-black background does almost nothing, so the hairline is most of the separation and the lifted surface supplies the rest. Neither can be dropped for the other. Note also that Android ignores `shadow*` entirely and draws only from `elevation`, so any change to the shadow needs a matching one there.
+
+**Any screen holding a floating menu needs a lagging elevation state** (`elevatedDropdown` in `SettingsScreen`, `elevatedPicker` in `AddEditEventModal`, `elevated` in `AddEditPersonModal`). The `zIndex` that lifts a menu's group above its neighbours cannot be driven by the open flag: the menu now animates out over ~130ms and the flag is already false for all of it, so the menu would drop behind the rows below for its whole exit. These states lag the open flag downward and only ever move to another open menu, never back to `null`.
+
 ### Navigation
 
 Bottom tab navigator (`@react-navigation/bottom-tabs`) with 4 tabs: Home, Calendar, People, Settings. Defined in `src/navigation.tsx`. Goals have no screen or tab of their own — they surface on `HomeScreen` through `GoalGrid` plus the `WeeklyPlanningModal` and `GoalWeeklyModal` sheets.

@@ -1,7 +1,7 @@
 /**
  * A deep verdant green — dark enough that white lettering clears 7:1 on it, and
- * far enough from the greens in SwatchColors that a header is never mistaken for
- * an event. `primary` is a setting, so this is only the starting point:
+ * far enough from the greens in `EventColors` that a header is never mistaken
+ * for an event. `primary` is a setting, so this is only the starting point:
  * `useColors` swaps in the user's choice, and everything that reads `primary`
  * (headers, the active tab pill, the now-line) follows.
  */
@@ -29,7 +29,7 @@ export const LightColors = {
   accent: '#00B5C8',
   // Navy, for the interactive furniture — checkmarks, switches, active pills and
   // tabs, the FAB, and the "add a thing" links. The same navy as the Service
-  // event type and the Service Hours goal (SwatchColors' #1A3A6B), not the
+  // event type and the Service Hours goal (both #1A3A6B), not the
   // slightly darker #253960 the goal sheets use. Lifts to a pale blue in dark
   // mode for the same reason goalTextAction does: navy on near-black is unreadable.
   control: '#1A3A6B',
@@ -79,6 +79,27 @@ export const LightColors = {
   // stack is a menu hanging off a button, not a sheet, so the calendar under it
   // should still read as the thing you are adding to.
   fabScrim: 'rgba(0,0,0,0.20)',
+  // Dropdown menus (see src/components/DropdownMenu.tsx). Separate from `card`
+  // and `border` because a menu is not a card: it floats above one, so in dark
+  // mode it has to be *lighter* than the surface it covers, and its hairlines
+  // are finer than the rules that divide a card's rows.
+  //
+  // Note `menuSurface` is exactly `card`. That is not an oversight, but it does
+  // mean the surface distinguishes nothing: almost every menu in the app opens
+  // over a card, so white lands on white and the edge and the shadow are left
+  // doing all of the work. Apple can style a menu on shadow alone because its
+  // menus open over content; over a white sheet the same styling disappears,
+  // which is why there is a real hairline here rather than a transparent one.
+  menuSurface: '#FFFFFF',
+  menuSeparator: 'rgba(60,60,67,0.13)',
+  // Deliberately heavier than menuSeparator: this is the boundary of the whole
+  // panel, and an edge drawn at the same weight as the rules between its rows
+  // stops the panel reading as one object.
+  menuBorder: 'rgba(60,60,67,0.20)',
+  menuPressedBg: 'rgba(0,0,0,0.055)',
+  // Deliberately stronger than `shadow` (which lifts a card by a hair): a menu
+  // reads as detached from the page, not merely raised off it.
+  menuShadow: 'rgba(0,0,0,0.28)',
 };
 
 export const DarkColors: typeof LightColors = {
@@ -126,44 +147,46 @@ export const DarkColors: typeof LightColors = {
   // Deeper than the light value for the same reason modalBackdrop is: the same
   // alpha that dims a white calendar leaves a near-black one looking untouched.
   fabScrim: 'rgba(0,0,0,0.50)',
+  // Lighter than `card` (#1E1E1E), not darker — the inverted-surface rule only
+  // holds for cards sitting *in* the page. A menu floats above the card, and
+  // depth in dark mode is read as lift, so it has to come forward.
+  menuSurface: '#2C2C2E',
+  menuSeparator: 'rgba(255,255,255,0.14)',
+  // Load-bearing in a way it only assists with in light mode: a black shadow on
+  // a near-black background does almost nothing, so this hairline is most of
+  // what separates the menu from whatever it covers.
+  //
+  // Lifted along with the light value, but by less. Dark already has a surface
+  // that stands off `card` on its own, which light has none of, so it needs
+  // less edge to say the same thing — pushed to light's weight it would read as
+  // a drawn outline rather than a lit edge.
+  menuBorder: 'rgba(255,255,255,0.16)',
+  menuPressedBg: 'rgba(255,255,255,0.09)',
+  menuShadow: 'rgba(0,0,0,0.70)',
 };
 
 export type ColorPalette = typeof LightColors;
 
-// The stock colours: what the built-in event types and goals are born with, and
-// where a new goal's colour starts. No longer a picker — colours are chosen off a
-// gradient now — so this is a set of defaults rather than the set of choices.
-// Ordered by hue, red through violet, with the low-saturation browns and grey
-// trailing, since they have no place on the spectrum.
-export const SwatchColors: string[] = [
-  '#E74C3C', // red
-  '#E05C6B', // rose
-  '#800000', // maroon
-  '#D2691E', // chocolate
-  '#E8980E', // orange
-  '#E8B820', // yellow
-  '#7CB342', // lime
-  '#1E8449', // deep green
-  '#00B5C8', // cyan
-  '#2979FF', // blue
-  '#1A3A6B', // navy
-  '#A29BFE', // periwinkle
-  '#9B59B6', // violet
-  '#795548', // brown
-  '#8B5A2B', // mid brown
-  '#A9744F', // light brown
-  '#8F8F8F', // grey
-];
+/**
+ * What a goal the user adds starts out as. Named rather than read off the first
+ * entry of a palette array, which is what it used to be: that made a new goal's
+ * colour a side effect of how the list happened to be sorted, so reordering it
+ * silently repainted every goal added afterwards.
+ *
+ * Blue because no built-in *goal* uses it, so a new goal is distinguishable from
+ * the eight that ship until it is given a colour of its own.
+ */
+export const DEFAULT_GOAL_COLOR = '#2979FF';
 
 // Key order is the display order: SettingsScreen and AddEditEventModal both
 // build their type lists with Object.keys(EventColors). EventTypeLabels and
 // EventTypeConfig are kept in the same order so the three read as one table.
 //
-// The order tracks each type's colour through SwatchColors — warm through cool,
-// then the browns and the grey — so the list reads as a spectrum rather than an
-// arbitrary order. A new type belongs wherever its colour falls, not at the end.
-// The muted tail has no hue to sort on, so it ramps by lightness instead, ending
-// on the neutral grey.
+// The order tracks each type's own colour by hue — warm through cool, then the
+// browns and the grey — so the list reads as a spectrum rather than an arbitrary
+// order. A new type belongs wherever its colour falls, not at the end. The muted
+// tail has no hue to sort on, so it ramps by lightness instead, ending on the
+// neutral grey.
 export const EventColors: Record<string, string> = {
   church:    '#E05C6B',
   travel:    '#800000',

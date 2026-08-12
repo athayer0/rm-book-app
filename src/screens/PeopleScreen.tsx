@@ -16,6 +16,7 @@ import {
   PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus,
 } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
+import { DropdownMenu, DropdownItem, MenuDivider } from '../components/DropdownMenu';
 import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 
 type FilterSelection =
@@ -132,56 +133,52 @@ export function PeopleScreen() {
             <Ionicons name="options-outline" size={26} color={Colors.onPrimary} />
           </TouchableOpacity>
 
-          {showFilterDropdown && (
-            <View style={styles.filterDropdown}>
-              <ScrollView
-                style={{ maxHeight: filterListMaxHeight }}
-                nestedScrollEnabled
-                bounces={false}
-                overScrollMode="never"
-                {...filterScrollEdges.scrollViewProps}
-              >
-                <TouchableOpacity
-                  style={styles.filterDropdownItem}
-                  onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
-                >
-                  <Text style={styles.filterDropdownText}>All</Text>
-                  {filterSelection.kind === 'all' && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                </TouchableOpacity>
-                {STATUS_GROUPS.map(g => (
-                  <TouchableOpacity
-                    key={g.name}
-                    style={styles.filterDropdownItem}
-                    onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
-                  >
-                    <Text style={styles.filterDropdownText}>{g.name}</Text>
-                    {filterSelection.kind === 'group' && filterSelection.name === g.name && (
-                      <Ionicons name="checkmark" size={16} color={Colors.control} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                <View style={styles.filterDropdownDivider} />
-                {STATUS_OPTIONS.map(s => {
-                  const cfg = PERSON_STATUSES[s];
-                  return (
-                    <TouchableOpacity
-                      key={s}
-                      style={styles.filterDropdownItem}
-                      onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
-                    >
-                      <StatusIcon config={cfg} size={14} style={styles.filterChipIcon} />
-                      <Text style={styles.filterDropdownText}>{s}</Text>
-                      {filterSelection.kind === 'status' && filterSelection.name === s && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <ScrollEdgeFade edge="top" color={Colors.card} visible={filterScrollEdges.showTopFade} />
-              <ScrollEdgeFade edge="bottom" color={Colors.card} visible={filterScrollEdges.showBottomFade} />
-            </View>
-          )}
+          {/* Right-aligned and content-width: it hangs off an icon button far
+              narrower than its own list, so stretching to the trigger would give
+              a menu the width of one glyph. `top` overrides the default '100%'
+              to keep the offset the header row has always used. */}
+          <DropdownMenu
+            open={showFilterDropdown}
+            align="right"
+            style={styles.filterDropdown}
+          >
+            <ScrollView
+              style={{ maxHeight: filterListMaxHeight }}
+              nestedScrollEnabled
+              bounces={false}
+              overScrollMode="never"
+              {...filterScrollEdges.scrollViewProps}
+            >
+              <DropdownItem
+                label="All"
+                selected={filterSelection.kind === 'all'}
+                onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
+              />
+              {STATUS_GROUPS.map((g, i) => (
+                <DropdownItem
+                  key={g.name}
+                  label={g.name}
+                  selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
+                  // The divider below does the separating for the last one.
+                  showSeparator={i < STATUS_GROUPS.length - 1}
+                  onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
+                />
+              ))}
+              <MenuDivider />
+              {STATUS_OPTIONS.map((s, i) => (
+                <DropdownItem
+                  key={s}
+                  label={s}
+                  selected={filterSelection.kind === 'status' && filterSelection.name === s}
+                  showSeparator={i < STATUS_OPTIONS.length - 1}
+                  leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
+                  onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
+                />
+              ))}
+            </ScrollView>
+            <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
+            <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
+          </DropdownMenu>
         </View>
       </View>
 
@@ -289,36 +286,16 @@ function makeStyles(C: ColorPalette) {
       zIndex: 10,
       elevation: 10,
     },
+    // Surface, radius, hairline and shadow all come from DropdownMenu now. What
+    // is left is only what is specific to hanging off this header: the offset
+    // below the chip row, and a floor on the width so the short status names
+    // don't collapse it to a sliver.
     filterDropdown: {
-      position: 'absolute',
-      top: 34,
-      right: 0,
+      // 28, not the 34 this used to be: DropdownMenu adds a 6px marginTop of its
+      // own, so the menu still lands exactly where it always has.
+      top: 28,
       minWidth: 190,
-      backgroundColor: C.card,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: C.border,
-      overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 10,
-      elevation: 12,
-      zIndex: 21,
     },
-    filterDropdownItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    filterDropdownDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: C.border,
-    },
-    filterDropdownText: { flex: 1, fontSize: 15, color: C.text },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',

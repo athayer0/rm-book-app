@@ -1,6 +1,6 @@
 import { format, parseISO, addDays, addWeeks, addMonths } from 'date-fns';
 import { DEFAULT_SLOT_HEIGHT, EventSizes } from '../constants/eventSizes';
-import { EventTypeConfig } from '../constants/colors';
+import { EventColors, EventTypeConfig } from '../constants/colors';
 
 export type RecurringRule = 'daily' | 'weekly' | 'monthly';
 
@@ -161,6 +161,38 @@ export function isCheckboxType(type: string): boolean {
 /** Whether this type may be saved without an end time rather than taking a default duration. */
 export function hasOptionalEnd(type: string): boolean {
   return EventTypeConfig[type]?.optionalEnd ?? false;
+}
+
+/** For a type this build no longer ships — a stored event can outlive its own type. */
+const DEFAULT_EVENT_COLOR = '#00B5C8';
+const FALLBACK_MINUTES = 30;
+
+/**
+ * What a type actually looks like and lasts, once the user's overrides are
+ * applied over the stock table. Both take the override map alone rather than the
+ * whole settings object, so `utils` keeps its one-way dependency on `constants`
+ * — three screens and the event editor need these answers and had each grown
+ * their own copy of the fallback chain.
+ *
+ * The reset flows depend on the fallback being *absence* of a key: deleting an
+ * override is how a type goes back to stock, so writing the stock value in would
+ * leave it looking customised forever.
+ */
+export function eventTypeColor(type: string, overrides: Record<string, string>): string {
+  return overrides[type] ?? EventColors[type] ?? DEFAULT_EVENT_COLOR;
+}
+
+/**
+ * null means the type has no default duration to offer at all — either it can
+ * never have one (a checkbox type) or it starts without one and asks (an
+ * optional-end type). Distinct from a duration of zero.
+ */
+export function eventTypeDefaultMinutes(
+  type: string,
+  overrides: Record<string, number>,
+): number | null {
+  if (isCheckboxType(type) || hasOptionalEnd(type)) return null;
+  return overrides[type] ?? EventTypeConfig[type]?.defaultMinutes ?? FALLBACK_MINUTES;
 }
 
 /**

@@ -1,0 +1,657 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet, useWindowDimensions,
+} from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
+import { useColors } from '../hooks/useColors';
+import { useTrackDrag } from '../hooks/useTrackDrag';
+import { BottomSheet } from './BottomSheet';
+import type { ColorPalette } from '../constants/colors';
+import {
+  contrastInk, hexToHsv, hexToRgb, hsvToHex, hueHex, normalizeHex, rgbToHex, type HSV,
+} from '../utils/colorUtils';
+
+/**
+ * The colour picker for the whole app: a bottom sheet over half the screen with
+ * three ways to land on the same value — a grid of ready-made swatches, a
+ * saturation/brightness field under a hue ramp, and RGB sliders with a hex
+ * field. Replaces the inline strips that used to expand inside a row and shove
+ * everything under them down the screen.
+ *
+ * The draft is committed on Done and thrown away on Cancel, so the caller sees
+ * one write per visit rather than one per drag — and a colour that drives the
+ * whole theme can be explored without every intermediate value being persisted
+ * and synced.
+ */
+
+type Tab = 'grid' | 'spectrum' | 'sliders';
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'grid', label: 'Grid' },
+  { key: 'spectrum', label: 'Spectrum' },
+  { key: 'sliders', label: 'Sliders' },
+];
+
+const HUE_STOPS = ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF', '#FF0000'];
+
+/**
+ * One grid, no headings: nine hue columns plus a tenth greyscale column, over
+ * nine rows of shade. Rows are spelled out as explicit arrays rather than one
+ * wrapped list — wrapping is what used to skew the spectrum into diagonals, by
+ * pushing the last cell of a too-wide row onto the next line and shifting every
+ * row below it a column further along.
+ *
+ * The greys are a column rather than a separate block because they belong on the
+ * same axis: every row is a lightness level, so row 1 is the palest tint of each
+ * hue *and* white, and row 9 is the deepest shade of each hue *and* black. Read
+ * down any column — coloured or grey — and it is the same thing getting darker.
+ */
+const GRID_HUES = [0, 25, 45, 90, 145, 190, 220, 265, 310];
+const GRID_COLS = GRID_HUES.length + 1;
+
+// Four tints, the pure hue, then four shades. Nine rows against ten columns is
+// what makes the cells come out square in a panel this shape.
+const GRID_SHADES: { s: number; v: number }[] = [
+  { s: 0.2, v: 1 },
+  { s: 0.4, v: 1 },
+  { s: 0.6, v: 1 },
+  { s: 0.8, v: 1 },
+  { s: 1, v: 1 },
+  { s: 1, v: 0.82 },
+  { s: 1, v: 0.64 },
+  { s: 1, v: 0.46 },
+  { s: 1, v: 0.28 },
+];
+
+const GRID_ROWS = GRID_SHADES.map(({ s, v }, i) => [
+  ...GRID_HUES.map(h => hsvToHex(h, s, v)),
+  // The grey column runs white to black across the same nine rows, so it stays
+  // in step with the tint-to-shade ramp beside it.
+  hsvToHex(0, 0, 1 - i / (GRID_SHADES.length - 1)),
+]);
+
+interface Props {
+  visible: boolean;
+  /** The colour the sheet opens on, and what Cancel restores. */
+  color: string;
+  /** Names what is being coloured — the event type, the goal, the theme slot. */
+  title?: string;
+  /** Supplied only where there is a stock value to go back to; shows Reset. */
+  defaultColor?: string;
+  onCancel: () => void;
+  onDone: (hex: string) => void;
+}
+
+export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel, onDone }: Props) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { height } = useWindowDimensions();
+
+  // A solid half of the screen, with a floor so a small device still gets a
+  // usable field rather than a squashed one.
+  const sheetHeight = Math.max(400, Math.round(height * 0.55));
+
+  // HSV rather than the hex prop is what the panels drag: hex forgets the hue at
+  // pure black and white, so dragging the brightness to zero and back up would
+  // come back on red instead of the hue you started on.
+  const [hsv, setHsv] = useState<HSV>(() => hexToHsv(normalizeHex(color) ?? '#000000'));
+  const [tab, setTab] = useState<Tab>('grid');
+  // What Cancel means, frozen at open time — the prop can change underneath a
+  // sheet whose caller re-renders, and the before/after swatch has to keep
+  // showing where this visit started.
+  const [opened, setOpened] = useState(() => normalizeHex(color) ?? '#000000');
+  const [hexEdit, setHexEdit] = useState<string | null>(null);
+
+  const draft = hsvToHex(hsv.h, hsv.s, hsv.v);
+
+  useEffect(() => {
+    if (!visible) return;
+    const start = normalizeHex(color) ?? '#000000';
+    setOpened(start);
+    setHsv(hexToHsv(start));
+    setTab('grid');
+    setHexEdit(null);
+  }, [visible]);
+
+  function pick(hex: string) {
+    Haptics.selectionAsync();
+    setHsv(hexToHsv(hex));
+    setHexEdit(null);
+  }
+
+  const showReset = !!defaultColor && normalizeHex(defaultColor) !== draft;
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title={title ?? 'Color'}
+      height={sheetHeight}
+      onCancel={onCancel}
+      onDone={() => onDone(draft)}
+    >
+      {/* Where this visit started and where it stands, unlabelled — two swatches
+          either side of an arrow say "from, to" without needing to be told.
+          Everything sits on one line, so the row centres between the header and
+          the tabs rather than hanging captions below its own baseline.
+
+          The default only appears once the colour is actually off it: with
+          nothing to undo it was just a dimmed circle taking up the right-hand
+          end of the row. It keeps its label because, unlike the pair, a lone
+          swatch at the far end doesn't explain itself. */}
+      <View style={styles.previewRow}>
+        <View style={[styles.previewDot, { backgroundColor: opened }]} />
+        <Ionicons name="arrow-forward" size={13} color={Colors.textLight} style={styles.previewArrow} />
+        <View style={[styles.previewDot, styles.previewDotDraft, { backgroundColor: draft }]} />
+        <View style={styles.previewSpacer} />
+        {showReset && defaultColor && (
+          <TouchableOpacity
+            style={styles.defaultBtn}
+            onPress={() => pick(defaultColor)}
+            activeOpacity={0.7}
+            hitSlop={8}
+          >
+            <Ionicons name="refresh" size={14} color={Colors.text} />
+            <Text style={styles.defaultLabel}>Default</Text>
+            <View
+              style={[styles.previewDot, { backgroundColor: normalizeHex(defaultColor) ?? defaultColor }]}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.tabBar}>
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            style={styles.tabBtn}
+            onPress={() => setTab(t.key)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.tabLabel, tab === t.key && styles.tabLabelActive]}>{t.label}</Text>
+            {tab === t.key && <View style={styles.tabUnderline} />}
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Every panel stays mounted: each holds drag state and a measured box,
+          and remounting one on a tab change would throw both away — the spectrum
+          field would come back unmeasured for a frame. */}
+      <View style={styles.panel}>
+        <View style={[styles.panelPage, tab !== 'grid' && styles.panelHidden]} pointerEvents={tab === 'grid' ? 'auto' : 'none'}>
+          <GridPanel styles={styles} selected={draft} onPick={pick} />
+        </View>
+        <View style={[styles.panelPage, tab !== 'spectrum' && styles.panelHidden]} pointerEvents={tab === 'spectrum' ? 'auto' : 'none'}>
+          <SpectrumPanel styles={styles} hsv={hsv} draft={draft} onChange={setHsv} />
+        </View>
+        <View style={[styles.panelPage, tab !== 'sliders' && styles.panelHidden]} pointerEvents={tab === 'sliders' ? 'auto' : 'none'}>
+          <SlidersPanel
+            styles={styles}
+            Colors={Colors}
+            draft={draft}
+            hexEdit={hexEdit}
+            onHexEdit={setHexEdit}
+            onChange={setHsv}
+          />
+        </View>
+      </View>
+    </BottomSheet>
+  );
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+
+/* ---------------------------------------------------------------- Grid tab */
+
+function GridPanel({
+  styles, selected, onPick,
+}: {
+  styles: Styles;
+  selected: string;
+  onPick: (hex: string) => void;
+}) {
+  // Cells are square, so one measurement decides everything: a `flex: 1` cell
+  // would stretch to whatever the row left over and come out rectangular. The
+  // side is whichever of the two axes runs out first, so the grid is as large as
+  // it can be while still fitting the panel whole.
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const size = Math.floor(
+    Math.min(
+      (box.w - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS,
+      (box.h - GRID_GAP * (GRID_ROWS.length - 1)) / GRID_ROWS.length,
+    ),
+  );
+
+  return (
+    <View
+      style={styles.gridWrap}
+      onLayout={e => {
+        const { width, height } = e.nativeEvent.layout;
+        setBox({ w: width - GRID_PAD * 2, h: height - GRID_PAD_V * 2 });
+      }}
+    >
+      {size > 0 && (
+        <View style={[styles.gridFrame, { gap: GRID_GAP }]}>
+          {GRID_ROWS.map((row, r) => (
+          <View key={r} style={styles.swatchRow}>
+            {row.map((hex, c) => (
+              <TouchableOpacity
+                key={c}
+                style={[
+                  styles.swatch,
+                  { width: size, height: size, backgroundColor: hex },
+                  // Drawn inside the cell — RN borders are border-box — so the
+                  // selected swatch keeps its footprint and the grid does not
+                  // shift by a few pixels every time the selection moves.
+                  // Ink taken off the swatch itself, so the ring reads on a pale
+                  // yellow as well as on a near-black.
+                  selected === hex && { borderWidth: SELECTED_BORDER, borderColor: contrastInk(hex) },
+                ]}
+                onPress={() => onPick(hex)}
+                activeOpacity={0.7}
+              />
+            ))}
+          </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------ Spectrum tab */
+
+function SpectrumPanel({
+  styles, hsv, draft, onChange,
+}: {
+  styles: Styles;
+  hsv: HSV;
+  draft: string;
+  onChange: (next: HSV) => void;
+}) {
+  // Gradient ids are document-global on web, so two live pickers would
+  // otherwise paint each other's ramps.
+  const uid = useRef(Math.random().toString(36).slice(2, 8)).current;
+
+  // The field is saturation across and brightness down, which is exactly what
+  // the two overlaid gradients draw: white → hue horizontally is hsv(h, x, 1),
+  // and black at opacity y over it multiplies through to hsv(h, x, 1 - y).
+  const field = useTrackDrag((fx, fy) => onChange({ h: hsv.h, s: fx, v: 1 - fy }));
+  const hue = useTrackDrag(fx => onChange({ ...hsv, h: fx * 360 }));
+
+  const pure = hueHex(hsv.h);
+
+  return (
+    <View style={styles.spectrumWrap}>
+      <View style={styles.field} {...field.panHandlers} onLayout={field.onLayout}>
+        <View style={styles.fieldFill} pointerEvents="none">
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id={`sat-${uid}`} x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#FFFFFF" />
+                <Stop offset="1" stopColor={pure} />
+              </LinearGradient>
+              <LinearGradient id={`val-${uid}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#000000" stopOpacity="0" />
+                <Stop offset="1" stopColor="#000000" stopOpacity="1" />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill={`url(#sat-${uid})`} />
+            <Rect x="0" y="0" width="100%" height="100%" fill={`url(#val-${uid})`} />
+          </Svg>
+        </View>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.fieldThumb,
+            { left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, backgroundColor: draft },
+          ]}
+        />
+      </View>
+
+      <View style={styles.strip} {...hue.panHandlers} onLayout={hue.onLayout}>
+        <View style={styles.stripFill} pointerEvents="none">
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id={`hue-${uid}`} x1="0" y1="0" x2="1" y2="0">
+                {HUE_STOPS.map((stop, i) => (
+                  <Stop key={i} offset={i / (HUE_STOPS.length - 1)} stopColor={stop} />
+                ))}
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill={`url(#hue-${uid})`} />
+          </Svg>
+        </View>
+        <View
+          pointerEvents="none"
+          style={[styles.stripThumb, { left: `${(hsv.h / 360) * 100}%`, backgroundColor: pure }]}
+        />
+      </View>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------- Sliders tab */
+
+const CHANNELS = [
+  { key: 'r', label: 'Red' },
+  { key: 'g', label: 'Green' },
+  { key: 'b', label: 'Blue' },
+] as const;
+
+function SlidersPanel({
+  styles, Colors, draft, hexEdit, onHexEdit, onChange,
+}: {
+  styles: Styles;
+  Colors: ColorPalette;
+  draft: string;
+  hexEdit: string | null;
+  onHexEdit: (v: string | null) => void;
+  onChange: (next: HSV) => void;
+}) {
+  const uid = useRef(Math.random().toString(36).slice(2, 8)).current;
+  const rgb = hexToRgb(draft);
+
+  // Held in a ref so the three PanResponders, built once, always set their own
+  // channel against the value on screen rather than the one from first render.
+  const current = useRef(rgb);
+  current.current = rgb;
+
+  function setChannel(key: 'r' | 'g' | 'b', value: number) {
+    const next = { ...current.current, [key]: Math.round(value * 255) };
+    // Back through HSV because that is what the sheet holds — the round trip is
+    // exact for any colour a slider can produce, bar hue at pure black.
+    onChange(hexToHsv(rgbToHex(next.r, next.g, next.b)));
+    onHexEdit(null);
+  }
+
+  const tracks = {
+    r: useTrackDrag(fx => setChannel('r', fx)),
+    g: useTrackDrag(fx => setChannel('g', fx)),
+    b: useTrackDrag(fx => setChannel('b', fx)),
+  };
+
+  function commitHex(text: string) {
+    const parsed = normalizeHex(text);
+    if (parsed) onChange(hexToHsv(parsed));
+    onHexEdit(null);
+  }
+
+  return (
+    <View style={styles.rgbWrap}>
+      {CHANNELS.map(({ key, label }) => {
+        const value = rgb[key];
+        // Each rail ramps its own channel end to end with the other two held
+        // where they are, so it previews the colour the drag would produce.
+        const from = rgbToHex(...channelEnds(rgb, key, 0));
+        const to = rgbToHex(...channelEnds(rgb, key, 255));
+        return (
+          <View key={key} style={styles.channelRow}>
+            <Text style={styles.channelLabel}>{label}</Text>
+            <View style={styles.channelTrack} {...tracks[key].panHandlers} onLayout={tracks[key].onLayout}>
+              <View style={styles.stripFill} pointerEvents="none">
+                <Svg width="100%" height="100%">
+                  <Defs>
+                    <LinearGradient id={`${key}-${uid}`} x1="0" y1="0" x2="1" y2="0">
+                      <Stop offset="0" stopColor={from} />
+                      <Stop offset="1" stopColor={to} />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${key}-${uid})`} />
+                </Svg>
+              </View>
+              <View
+                pointerEvents="none"
+                style={[styles.stripThumb, { left: `${(value / 255) * 100}%`, backgroundColor: draft }]}
+              />
+            </View>
+            <Text style={styles.channelValue}>{value}</Text>
+          </View>
+        );
+      })}
+
+      <View style={styles.hexRow}>
+        <Text style={styles.channelLabel}>Hex</Text>
+        <View style={styles.hexField}>
+          <Text style={styles.hexHash}>#</Text>
+          <TextInput
+            style={styles.hexInput}
+            value={hexEdit ?? draft.slice(1)}
+            onChangeText={text => {
+              const cleaned = text.replace(/[^0-9a-fA-F]/g, '').slice(0, 6).toUpperCase();
+              onHexEdit(cleaned);
+              // Applied as soon as it is a colour at all, so a pasted value
+              // lands without needing the keyboard dismissed first.
+              if (cleaned.length === 6 || cleaned.length === 3) {
+                const parsed = normalizeHex(cleaned);
+                if (parsed) onChange(hexToHsv(parsed));
+              }
+            }}
+            onEndEditing={e => commitHex(e.nativeEvent.text)}
+            onSubmitEditing={e => commitHex(e.nativeEvent.text)}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={6}
+            placeholder="000000"
+            placeholderTextColor={Colors.textLight}
+            returnKeyType="done"
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** The rgb triple with one channel pinned — the two ends of that channel's rail. */
+function channelEnds(
+  rgb: { r: number; g: number; b: number },
+  key: 'r' | 'g' | 'b',
+  value: number,
+): [number, number, number] {
+  const next = { ...rgb, [key]: value };
+  return [next.r, next.g, next.b];
+}
+
+// Just enough for the card to show between cells — the grid should read as one
+// field of colour, not as tiles.
+const GRID_GAP = 1;
+const GRID_PAD = 16;
+const GRID_PAD_V = 10;
+// Thick enough to read at a glance against a neighbouring cell of a similar tone.
+const SELECTED_BORDER = 3;
+// The preview row's tallest dot, and the slot every dot centres inside.
+const PREVIEW_SLOT = 30;
+const STRIP_HEIGHT = 24;
+
+function makeStyles(C: ColorPalette) {
+  const stripThumb = STRIP_HEIGHT + 6;
+  const fieldThumb = 26;
+  return StyleSheet.create({
+    // The sheet frame, backdrop and Cancel/title/Done header all live in
+    // `BottomSheet` now — shared with `DurationSheet` so the two editors opened
+    // from Settings cannot drift apart.
+    //
+    // One line, so plain centring works and the generous padding sits the row
+    // visually between the header above and the tab bar below.
+    previewRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 6,
+      paddingBottom: 16,
+    },
+    previewDot: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    // The one that matters of the pair, so it carries the ring and the size.
+    previewDotDraft: {
+      width: PREVIEW_SLOT,
+      height: PREVIEW_SLOT,
+      borderRadius: PREVIEW_SLOT / 2,
+      borderWidth: 2,
+      borderColor: C.border,
+    },
+    previewArrow: { marginHorizontal: 8 },
+    previewSpacer: { flex: 1 },
+    // Label beside the swatch rather than beneath it: it is the only labelled
+    // thing in the row, and a lone hanging caption would drag the row's height
+    // down past the two dots it sits next to.
+    // Tighter between the glyph and its label than between the label and the
+    // swatch, so the two read as one unit with the colour trailing them.
+    defaultBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    // `text`, not `control`: the swatch beside it is the affordance, and the
+    // navy competed with Done in the header directly above. Follows the theme,
+    // so it is near-black in light mode and near-white in dark.
+    defaultLabel: { fontSize: 13, fontWeight: '600', color: C.text, marginRight: 3 },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, position: 'relative' },
+    tabLabel: { fontSize: 14, fontWeight: '600', color: C.textSecondary },
+    tabLabelActive: { color: C.control },
+    tabUnderline: {
+      position: 'absolute',
+      bottom: 0,
+      left: '18%',
+      right: '18%',
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: C.control,
+    },
+    panel: { flex: 1 },
+    // All three panels are laid out on top of each other and the inactive ones
+    // hidden, rather than swapped in and out — see the render for why.
+    panelPage: { ...StyleSheet.absoluteFillObject },
+    panelHidden: { opacity: 0, zIndex: -1 },
+
+    // Centred both ways: the cells are square, so whichever axis didn't decide
+    // the size has a remainder, and splitting it evenly reads as intentional
+    // where letting it all fall to one edge would not.
+    gridWrap: {
+      flex: 1,
+      paddingHorizontal: GRID_PAD,
+      paddingVertical: GRID_PAD_V,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // The grid reads as one continuous field, so the only thing marking its
+    // outer edge is this hairline. Load-bearing at the top right, where a pure
+    // white swatch meets a white card in light mode and would otherwise have no
+    // edge at all — the swatches themselves no longer carry borders.
+    gridFrame: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      overflow: 'hidden',
+    },
+    // No wrapping — the row holds exactly GRID_COLS fixed-size cells. Wrapping
+    // is what skewed the spectrum into diagonals.
+    swatchRow: { flexDirection: 'row', gap: GRID_GAP },
+    // Square corners and a hairline gap: the cells butt together as one sheet of
+    // colour, with the card showing through just enough to separate them.
+    swatch: { borderRadius: 0 },
+
+    spectrumWrap: { flex: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+    field: { flex: 1, marginBottom: 18, justifyContent: 'center' },
+    fieldFill: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    fieldThumb: {
+      position: 'absolute',
+      width: fieldThumb,
+      height: fieldThumb,
+      borderRadius: fieldThumb / 2,
+      marginLeft: -fieldThumb / 2,
+      marginTop: -fieldThumb / 2,
+      // A card-coloured ring separates the thumb from the field under it in
+      // either theme; the shadow only has to lift it off a same-toned patch.
+      borderWidth: 3,
+      borderColor: C.card,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.3,
+      shadowRadius: 2,
+      elevation: 3,
+    },
+    strip: {
+      height: STRIP_HEIGHT,
+      // Room for the thumb, which overhangs the track at both ends.
+      marginHorizontal: stripThumb / 2,
+      justifyContent: 'center',
+    },
+    stripFill: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: STRIP_HEIGHT / 2,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    stripThumb: {
+      position: 'absolute',
+      width: stripThumb,
+      height: stripThumb,
+      borderRadius: stripThumb / 2,
+      marginLeft: -stripThumb / 2,
+      borderWidth: 3,
+      borderColor: C.card,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.25,
+      shadowRadius: 2,
+      elevation: 3,
+    },
+
+    rgbWrap: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+    channelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+    // Wide enough for "Green" — the widest of the four labels that share this
+    // column — so all four rails start on the same x.
+    channelLabel: { width: 48, fontSize: 13, fontWeight: '700', color: C.textSecondary },
+    channelTrack: {
+      flex: 1,
+      height: STRIP_HEIGHT,
+      // Only half a thumb of clearance on the left: the label column already
+      // gives the track's start room to overhang into.
+      marginRight: stripThumb / 2,
+      marginLeft: stripThumb / 4,
+      justifyContent: 'center',
+    },
+    // Fixed width and tabular figures so the rails don't shift as the numbers
+    // go from one digit to three mid-drag.
+    channelValue: {
+      width: 36,
+      fontSize: 13,
+      color: C.text,
+      textAlign: 'right',
+      fontVariant: ['tabular-nums'],
+    },
+    hexRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    hexField: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: C.background,
+    },
+    hexHash: { fontSize: 15, color: C.textLight },
+    hexInput: {
+      width: 96,
+      fontSize: 15,
+      color: C.text,
+      paddingVertical: 0,
+      letterSpacing: 1,
+    },
+  });
+}

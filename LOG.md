@@ -25,6 +25,8 @@ FEATURES
 [x] add color picker for event colors and a different way to select default duration for events
 [x] daily review and event notifications
 
+[ ] fix graph y axis labels
+[ ] swiping time spacing calendar bug
 [ ] save recent convert info on where they are on the covenant path
 [ ] onboarding
 [ ] make friends and districts, be able to view each others KIs

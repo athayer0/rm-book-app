@@ -8,18 +8,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import {
-  EventColors, EventTypeLabels, EventTypeConfig, DEFAULT_THEME_COLOR,
+  EventColors, EventTypeConfig, DEFAULT_THEME_COLOR,
   DEFAULT_SECONDARY_COLOR_LIGHT, DEFAULT_SECONDARY_COLOR_DARK,
   DEFAULT_TERTIARY_COLOR_LIGHT, DEFAULT_TERTIARY_COLOR_DARK,
 } from '../constants/colors';
 import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
-import { GradientColorPicker } from '../components/GradientColorPicker';
-import { DurationSlider, durationLabel } from '../components/DurationSlider';
+import { ColorPickerSheet } from '../components/ColorPickerSheet';
+import { DropdownMenu, DropdownItem, Collapsible } from '../components/DropdownMenu';
+import { EventColorsModal } from '../modals/EventColorsModal';
+import { EventDurationsModal } from '../modals/EventDurationsModal';
 import { normalizeHex } from '../utils/colorUtils';
 import { useSettings, type AppSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { isCheckboxType, hasOptionalEnd } from '../utils/eventUtils';
+import { eventTypeColor, eventTypeDefaultMinutes } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
 import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
 import { CONTACT_METHODS, DEFAULT_CONTACT_METHOD, DEFAULT_METHOD_CHOICES } from '../constants/contactMethods';
@@ -45,7 +47,19 @@ const EVENT_TYPES = Object.keys(EventColors);
 // tracking its own independent boolean.
 type DropdownKey =
   | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'dailyReviewTime' | 'eventReminderLead'
-  | 'colors' | 'types' | 'method';
+  | 'colors' | 'method';
+
+/**
+ * The dropdowns that open in the flow and push the rows below them down, rather
+ * than floating over them.
+ *
+ * These are the ones an outside tap does *not* dismiss. A panel that moved the
+ * page to make room for itself is something you work *inside* — pick a colour,
+ * see what it did, pick again — not a menu hovering over your work. Closing one
+ * on a stray tap would take back the space it just made and shift everything
+ * under your finger. Both still close from the row that opened them.
+ */
+const IN_FLOW_DROPDOWNS: DropdownKey[] = ['colors', 'dailyReviewTime'];
 
 type ThemeColorRowKey = 'primary' | 'secondaryLight' | 'secondaryDark' | 'tertiaryLight' | 'tertiaryDark';
 type ThemeColorSettingKey =
@@ -89,14 +103,11 @@ export function SettingsScreen() {
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
   // Primary always shows; secondary/tertiary show only their current-theme variant.
   const visibleColorRows = THEME_COLOR_ROWS.filter(row => !row.mode || row.mode === (isDark ? 'dark' : 'light'));
-  const [expandedType, setExpandedType] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
-  const [expandedColor, setExpandedColor] = useState<ThemeColorRowKey | null>(null);
-  const [colorResetOpen, setColorResetOpen] = useState(false);
-  // The types deliberately spared, so everything listed starts checked.
-  const [keptTypes, setKeptTypes] = useState<string[]>([]);
-  const [durationResetOpen, setDurationResetOpen] = useState(false);
-  const [keptDurationTypes, setKeptDurationTypes] = useState<string[]>([]);
+  // Which theme colour the picker sheet is editing, if any.
+  const [colorSheet, setColorSheet] = useState<ThemeColorRowKey | null>(null);
+  // Which of the two event-type screens is open.
+  const [eventSheet, setEventSheet] = useState<'colors' | 'durations' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
@@ -105,53 +116,47 @@ export function SettingsScreen() {
     setOpenDropdown(prev => (prev === key ? null : key));
   }
 
-  // Schedule Hours, Event Size, Theme, Time Before, and Default Contact Method
-  // float their option list over the rows beneath rather than pushing them
-  // down (see FLOATING_DROPDOWN_KEYS-style usage below and floatingDropdown
-  // in makeStyles) — matching the picker construction AddEditEventModal and
-  // AddEditPersonModal already use. A backdrop dismisses whichever of them is
-  // open on an outside tap, the same as those two screens.
-  const floatingDropdownOpen =
-    openDropdown === 'hourStart' || openDropdown === 'hourEnd' || openDropdown === 'size'
-    || openDropdown === 'theme' || openDropdown === 'eventReminderLead' || openDropdown === 'method';
-
-  // A row that's mid-edit can go out of view when the theme flips (e.g. the
-  // Theme section further down this same screen) — close it rather than
-  // leave a picker open for a variant no longer shown.
+  /**
+   * Which section currently wins the paint order. Lags `openDropdown` on the way
+   * down and only ever moves to another open dropdown, never back to null: a
+   * menu now animates out over ~130ms, and `openDropdown` is already null for
+   * all of it. Dropping the zIndex the instant it closes would send the menu
+   * behind the rows below for the whole exit. Leaving the last one elevated
+   * afterwards costs nothing — there is no longer anything drawn to overlap.
+   */
+  const [elevatedDropdown, setElevatedDropdown] = useState<DropdownKey | null>(null);
   useEffect(() => {
-    setExpandedColor(null);
+    if (openDropdown) setElevatedDropdown(openDropdown);
+  }, [openDropdown]);
+
+  // An outside tap closes whichever dropdown floats over the rows beneath it;
+  // the two that open in the flow are left alone. See IN_FLOW_DROPDOWNS.
+  const dismissableDropdownOpen =
+    openDropdown !== null && !IN_FLOW_DROPDOWNS.includes(openDropdown);
+
+  // A row mid-edit can go out of view when the theme flips (the Theme section is
+  // on this same screen) — close the picker rather than leave it editing a
+  // variant that is no longer shown.
+  useEffect(() => {
+    setColorSheet(null);
   }, [isDark]);
 
-  // The per-row pickers nested inside "Customize Colors"/"Customize Types"
-  // belong to those dropdowns — switching to a different top-level dropdown,
-  // or closing this one, closes them too rather than leaving them ready to
-  // reappear the next time that section reopens.
+  // The theme-colour picker hangs off a row inside "Customize Colors" — closing
+  // that section, or opening a different one, dismisses it too rather than
+  // leaving a sheet over a list that is no longer there.
   useEffect(() => {
-    if (openDropdown !== 'colors') setExpandedColor(null);
-  }, [openDropdown]);
-  useEffect(() => {
-    if (openDropdown !== 'types') {
-      setExpandedType(null);
-      setColorResetOpen(false);
-      setKeptTypes([]);
-      setDurationResetOpen(false);
-      setKeptDurationTypes([]);
-    }
+    if (openDropdown !== 'colors') setColorSheet(null);
   }, [openDropdown]);
 
-  // Leaving Settings for another tab closes every open dropdown, so coming
-  // back — or landing on a different tab entirely — never shows one already
-  // expanded from a prior visit.
+  // Leaving Settings for another tab closes every open dropdown and sheet, so
+  // coming back — or landing on a different tab entirely — never shows one
+  // already expanded from a prior visit.
   useFocusEffect(
     useCallback(() => {
       return () => {
         setOpenDropdown(null);
-        setExpandedColor(null);
-        setExpandedType(null);
-        setColorResetOpen(false);
-        setKeptTypes([]);
-        setDurationResetOpen(false);
-        setKeptDurationTypes([]);
+        setColorSheet(null);
+        setEventSheet(null);
       };
     }, []),
   );
@@ -240,57 +245,80 @@ export function SettingsScreen() {
     ]);
   }
 
-  function effectiveColor(type: string) {
-    return settings.eventTypeColors[type] ?? EventColors[type];
-  }
-
-  // null means the type has no default duration to offer — either it can never
-  // have one (checkbox types) or it starts without one (optional-end types).
-  function effectiveMinutes(type: string): number | null {
-    if (isCheckboxType(type) || hasOptionalEnd(type)) return null;
-    return settings.eventTypeDefaultMinutes[type] ?? EventTypeConfig[type]?.defaultMinutes ?? 30;
-  }
-
-  function setColor(type: string, color: string) {
-    updateSettings({ eventTypeColors: { ...settings.eventTypeColors, [type]: color } });
-  }
-
-  function setDuration(type: string, minutes: number) {
-    updateSettings({ eventTypeDefaultMinutes: { ...settings.eventTypeDefaultMinutes, [type]: minutes } });
-  }
+  // Per-type editing lives in EventColorsModal / EventDurationsModal. The bulk
+  // resets stay here rather than travelling with it: those lists are sized to
+  // fill their sheet exactly with no scroll, so there is nowhere to put a reset
+  // panel inside one, and a reset is a thing you do to the whole set anyway.
+  const effectiveColor = (type: string) => eventTypeColor(type, settings.eventTypeColors);
+  const effectiveMinutes = (type: string) =>
+    eventTypeDefaultMinutes(type, settings.eventTypeDefaultMinutes);
+  const stockMinutes = (type: string) => EventTypeConfig[type]?.defaultMinutes ?? 30;
 
   // A type is "customized" by what it resolves to, not by whether it has an
-  // override: one set back to the stock colour by hand has nothing to reset.
-  const customizedTypes = EVENT_TYPES.filter(type => effectiveColor(type) !== EventColors[type]);
-  const typesToReset = customizedTypes.filter(type => !keptTypes.includes(type));
+  // override: one set back to the stock value by hand has nothing to reset.
+  const customizedColorTypes = EVENT_TYPES.filter(t => effectiveColor(t) !== EventColors[t]);
 
-  function resetEventColors() {
-    // Deleting the override is the reset — effectiveColor then falls through to
-    // EventColors. Writing the stock colour in would leave it looking custom.
-    const next = { ...settings.eventTypeColors };
-    typesToReset.forEach(type => { delete next[type]; });
-    updateSettings({ eventTypeColors: next });
-    setColorResetOpen(false);
-    setKeptTypes([]);
-  }
-
-  // Types with no duration to offer at all (checkbox types, optional-end types)
-  // have nothing to be "customized" — effectiveMinutes is already null for them.
-  const customizedDurationTypes = EVENT_TYPES.filter(type => {
-    const mins = effectiveMinutes(type);
-    return mins !== null && mins !== (EventTypeConfig[type]?.defaultMinutes ?? 30);
+  // Types with no duration to offer at all have nothing to be customized —
+  // effectiveMinutes is already null for them.
+  const customizedDurationTypes = EVENT_TYPES.filter(t => {
+    const mins = effectiveMinutes(t);
+    return mins !== null && mins !== stockMinutes(t);
   });
-  const durationTypesToReset = customizedDurationTypes.filter(type => !keptDurationTypes.includes(type));
 
-  function resetEventDurations() {
-    // Same shape as resetEventColors: deleting the override lets
-    // effectiveMinutes fall through to EventTypeConfig's default.
-    const next = { ...settings.eventTypeDefaultMinutes };
-    durationTypesToReset.forEach(type => { delete next[type]; });
-    updateSettings({ eventTypeDefaultMinutes: next });
-    setDurationResetOpen(false);
-    setKeptDurationTypes([]);
+  // Both resets are all-or-nothing and confirmed by an alert rather than a panel
+  // of checkboxes. The alert names the count, since the row itself no longer
+  // shows which types are affected — and the same alert pattern already guards
+  // the destructive rows further down this screen.
+  function confirmResetEventColors() {
+    const n = customizedColorTypes.length;
+    Alert.alert(
+      'Reset Event Colors',
+      n === 1
+        ? '1 event type will go back to its original color. This cannot be undone.'
+        : `${n} event types will go back to their original colors. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            // Deleting the override is the reset — eventTypeColor then falls
+            // through to EventColors. Writing the stock colour in would leave it
+            // looking custom.
+            const next = { ...settings.eventTypeColors };
+            customizedColorTypes.forEach(t => { delete next[t]; });
+            updateSettings({ eventTypeColors: next });
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   }
+
+  function confirmResetEventDurations() {
+    const n = customizedDurationTypes.length;
+    Alert.alert(
+      'Reset Default Durations',
+      n === 1
+        ? '1 event type will go back to its original duration. This cannot be undone.'
+        : `${n} event types will go back to their original durations. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            const next = { ...settings.eventTypeDefaultMinutes };
+            customizedDurationTypes.forEach(t => { delete next[t]; });
+            updateSettings({ eventTypeDefaultMinutes: next });
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  }
+
+  const colorSheetRow = THEME_COLOR_ROWS.find(row => row.key === colorSheet);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -309,16 +337,16 @@ export function SettingsScreen() {
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
       >
-        {floatingDropdownOpen && (
+        {dismissableDropdownOpen && (
           <Pressable style={styles.pickerBackdrop} onPress={() => setOpenDropdown(null)} />
         )}
 
         {/* Theme — collapsed to one row, same shape as Event Size / Contact
             Method, instead of all three options sitting on the screen. */}
-        <View style={[styles.section, openDropdown === 'theme' && styles.sectionFloating]}>
+        <View style={[styles.section, elevatedDropdown === 'theme' && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>THEME</Text>
           <View style={styles.card}>
-            <View style={[styles.fieldRow, openDropdown === 'theme' && styles.fieldRowOpen]}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'theme' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('theme')}
@@ -334,24 +362,17 @@ export function SettingsScreen() {
                   style={{ marginLeft: 6 }}
                 />
               </TouchableOpacity>
-              {openDropdown === 'theme' && (
-                <View style={styles.floatingDropdown}>
-                  {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
-                    <TouchableOpacity
-                      key={theme}
-                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ theme }); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.floatingDropdownText, settings.theme === theme && styles.floatingDropdownTextActive]}>
-                        {theme.charAt(0).toUpperCase() + theme.slice(1)}
-                      </Text>
-                      {settings.theme === theme && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              <DropdownMenu open={openDropdown === 'theme'}>
+                {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
+                  <DropdownItem
+                    key={theme}
+                    label={theme.charAt(0).toUpperCase() + theme.slice(1)}
+                    selected={settings.theme === theme}
+                    showSeparator={i < arr.length - 1}
+                    onPress={() => { updateSettings({ theme }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
             </View>
           </View>
         </View>
@@ -361,6 +382,8 @@ export function SettingsScreen() {
             expanding into the same indented dropdown-item list Schedule
             Hours and Contact Method use. Each item still opens its own
             picker panel underneath, exactly as before. */}
+        {/* No lift for `colors`: no backdrop goes up for it, so there is
+            nothing for the section to need lifting over. */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>THEME COLORS</Text>
           <View style={styles.card}>
@@ -384,62 +407,36 @@ export function SettingsScreen() {
                 style={{ marginLeft: 6 }}
               />
             </TouchableOpacity>
-            {openDropdown === 'colors' && (
-              <View style={[styles.dropdownList, !expandedColor && styles.dropdownListLast]}>
+            <Collapsible open={openDropdown === 'colors'}>
+              <View style={[styles.dropdownList, styles.dropdownListLast]}>
                 {visibleColorRows.map((row, i, arr) => {
-                  const isOpen = expandedColor === row.key;
-                  const isLastRow = i === arr.length - 1;
                   // The dot is the value; the hex it happens to have said
                   // nothing the colour itself doesn't.
                   const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
                   return (
-                    <View key={row.key}>
-                      <TouchableOpacity
-                        style={[styles.dropdownItem, !isOpen && isLastRow && styles.dropdownItemLast]}
-                        onPress={() => setExpandedColor(isOpen ? null : row.key)}
-                      >
-                        <View style={[styles.colorDot, { backgroundColor: value }]} />
-                        <Text style={styles.dropdownItemText}>{row.label}</Text>
-                        <Ionicons
-                          name={isOpen ? 'chevron-up' : 'chevron-down'}
-                          size={16}
-                          color={Colors.textLight}
-                        />
-                      </TouchableOpacity>
-                      {isOpen && (
-                        <View style={[styles.expandedPanel, isLastRow && styles.expandedPanelLast]}>
-                          <GradientColorPicker
-                            color={value}
-                            onChange={hex =>
-                              updateSettings({ [row.settingKey]: hex } as Partial<AppSettings>)
-                            }
-                          />
-                          <TouchableOpacity
-                            style={styles.resetColorBtn}
-                            onPress={() =>
-                              updateSettings({ [row.settingKey]: row.defaultValue } as Partial<AppSettings>)
-                            }
-                          >
-                            <Ionicons name="refresh" size={15} color={Colors.control} />
-                            <Text style={styles.resetColorText}>Reset to Default Color</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
+                    <TouchableOpacity
+                      key={row.key}
+                      style={[styles.dropdownItem, i === arr.length - 1 && styles.dropdownItemLast]}
+                      onPress={() => setColorSheet(row.key)}
+                    >
+                      <View style={[styles.colorDot, { backgroundColor: value }]} />
+                      <Text style={styles.dropdownItemText}>{row.label}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+                    </TouchableOpacity>
                   );
                 })}
               </View>
-            )}
+            </Collapsible>
           </View>
         </View>
 
         {/* Event Size — collapsed to one row and expanded on tap, the same
             shape as Start Time / End Time above, instead of every option
             sitting on the screen at once. */}
-        <View style={[styles.section, openDropdown === 'size' && styles.sectionFloating]}>
+        <View style={[styles.section, elevatedDropdown === 'size' && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>EVENT SIZE</Text>
           <View style={styles.card}>
-            <View style={[styles.fieldRow, openDropdown === 'size' && styles.fieldRowOpen]}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'size' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('size')}
@@ -455,24 +452,17 @@ export function SettingsScreen() {
                   style={{ marginLeft: 6 }}
                 />
               </TouchableOpacity>
-              {openDropdown === 'size' && (
-                <View style={styles.floatingDropdown}>
-                  {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
-                    <TouchableOpacity
-                      key={size}
-                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ eventSize: size }); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.floatingDropdownText, selectedEventSize === size && styles.floatingDropdownTextActive]}>
-                        {EventSizes[size].label} ({eventSizePercent(size)}%)
-                      </Text>
-                      {selectedEventSize === size && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              <DropdownMenu open={openDropdown === 'size'}>
+                {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
+                  <DropdownItem
+                    key={size}
+                    label={`${EventSizes[size].label} (${eventSizePercent(size)}%)`}
+                    selected={selectedEventSize === size}
+                    showSeparator={i < arr.length - 1}
+                    onPress={() => { updateSettings({ eventSize: size }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
             </View>
           </View>
         </View>
@@ -497,10 +487,10 @@ export function SettingsScreen() {
         </View>
 
         {/* Schedule Hours */}
-        <View style={[styles.section, (openDropdown === 'hourStart' || openDropdown === 'hourEnd') && styles.sectionFloating]}>
+        <View style={[styles.section, (elevatedDropdown === 'hourStart' || elevatedDropdown === 'hourEnd') && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>SCHEDULE HOURS</Text>
           <View style={styles.card}>
-            <View style={[styles.fieldRow, openDropdown === 'hourStart' && styles.fieldRowOpen]}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'hourStart' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={styles.row}
                 onPress={() => toggleDropdown('hourStart')}
@@ -514,27 +504,20 @@ export function SettingsScreen() {
                   style={{ marginLeft: 6 }}
                 />
               </TouchableOpacity>
-              {openDropdown === 'hourStart' && (
-                <View style={styles.floatingDropdown}>
-                  {START_HOUR_OPTIONS.map((h, i) => (
-                    <TouchableOpacity
-                      key={h}
-                      style={[styles.floatingDropdownItem, i === START_HOUR_OPTIONS.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ gridStartHour: h }); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.floatingDropdownText, settings.gridStartHour === h && styles.floatingDropdownTextActive]}>
-                        {hourLabel(h)}
-                      </Text>
-                      {settings.gridStartHour === h && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              <DropdownMenu open={openDropdown === 'hourStart'}>
+                {START_HOUR_OPTIONS.map((h, i) => (
+                  <DropdownItem
+                    key={h}
+                    label={hourLabel(h)}
+                    selected={settings.gridStartHour === h}
+                    showSeparator={i < START_HOUR_OPTIONS.length - 1}
+                    onPress={() => { updateSettings({ gridStartHour: h }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
             </View>
 
-            <View style={[styles.fieldRow, openDropdown === 'hourEnd' && styles.fieldRowOpen]}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'hourEnd' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('hourEnd')}
@@ -548,267 +531,95 @@ export function SettingsScreen() {
                   style={{ marginLeft: 6 }}
                 />
               </TouchableOpacity>
-              {openDropdown === 'hourEnd' && (
-                <View style={styles.floatingDropdown}>
-                  {END_HOUR_OPTIONS.map((h, i) => (
-                    <TouchableOpacity
-                      key={h}
-                      style={[styles.floatingDropdownItem, i === END_HOUR_OPTIONS.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ gridEndHour: h }); setOpenDropdown(null); }}
-                    >
-                      <Text style={[styles.floatingDropdownText, settings.gridEndHour === h && styles.floatingDropdownTextActive]}>
-                        {hourLabel(h)}
-                      </Text>
-                      {settings.gridEndHour === h && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              <DropdownMenu open={openDropdown === 'hourEnd'}>
+                {END_HOUR_OPTIONS.map((h, i) => (
+                  <DropdownItem
+                    key={h}
+                    label={hourLabel(h)}
+                    selected={settings.gridEndHour === h}
+                    showSeparator={i < END_HOUR_OPTIONS.length - 1}
+                    onPress={() => { updateSettings({ gridEndHour: h }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
             </View>
           </View>
         </View>
 
-        {/* Event Types — collapsed behind one summary row, same as Theme
-            Colors above. What expands underneath is the original per-type
-            row + panel design (color dot, label, duration badge, its own
-            expand), unchanged apart from now sitting inside a dropdownList
-            instead of directly in the card. */}
+        {/* Event Colors and Default Durations — one setting each, on a screen of
+            their own. They used to share a "Customize Types" panel per type,
+            which meant scrolling past every colour to reach a duration and
+            expanding a picker that pushed fourteen rows down the list. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
+          <Text style={styles.sectionTitle}>EVENT COLORS</Text>
           <View style={styles.card}>
-            <TouchableOpacity
-              style={[styles.row, openDropdown !== 'types' && styles.rowLast]}
-              onPress={() => toggleDropdown('types')}
-            >
-              <Text style={styles.rowLabel}>Customize Types</Text>
-              <Ionicons
-                name={openDropdown === 'types' ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={Colors.textLight}
-                style={{ marginLeft: 6 }}
-              />
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('colors')}>
+              <Text style={styles.rowLabel}>Customize</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
-            {openDropdown === 'types' && (
-              <View style={[styles.dropdownList, styles.dropdownListLast]}>
-                {EVENT_TYPES.map(type => {
-                  const isExpanded = expandedType === type;
-                  const mins = effectiveMinutes(type);
-                  const color = effectiveColor(type);
-                  return (
-                    <View key={type}>
-                      <TouchableOpacity
-                        style={styles.dropdownItem}
-                        onPress={() => setExpandedType(isExpanded ? null : type)}
-                      >
-                        <View style={[styles.colorDot, { backgroundColor: color }]} />
-                        <Text style={styles.dropdownItemText}>{EventTypeLabels[type]}</Text>
-                        <Text style={styles.durationBadge}>
-                          {mins !== null ? durationLabel(mins) : hasOptionalEnd(type) ? 'Optional' : 'Fixed'}
-                        </Text>
-                        <Ionicons
-                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                          size={16}
-                          color={Colors.textLight}
-                        />
-                      </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={customizedColorTypes.length === 0}
+              onPress={confirmResetEventColors}
+            >
+              <Text
+                style={[
+                  styles.rowLabel,
+                  // Reads as a row like every other one on this screen when it
+                  // is live, and greys out when there is nothing to undo.
+                  { color: customizedColorTypes.length ? Colors.text : Colors.textLight },
+                ]}
+              >
+                Reset to Default
+              </Text>
+              {/* The greyed label and icon are the whole disabled state now —
+                  nothing to reset reads clearly enough without saying so. */}
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={customizedColorTypes.length ? Colors.textLight : Colors.border}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-                      {isExpanded && (
-                        <View style={styles.expandedPanel}>
-                          <Text style={styles.panelLabel}>Color</Text>
-                          <GradientColorPicker color={color} onChange={c => setColor(type, c)} />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EVENT DEFAULT DURATIONS</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('durations')}>
+              <Text style={styles.rowLabel}>Customize</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+            </TouchableOpacity>
 
-                          {/* Types with no duration to set get no duration section —
-                              the collapsed row already says "Optional" or "Fixed". */}
-                          {mins !== null && (
-                            <>
-                              <Text style={[styles.panelLabel, { marginTop: 16 }]}>Default Duration</Text>
-                              <DurationSlider minutes={mins} onChange={d => setDuration(type, d)} />
-                            </>
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-
-                {/* Reset colors. Lists only the types actually off their default —
-                    the rest have nothing to undo, and padding the list with them
-                    would hide the ones that do behind fourteen no-ops. */}
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  disabled={customizedTypes.length === 0}
-                  onPress={() => { setColorResetOpen(v => !v); setKeptTypes([]); }}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      { color: customizedTypes.length ? Colors.control : Colors.textLight },
-                    ]}
-                  >
-                    Reset Colors to Default
-                  </Text>
-                  {customizedTypes.length === 0 ? (
-                    <Text style={styles.rowValue}>All default</Text>
-                  ) : (
-                    <Ionicons
-                      name={colorResetOpen ? 'chevron-up' : 'chevron-down'}
-                      size={16}
-                      color={Colors.textLight}
-                    />
-                  )}
-                </TouchableOpacity>
-
-                {colorResetOpen && customizedTypes.length > 0 && (
-                  <View style={styles.expandedPanel}>
-                    <Text style={styles.panelLabel}>Uncheck any you want to keep</Text>
-                    {customizedTypes.map(type => {
-                      const checked = !keptTypes.includes(type);
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          style={styles.resetItem}
-                          onPress={() =>
-                            setKeptTypes(prev =>
-                              prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-                            )
-                          }
-                        >
-                          <Ionicons
-                            name={checked ? 'checkbox' : 'square-outline'}
-                            size={20}
-                            color={checked ? Colors.control : Colors.textLight}
-                          />
-                          <View style={[styles.colorDot, { backgroundColor: effectiveColor(type), marginLeft: 10 }]} />
-                          <Text style={styles.resetItemLabel}>{EventTypeLabels[type]}</Text>
-                          {/* The colour it would go back to, so the choice is visible
-                              rather than something you have to remember. */}
-                          <View style={[styles.colorDot, { backgroundColor: EventColors[type], marginRight: 0 }]} />
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    <TouchableOpacity
-                      style={[styles.resetColorBtn, typesToReset.length === 0 && styles.resetColorBtnDisabled]}
-                      disabled={typesToReset.length === 0}
-                      onPress={resetEventColors}
-                    >
-                      <Ionicons
-                        name="refresh"
-                        size={15}
-                        color={typesToReset.length ? Colors.control : Colors.textLight}
-                      />
-                      <Text
-                        style={[
-                          styles.resetColorText,
-                          typesToReset.length === 0 && { color: Colors.textLight },
-                        ]}
-                      >
-                        {typesToReset.length === 1
-                          ? 'Reset 1 Color'
-                          : `Reset ${typesToReset.length} Colors`}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Reset durations. Same shape as Reset Colors above, one row
-                    down — a type only appears once its own default duration has
-                    actually been changed from EventTypeConfig's. */}
-                <TouchableOpacity
-                  style={[styles.dropdownItem, !durationResetOpen && styles.dropdownItemLast]}
-                  disabled={customizedDurationTypes.length === 0}
-                  onPress={() => { setDurationResetOpen(v => !v); setKeptDurationTypes([]); }}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      { color: customizedDurationTypes.length ? Colors.control : Colors.textLight },
-                    ]}
-                  >
-                    Reset Durations to Default
-                  </Text>
-                  {customizedDurationTypes.length === 0 ? (
-                    <Text style={styles.rowValue}>All default</Text>
-                  ) : (
-                    <Ionicons
-                      name={durationResetOpen ? 'chevron-up' : 'chevron-down'}
-                      size={16}
-                      color={Colors.textLight}
-                    />
-                  )}
-                </TouchableOpacity>
-
-                {durationResetOpen && customizedDurationTypes.length > 0 && (
-                  <View style={[styles.expandedPanel, styles.expandedPanelLast]}>
-                    <Text style={styles.panelLabel}>Uncheck any you want to keep</Text>
-                    {customizedDurationTypes.map(type => {
-                      const checked = !keptDurationTypes.includes(type);
-                      const mins = effectiveMinutes(type);
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          style={styles.resetItem}
-                          onPress={() =>
-                            setKeptDurationTypes(prev =>
-                              prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-                            )
-                          }
-                        >
-                          <Ionicons
-                            name={checked ? 'checkbox' : 'square-outline'}
-                            size={20}
-                            color={checked ? Colors.control : Colors.textLight}
-                          />
-                          <Text style={[styles.resetItemLabel, { marginLeft: 10 }]}>{EventTypeLabels[type]}</Text>
-                          {/* Current duration, then the default it would go back
-                              to — so the choice is visible rather than something
-                              you have to remember, same as the colour dots above. */}
-                          <Text style={styles.durationBadge}>{mins !== null ? durationLabel(mins) : ''}</Text>
-                          <Ionicons name="arrow-forward" size={12} color={Colors.textLight} style={{ marginHorizontal: 4 }} />
-                          <Text style={styles.durationBadge}>
-                            {durationLabel(EventTypeConfig[type]?.defaultMinutes ?? 30)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    <TouchableOpacity
-                      style={[styles.resetColorBtn, durationTypesToReset.length === 0 && styles.resetColorBtnDisabled]}
-                      disabled={durationTypesToReset.length === 0}
-                      onPress={resetEventDurations}
-                    >
-                      <Ionicons
-                        name="refresh"
-                        size={15}
-                        color={durationTypesToReset.length ? Colors.control : Colors.textLight}
-                      />
-                      <Text
-                        style={[
-                          styles.resetColorText,
-                          durationTypesToReset.length === 0 && { color: Colors.textLight },
-                        ]}
-                      >
-                        {durationTypesToReset.length === 1
-                          ? 'Reset 1 Duration'
-                          : `Reset ${durationTypesToReset.length} Durations`}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={customizedDurationTypes.length === 0}
+              onPress={confirmResetEventDurations}
+            >
+              <Text
+                style={[
+                  styles.rowLabel,
+                  { color: customizedDurationTypes.length ? Colors.text : Colors.textLight },
+                ]}
+              >
+                Reset to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={customizedDurationTypes.length ? Colors.textLight : Colors.border}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Default Contact Method. The section title names the setting, so the
             row carries the value alone rather than repeating it as a label. */}
-        <View style={[styles.section, openDropdown === 'method' && styles.sectionFloating]}>
+        <View style={[styles.section, elevatedDropdown === 'method' && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>DEFAULT CONTACT METHOD</Text>
           <View style={styles.card}>
-            <View style={[styles.fieldRow, openDropdown === 'method' && styles.fieldRowOpen]}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'method' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('method')}
@@ -828,14 +639,14 @@ export function SettingsScreen() {
                   color={Colors.textLight}
                 />
               </TouchableOpacity>
-              {openDropdown === 'method' && (
-                <View style={styles.floatingDropdown}>
-                  {DEFAULT_METHOD_CHOICES.map((key, i, arr) => (
-                    <TouchableOpacity
-                      key={key}
-                      style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                      onPress={() => { updateSettings({ defaultContactMethod: key }); setOpenDropdown(null); }}
-                    >
+              <DropdownMenu open={openDropdown === 'method'}>
+                {DEFAULT_METHOD_CHOICES.map((key, i, arr) => (
+                  <DropdownItem
+                    key={key}
+                    label={CONTACT_METHODS[key].label}
+                    selected={selectedMethod === key}
+                    showSeparator={i < arr.length - 1}
+                    leading={
                       <View style={styles.methodIcon}>
                         <GoalIcon
                           icon={CONTACT_METHODS[key].icon}
@@ -844,16 +655,11 @@ export function SettingsScreen() {
                           color={selectedMethod === key ? Colors.control : Colors.textSecondary}
                         />
                       </View>
-                      <Text style={[styles.floatingDropdownText, selectedMethod === key && styles.floatingDropdownTextActive]}>
-                        {CONTACT_METHODS[key].label}
-                      </Text>
-                      {selectedMethod === key && (
-                        <Ionicons name="checkmark" size={16} color={Colors.control} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                    }
+                    onPress={() => { updateSettings({ defaultContactMethod: key }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
             </View>
           </View>
         </View>
@@ -912,6 +718,8 @@ export function SettingsScreen() {
 
         {/* Daily Review Reminder — a local notification, off by default, that
             opens straight to the unreported-events backlog when tapped. */}
+        {/* No lift: the time wheel opens in the flow, so no backdrop goes up
+            for it and there is nothing for the section to rise over. */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>DAILY REVIEW</Text>
           <View style={styles.card}>
@@ -941,14 +749,14 @@ export function SettingsScreen() {
                     style={{ marginLeft: 6 }}
                   />
                 </TouchableOpacity>
-                {openDropdown === 'dailyReviewTime' && (
+                <Collapsible open={openDropdown === 'dailyReviewTime'}>
                   <View style={styles.timeWheelPanel}>
                     <TimeWheelPicker
                       value={formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
                       onChange={handleSelectDailyReviewTime}
                     />
                   </View>
-                )}
+                </Collapsible>
               </>
             )}
           </View>
@@ -956,7 +764,7 @@ export function SettingsScreen() {
 
         {/* Event Reminders — a second, independent local notification: one
             per upcoming event occurrence rather than a single daily one. */}
-        <View style={[styles.section, openDropdown === 'eventReminderLead' && styles.sectionFloating]}>
+        <View style={[styles.section, elevatedDropdown === 'eventReminderLead' && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>EVENT REMINDERS</Text>
           <View style={styles.card}>
             <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
@@ -969,7 +777,7 @@ export function SettingsScreen() {
               />
             </View>
             {settings.eventReminderEnabled && (
-              <View style={[styles.fieldRow, openDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
+              <View style={[styles.fieldRow, elevatedDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
                 <TouchableOpacity
                   style={[styles.row, styles.rowLast]}
                   onPress={() => toggleDropdown('eventReminderLead')}
@@ -983,24 +791,17 @@ export function SettingsScreen() {
                     style={{ marginLeft: 6 }}
                   />
                 </TouchableOpacity>
-                {openDropdown === 'eventReminderLead' && (
-                  <View style={styles.floatingDropdown}>
-                    {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
-                      <TouchableOpacity
-                        key={minutes}
-                        style={[styles.floatingDropdownItem, i === arr.length - 1 && styles.floatingDropdownItemLast]}
-                        onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
-                      >
-                        <Text style={[styles.floatingDropdownText, settings.eventReminderMinutes === minutes && styles.floatingDropdownTextActive]}>
-                          {eventReminderLabel(minutes)}
-                        </Text>
-                        {settings.eventReminderMinutes === minutes && (
-                          <Ionicons name="checkmark" size={16} color={Colors.control} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                <DropdownMenu open={openDropdown === 'eventReminderLead'}>
+                  {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
+                    <DropdownItem
+                      key={minutes}
+                      label={eventReminderLabel(minutes)}
+                      selected={settings.eventReminderMinutes === minutes}
+                      showSeparator={i < arr.length - 1}
+                      onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
+                    />
+                  ))}
+                </DropdownMenu>
               </View>
             )}
           </View>
@@ -1117,6 +918,29 @@ export function SettingsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* All three sit outside the ScrollView: each is its own Modal, so nothing
+          here clips them and the scroll position underneath is left alone. */}
+      <ColorPickerSheet
+        visible={colorSheetRow !== undefined}
+        color={
+          colorSheetRow
+            ? normalizeHex(settings[colorSheetRow.settingKey]) ?? colorSheetRow.defaultValue
+            : DEFAULT_THEME_COLOR
+        }
+        title={colorSheetRow?.label}
+        defaultColor={colorSheetRow?.defaultValue}
+        onCancel={() => setColorSheet(null)}
+        onDone={hex => {
+          if (colorSheetRow) {
+            updateSettings({ [colorSheetRow.settingKey]: hex } as Partial<AppSettings>);
+          }
+          setColorSheet(null);
+        }}
+      />
+
+      <EventColorsModal visible={eventSheet === 'colors'} onClose={() => setEventSheet(null)} />
+      <EventDurationsModal visible={eventSheet === 'durations'} onClose={() => setEventSheet(null)} />
     </SafeAreaView>
   );
 }
@@ -1186,11 +1010,6 @@ function makeStyles(C: ColorPalette) {
     colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
     // Fixed width so the labels line up despite the glyphs differing in width.
     methodIcon: { width: 24, alignItems: 'center', marginRight: 6 },
-    durationBadge: {
-      fontSize: 12,
-      color: C.textLight,
-      marginRight: 4,
-    },
     // Theme Colors summary row — a small dot per colour, so the collapsed
     // row still previews all five without expanding.
     dotPreviewRow: { flexDirection: 'row', marginRight: 4 },
@@ -1202,54 +1021,6 @@ function makeStyles(C: ColorPalette) {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
     },
-    // Everything that opens out of a row stays on the card's own surface — the
-    // hairline rules and the indent separate it, not a change of background.
-    expandedPanel: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: C.card,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    // Rounds off to match card's own corners. Needed explicitly because `card`
-    // has no overflow: 'hidden' (see its own comment) — without it, this panel's
-    // opaque background would square off what should be a rounded bottom edge.
-    expandedPanelLast: {
-      borderBottomWidth: 0,
-      borderBottomLeftRadius: 12,
-      borderBottomRightRadius: 12,
-    },
-    panelLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: C.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      marginBottom: 8,
-    },
-    // Undoes a colour choice only, so it reads as an action rather than taking
-    // the red the destructive Data rows use.
-    resetColorBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      alignSelf: 'center',
-      marginTop: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: C.control,
-    },
-    resetColorText: { fontSize: 13, fontWeight: '600', color: C.control },
-    resetColorBtnDisabled: { borderColor: C.border },
-    resetItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 9,
-    },
-    resetItemLabel: { flex: 1, fontSize: 15, color: C.text },
     dropdownList: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
@@ -1285,19 +1056,14 @@ function makeStyles(C: ColorPalette) {
       fontSize: 15,
       color: C.text,
     },
-    dropdownItemActive: {
-      color: C.control,
-      fontWeight: '600',
-    },
     // Floating dropdowns — Schedule Hours, Event Size, Theme, Time Before, and
-    // Default Contact Method. Detached from the row that opens it rather than
-    // pushing the rows below down, the same construction as the pickers in
-    // AddEditEventModal and AddEditPersonModal (see their `dropdownFloating` /
-    // `pickerBackdrop`).
+    // Default Contact Method — are drawn by DropdownMenu now; all that is left
+    // here is the stacking they need from this screen.
     //
-    // fieldRow/fieldRowOpen mirror those screens' pickerRow/openPickerRow: a
-    // trigger's wrapper needs a higher zIndex than the sibling row beneath it
-    // in the same card, or the floating panel would paint behind it.
+    // fieldRow/fieldRowOpen: a trigger's wrapper needs a higher zIndex than the
+    // sibling row beneath it in the same card, or the menu would paint behind
+    // it. Both are driven by `elevatedDropdown`, not `openDropdown` — see its
+    // comment for why the distinction matters now that menus animate out.
     fieldRow: { zIndex: 20 },
     fieldRowOpen: { zIndex: 30 },
     // Lifts the whole section above the ones that follow it in the ScrollView
@@ -1305,44 +1071,6 @@ function makeStyles(C: ColorPalette) {
     // still paint behind a later section's card, since siblings with equal
     // zIndex stack in document order.
     sectionFloating: { zIndex: 2 },
-    floatingDropdown: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
-      marginTop: 4,
-      backgroundColor: C.card,
-      borderRadius: 8,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-      overflow: 'hidden',
-      shadowColor: C.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 10,
-      elevation: 12,
-      zIndex: 21,
-    },
-    floatingDropdownItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    floatingDropdownItemLast: {
-      borderBottomWidth: 0,
-    },
-    floatingDropdownText: {
-      flex: 1,
-      fontSize: 15,
-      color: C.text,
-    },
-    floatingDropdownTextActive: {
-      color: C.control,
-      fontWeight: '600',
-    },
     // Dismisses whichever floating dropdown is open on an outside tap. Covers
     // the full scroll content (not just the viewport), same as the reference
     // pickerBackdrop — bottom: 0 anchors to the content container's edge.

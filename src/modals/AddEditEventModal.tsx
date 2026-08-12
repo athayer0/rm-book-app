@@ -16,6 +16,7 @@ import {
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
 import { InlineDatePicker } from '../components/InlineDatePicker';
+import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
@@ -52,11 +53,12 @@ interface Props {
 
 const EVENT_TYPES = Object.keys(EventColors);
 
-// Must match dropdownItem's rendered row height exactly — the open-picker
-// effects scroll by idx * DROPDOWN_ITEM_HEIGHT to land the selected row at the
-// top, and any drift between this and the real row height compounds with idx,
-// walking the "selected" row further off the top the deeper it sits in the list.
-const DROPDOWN_ITEM_HEIGHT = 40;
+// Ends on half a row rather than a whole one, so a list longer than this says so
+// by being visibly cut. Read off MENU_ITEM_HEIGHT rather than written as a number:
+// the open-picker effect scrolls by idx * MENU_ITEM_HEIGHT to land the selected
+// row at the top, and any drift from the real row height compounds with idx,
+// walking that row further off the top the deeper it sits in the list.
+const TYPE_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
@@ -88,6 +90,19 @@ function weekdayOf(dateStr: string): number {
 }
 
 type PickerId = 'type' | 'date' | 'start' | 'end' | 'rule' | 'endsOn' | 'method';
+
+/**
+ * The pickers that float over the fields below. The rest — Date, the two time
+ * wheels, the recurrence Ends date — open in the flow and push the fields down
+ * instead.
+ *
+ * Only these are dismissed by tapping away. A panel that moved the page to make
+ * room for itself is something you work *inside*, not a menu hovering over your
+ * work: closing one on a stray tap would take back the space it just made and
+ * shift everything under your finger. Those close from their own row, or by
+ * choosing a value.
+ */
+const FLOATING_PICKERS: PickerId[] = ['type', 'method', 'rule'];
 
 export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, prefill, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
@@ -221,7 +236,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       const idx = EVENT_TYPES.findIndex(t => t === type);
       if (idx >= 0) {
         requestAnimationFrame(() => {
-          typeScrollRef.current?.scrollTo({ y: idx * DROPDOWN_ITEM_HEIGHT, animated: false });
+          typeScrollRef.current?.scrollTo({ y: idx * MENU_ITEM_HEIGHT, animated: false });
         });
       }
     }
@@ -405,7 +420,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   }
 
   const fixed = isCheckboxType(type);
-  const anyPickerOpen = openPicker !== null;
   // An optional-end type with end === start has no end time yet; every other type
   // always shows the picker, so a meal that happens to end when it starts is not
   // mistaken for one still awaiting an end.
@@ -426,6 +440,13 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     return PERSON_STATUSES[candidate?.status ?? ''] ?? { color: Colors.textLight, icon: 'ellipse', shape: 'dot' };
   }
 
+  const floatingPickerOpen = openPicker !== null && FLOATING_PICKERS.includes(openPicker);
+
+  /** Tap-away dismissal — deliberately blind to the in-flow pickers. */
+  function closeFloatingPicker() {
+    if (floatingPickerOpen) setOpenPicker(null);
+  }
+
   function closePickers() {
     setOpenPicker(null);
   }
@@ -433,6 +454,19 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   function togglePicker(which: PickerId) {
     setOpenPicker(cur => (cur === which ? null : which));
   }
+
+  /**
+   * Which group wins the paint order. Lags `openPicker` on the way down and only
+   * ever moves to another open picker, never back to null: a menu animates out
+   * over ~130ms and `openPicker` is already null for all of it, so dropping the
+   * zIndex on close would send the menu behind the fields below for its whole
+   * exit. Leaving the last group elevated afterwards is harmless — nothing is
+   * drawn there to overlap anything.
+   */
+  const [elevatedPicker, setElevatedPicker] = useState<PickerId | null>(null);
+  useEffect(() => {
+    if (openPicker) setElevatedPicker(openPicker);
+  }, [openPicker]);
 
   // Narrowed rather than a bare boolean so the display view can read the id off it.
   const viewedEvent = mode === 'view' ? event : null;
@@ -491,11 +525,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           />
         ) : (
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
-          {anyPickerOpen && (
-            <Pressable style={styles.pickerBackdrop} onPress={closePickers} />
+          {floatingPickerOpen && (
+            <Pressable style={styles.pickerBackdrop} onPress={closeFloatingPicker} />
           )}
 
           <View style={styles.card}>
+          {floatingPickerOpen && (
+            <Pressable style={styles.cardBackdrop} onPress={closeFloatingPicker} />
+          )}
           <View style={styles.group}>
             <Text style={styles.label}>Name</Text>
             <View style={styles.titleRow}>
@@ -520,7 +557,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           </View>
 
-          <View style={[styles.group, styles.columns, styles.pickerRow, showTypePicker && styles.openPickerRow]}>
+          <View style={[styles.group, styles.columns, styles.pickerRow, elevatedPicker === 'type' && styles.openPickerRow]}>
             <View style={styles.column}>
               <Text style={styles.label}>Event Type</Text>
               <View>
@@ -529,32 +566,31 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
                   <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
                 </TouchableOpacity>
-                {showTypePicker && (
-                  <View style={[styles.dropdown, styles.dropdownFloating]}>
-                    <ScrollView
-                      ref={typeScrollRef}
-                      style={{ maxHeight: 185 }}
-                      nestedScrollEnabled
-                      bounces={false}
-                      overScrollMode="never"
-                      {...typeScrollEdges.scrollViewProps}
-                    >
-                      {EVENT_TYPES.map(t => (
-                        <TouchableOpacity
-                          key={t}
-                          style={styles.dropdownItem}
-                          onPress={() => handleTypeChange(t)}
-                        >
-                          <View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />
-                          <Text style={styles.dropdownText}>{EventTypeLabels[t]}</Text>
-                          {type === t && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                    <ScrollEdgeFade edge="top" color={Colors.card} visible={typeScrollEdges.showTopFade} />
-                    <ScrollEdgeFade edge="bottom" color={Colors.card} visible={typeScrollEdges.showBottomFade} />
-                  </View>
-                )}
+                <DropdownMenu open={showTypePicker}>
+                  <ScrollView
+                    ref={typeScrollRef}
+                    style={{ maxHeight: TYPE_LIST_MAX_HEIGHT }}
+                    nestedScrollEnabled
+                    bounces={false}
+                    overScrollMode="never"
+                    {...typeScrollEdges.scrollViewProps}
+                  >
+                    {EVENT_TYPES.map((t, i) => (
+                      <DropdownItem
+                        key={t}
+                        label={EventTypeLabels[t]}
+                        selected={type === t}
+                        showSeparator={i < EVENT_TYPES.length - 1}
+                        leading={<View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />}
+                        onPress={() => handleTypeChange(t)}
+                      />
+                    ))}
+                  </ScrollView>
+                  {/* menuSurface, not card — the menu no longer sits on the card's
+                      colour, so fading to `card` would leave a visible band. */}
+                  <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={typeScrollEdges.showTopFade} />
+                  <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={typeScrollEdges.showBottomFade} />
+                </DropdownMenu>
               </View>
             </View>
             <View style={styles.column}>
@@ -568,6 +604,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           {/* A group of its own rather than a panel hanging off the row: it
               belongs to the Date field above it, and reads that way sitting
               directly beneath it inside the same card. */}
+          {/* Deliberately not wrapped in Collapsible, unlike the time wheels
+              below. Animating this one cost it taps that used to land — and the
+              zIndex lift it needs is what a Collapsible's own wrapper gets in
+              the way of. Left as it was: mounted only while open, lifted over
+              its neighbours, no animation. */}
           {showDatePicker && (
             <View style={[styles.group, { paddingTop: 4 }, styles.openPickerRow]}>
               <InlineDatePicker
@@ -578,7 +619,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           )}
 
-          <View style={[styles.group, styles.columns, styles.pickerRow, (showStartPicker || showEndPicker) && styles.openPickerRow]}>
+          <View style={[styles.group, styles.columns, styles.pickerRow, (elevatedPicker === 'start' || elevatedPicker === 'end') && styles.openPickerRow]}>
             <View style={styles.column}>
               <Text style={styles.label}>Start Time</Text>
               <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
@@ -620,20 +661,24 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             )}
           </View>
 
-          {(showStartPicker || showEndPicker) && (
-            <View style={[styles.group, { paddingTop: 4 }, styles.openPickerRow]}>
+          {/* Which time it is editing reads off `elevatedPicker`, not
+              `showStartPicker`: the latter is already false for the whole
+              collapse, so the wheel would flip to the end time and animate away
+              showing the wrong number. elevatedPicker holds the last one opened. */}
+          <Collapsible open={showStartPicker || showEndPicker}>
+            <View style={[styles.group, { paddingTop: 4 }]}>
               <TimeWheelPicker
-                value={showStartPicker ? startTime : endTime}
-                onChange={showStartPicker ? handleStartTimeChange : setEndTime}
+                value={elevatedPicker === 'start' ? startTime : endTime}
+                onChange={elevatedPicker === 'start' ? handleStartTimeChange : setEndTime}
               />
             </View>
-          )}
+          </Collapsible>
 
           {/* Half a row, with the other half left empty: the value is a short
               label off a fixed list, and stretching it the full width made it
               read as a longer field than it is. */}
           {usesContactMethod(type) && (
-            <View style={[styles.group, styles.columns, styles.pickerRow, showMethodPicker && styles.openPickerRow]}>
+            <View style={[styles.group, styles.columns, styles.pickerRow, elevatedPicker === 'method' && styles.openPickerRow]}>
               <View style={styles.column}>
                 <Text style={styles.label}>{methodFieldLabel(type)}</Text>
                 <View>
@@ -647,26 +692,26 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     <Text style={[styles.pickerText, { marginLeft: 8 }]}>{contactMethodLabel(contactMethod)}</Text>
                     <Ionicons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                   </TouchableOpacity>
-                  {showMethodPicker && (
-                    <View style={[styles.dropdown, styles.dropdownFloating]}>
-                      {methodOptionsFor(type).map(m => (
-                        <TouchableOpacity
-                          key={m}
-                          style={styles.dropdownItem}
-                          onPress={() => { setContactMethod(m); closePickers(); }}
-                        >
+                  <DropdownMenu open={showMethodPicker}>
+                    {methodOptionsFor(type).map((m, i, arr) => (
+                      <DropdownItem
+                        key={m}
+                        label={CONTACT_METHODS[m].label}
+                        selected={contactMethod === m}
+                        showSeparator={i < arr.length - 1}
+                        labelStyle={{ marginLeft: 8 }}
+                        leading={
                           <GoalIcon
                             icon={CONTACT_METHODS[m].icon}
                             iconFamily={CONTACT_METHODS[m].iconFamily}
                             size={16}
-                            color={Colors.textSecondary}
+                            color={contactMethod === m ? Colors.control : Colors.textSecondary}
                           />
-                          <Text style={[styles.dropdownText, { marginLeft: 8 }]}>{CONTACT_METHODS[m].label}</Text>
-                          {contactMethod === m && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                        }
+                        onPress={() => { setContactMethod(m); closePickers(); }}
+                      />
+                    ))}
+                  </DropdownMenu>
                 </View>
               </View>
               <View style={styles.column} />
@@ -732,7 +777,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             />
           </View>
 
-          <View style={[styles.group, styles.pickerRow, (showRulePicker || showEndsOnPicker) && styles.openPickerRow]}>
+          <View style={[styles.group, styles.pickerRow, (elevatedPicker === 'rule' || elevatedPicker === 'endsOn') && styles.openPickerRow]}>
             <View style={styles.switchRow}>
               <Text style={styles.label}>Recurring</Text>
               <Switch
@@ -744,7 +789,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
             {recurring && (
               <>
-                <View style={[styles.columns, { marginTop: 12 }, showRulePicker && styles.openPickerRow]}>
+                <View style={[styles.columns, { marginTop: 12 }, elevatedPicker === 'rule' && styles.openPickerRow]}>
                   <View style={styles.column}>
                     <Text style={styles.label}>Frequency</Text>
                     <View>
@@ -754,22 +799,17 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         </Text>
                         <Ionicons name={showRulePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                       </TouchableOpacity>
-                      {showRulePicker && (
-                        <View style={[styles.dropdown, styles.dropdownFloating]}>
-                          {(['daily', 'weekly', 'monthly'] as const).map(rule => (
-                            <TouchableOpacity
-                              key={rule}
-                              style={styles.dropdownItem}
-                              onPress={() => { changeRule(rule); closePickers(); }}
-                            >
-                              <Text style={styles.dropdownText}>
-                                {rule.charAt(0).toUpperCase() + rule.slice(1)}
-                              </Text>
-                              {recurringRule === rule && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
+                      <DropdownMenu open={showRulePicker}>
+                        {(['daily', 'weekly', 'monthly'] as const).map((rule, i, arr) => (
+                          <DropdownItem
+                            key={rule}
+                            label={rule.charAt(0).toUpperCase() + rule.slice(1)}
+                            selected={recurringRule === rule}
+                            showSeparator={i < arr.length - 1}
+                            onPress={() => { changeRule(rule); closePickers(); }}
+                          />
+                        ))}
+                      </DropdownMenu>
                     </View>
                   </View>
 
@@ -784,14 +824,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   </View>
                 </View>
 
-                {showEndsOnPicker && (
+                <Collapsible open={showEndsOnPicker}>
                   <InlineDatePicker
                     value={endsOn}
                     weekStart={settings.weekStart}
                     minDate={date}
                     onChange={ds => { setEndsOn(ds); closePickers(); }}
                   />
-                )}
+                </Collapsible>
 
                 {recurringRule === 'weekly' && (
                   <View style={styles.dayRow}>
@@ -890,7 +930,10 @@ function makeStyles(C: ColorPalette) {
     card: {
       backgroundColor: C.card,
       marginHorizontal: 16,
-      marginTop: 12,
+      // 18, matching EventDetailView's card exactly. Tapping EDIT swaps one for
+      // the other in place, so any difference here is a jump in something that
+      // should read as the same card gaining fields, not as a new screen.
+      marginTop: 18,
       borderRadius: 12,
       zIndex: 20,
     },
@@ -978,14 +1021,10 @@ function makeStyles(C: ColorPalette) {
       paddingVertical: 6,
     },
     addPersonText: { fontSize: 14, fontWeight: '700', color: C.goalTextAction },
-    dropdown: {
-      marginTop: 4,
-      backgroundColor: C.background,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: C.border,
-      overflow: 'hidden',
-    },
+    /**
+     * Dismisses an open floating picker on a tap outside the card. Stays below
+     * the card (20), so it covers the form's surroundings only.
+     */
     pickerBackdrop: {
       position: 'absolute',
       top: 0,
@@ -995,28 +1034,31 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: 'transparent',
       zIndex: 10,
     },
-    dropdownFloating: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
-      backgroundColor: C.card,
-      shadowColor: C.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 10,
-      elevation: 12,
-      zIndex: 21,
+    /**
+     * The same job for taps that land *on* the card — a label, the padding
+     * between fields. It has to be a child of the card rather than a second
+     * sibling above it: a subview can never paint above a sibling of its
+     * parent, so a backdrop outranking the card outranks everything in it,
+     * open menu included, and the menu stops taking taps at all.
+     *
+     * Inside, the card's own layering does the work: 25 covers the groups that
+     * merely hold a trigger (pickerRow, 20) while the group whose picker is
+     * open (openPickerRow, 30) stays above it, keeping that trigger and its
+     * menu live.
+     *
+     * Not a Pressable wrapped around the card, which is the other obvious way
+     * to reach the dead space — that puts a touch responder over every field,
+     * and TimeWheelPicker is a snapping ScrollView, so the wheels stop
+     * scrolling. Taps survive it (a Touchable child claims the responder
+     * first), which makes it look as though only the wheels are broken.
+     *
+     * Nothing is covered while an in-flow picker is open: this renders only for
+     * the floating ones. See FLOATING_PICKERS.
+     */
+    cardBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 25,
     },
-    dropdownItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      height: DROPDOWN_ITEM_HEIGHT,
-      paddingHorizontal: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    dropdownText: { flex: 1, fontSize: 15, color: C.text },
     switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     dayRow: {
       flexDirection: 'row',

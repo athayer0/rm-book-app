@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, LayoutChangeEvent,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, LayoutChangeEvent, Pressable,
 } from 'react-native';
 import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { GoalDefinition } from '../constants/defaultGoals';
 import { GoalIcon } from './GoalIcon';
+import { DropdownMenu, DropdownItem } from './DropdownMenu';
 import { useWeeklyGoals, resolveGoal } from '../hooks/useWeeklyGoals';
 import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
 
@@ -123,49 +124,58 @@ export function GoalGraphTab({ definitions }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.dropdownWrapper}>
-        <TouchableOpacity
-          style={styles.dropdownBtn}
-          onPress={() => setDropdownOpen(o => !o)}
-          activeOpacity={0.8}
-        >
-          {selectedDef && (
-            <View style={[styles.dropIconBadge, { backgroundColor: isDark ? selectedDef.color : selectedDef.color + '20' }]}>
-              <GoalIcon icon={selectedDef.icon} iconFamily={selectedDef.iconFamily} size={16} color={isDark ? lightenColor(selectedDef.color) : selectedDef.color} />
-            </View>
-          )}
-          <Text style={styles.dropLabel} numberOfLines={1}>
-            {selectedDef?.label ?? 'Select goal'}
-          </Text>
-          <Ionicons
-            name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
-            size={16}
-            color={Colors.textSecondary}
-          />
-        </TouchableOpacity>
+        {/* Trigger and menu share a wrapper so the menu hangs off the button
+            itself rather than the wrapper's padding box — same construction as
+            the pickers in the event and person forms. */}
+        <View>
+          <TouchableOpacity
+            style={styles.dropdownBtn}
+            onPress={() => setDropdownOpen(o => !o)}
+            activeOpacity={0.8}
+          >
+            {selectedDef && (
+              <View style={[styles.dropIconBadge, { backgroundColor: isDark ? selectedDef.color : selectedDef.color + '20' }]}>
+                <GoalIcon icon={selectedDef.icon} iconFamily={selectedDef.iconFamily} size={16} color={isDark ? lightenColor(selectedDef.color) : selectedDef.color} />
+              </View>
+            )}
+            <Text style={styles.dropLabel} numberOfLines={1}>
+              {selectedDef?.label ?? 'Select goal'}
+            </Text>
+            <Ionicons
+              name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={Colors.textSecondary}
+            />
+          </TouchableOpacity>
 
-        {dropdownOpen && (
-          <View style={styles.dropList}>
-            {visibleDefs.map(def => (
-              <TouchableOpacity
+          <DropdownMenu open={dropdownOpen}>
+            {visibleDefs.map((def, i) => (
+              <DropdownItem
                 key={def.id}
-                style={[styles.dropItem, def.id === selectedId && styles.dropItemActive]}
+                label={def.label}
+                selected={def.id === selectedId}
+                showSeparator={i < visibleDefs.length - 1}
+                leading={
+                  // marginRight rather than the trigger's `gap`, which a menu row
+                  // has no equivalent of — DropdownItem lays leading and label out
+                  // adjacently and lets the leading element own its own spacing.
+                  <View style={[styles.dropIconBadge, { backgroundColor: isDark ? def.color : def.color + '20', marginRight: 10 }]}>
+                    <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={15} color={isDark ? lightenColor(def.color) : def.color} />
+                  </View>
+                }
                 onPress={() => { setSelectedId(def.id); setDropdownOpen(false); }}
-              >
-                <View style={[styles.dropIconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                  <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={15} color={isDark ? lightenColor(def.color) : def.color} />
-                </View>
-                <Text style={[styles.dropItemText, def.id === selectedId && { color: Colors.primary, fontWeight: '600' }]}
-                  numberOfLines={1}>
-                  {def.label}
-                </Text>
-                {def.id === selectedId && (
-                  <Ionicons name="checkmark" size={15} color={Colors.primary} />
-                )}
-              </TouchableOpacity>
+              />
             ))}
-          </View>
-        )}
+          </DropdownMenu>
+        </View>
       </View>
+
+      {/* Dismisses the menu on a tap anywhere else in the tab. Sits under
+          dropdownWrapper's own zIndex, so the trigger stays reachable and one
+          tap still closes the menu by re-tapping it rather than being eaten. */}
+      {dropdownOpen && (
+        <Pressable style={styles.dropdownBackdrop} onPress={() => setDropdownOpen(false)} />
+      )}
 
       <ScrollView
         style={styles.scroll}
@@ -318,6 +328,12 @@ function makeStyles(C: ColorPalette) {
       paddingBottom: 6,
       zIndex: 10,
     },
+    // Covers the whole tab, chart included; the wrapper above outranks it, so
+    // the trigger and the open menu are the only things it doesn't cover.
+    dropdownBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 1,
+    },
     dropdownBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -340,39 +356,6 @@ function makeStyles(C: ColorPalette) {
       flex: 1,
       fontSize: 15,
       fontWeight: '500',
-      color: C.text,
-    },
-    dropList: {
-      position: 'absolute',
-      top: 66,
-      left: 16,
-      right: 16,
-      backgroundColor: C.card,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: C.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.1,
-      shadowRadius: 6,
-      elevation: 6,
-      zIndex: 20,
-    },
-    dropItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    dropItemActive: {
-      backgroundColor: C.primary + '08',
-    },
-    dropItemText: {
-      flex: 1,
-      fontSize: 14,
       color: C.text,
     },
     scroll: { flex: 1 },

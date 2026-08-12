@@ -9,6 +9,7 @@ import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
 import { PERSON_STATUSES, STATUS_OPTIONS, statusDisplayName } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
+import { DropdownMenu, DropdownItem, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
 import { SheetModal } from '../components/SheetModal';
 import { useSettings } from '../hooks/useSettings';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
@@ -18,9 +19,15 @@ import { AddEditEventModal } from './AddEditEventModal';
 import { PersonTimelineTab } from '../components/PersonTimelineTab';
 import { PersonDetailView } from '../components/PersonDetailView';
 import { EdgeFade, TextWidthProbe } from '../components/ScrollableValue';
+import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 // Only the readers are left here. Dialling, messaging and mapping are the display
 // view's, so this file no longer knows how to open another app.
 import { isFacebookShareLink, toMessengerHandle } from '../utils/phoneUtils';
+
+// Thirteen statuses is far more than a menu should ever be tall, so the list
+// scrolls. Ends on half a row rather than a whole one, which is what says there
+// is more below without needing a scrollbar to be visible to say it.
+const STATUS_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
 
 interface Props {
   visible: boolean;
@@ -45,6 +52,20 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const [starred, setStarred] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
+  /**
+   * Which group wins the paint order. Lags the two booleans on the way down and
+   * only ever moves to the other picker, never back to null: a menu animates out
+   * over ~130ms, and its boolean is already false for all of it, so dropping the
+   * zIndex on close would send the menu behind the fields below for its whole
+   * exit. Leaving the last group elevated afterwards is harmless — nothing is
+   * drawn there to overlap anything.
+   */
+  const statusScrollEdges = useScrollEdges();
+  const [elevated, setElevated] = useState<'status' | 'method' | null>(null);
+  useEffect(() => {
+    if (showStatusPicker) setElevated('status');
+    else if (showMethodPicker) setElevated('method');
+  }, [showStatusPicker, showMethodPicker]);
   const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
   /**
    * Someone who already exists opens as a page about themselves; only editing
@@ -175,17 +196,20 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   }
 
   /**
-   * Dismiss the contact-method dropdown, which floats over the rows beneath it.
+   * Dismiss both dropdowns, which float over the rows beneath them.
    *
    * Every control in the card calls this, because the card has to sit above the
-   * dismiss backdrop for that dropdown to be visible at all — which means taps
-   * landing on a control no longer reach the backdrop. The status dropdown is
-   * deliberately not touched: it pushes the rows down rather than floating over
-   * them, has never had a backdrop, and closing it here would change when it
-   * goes away.
+   * dismiss backdrop for either dropdown to be visible at all — which means taps
+   * landing on a control no longer reach the backdrop.
+   *
+   * Status used to be exempt: it sat in the flow and pushed the rows below it
+   * down, so it had no backdrop to be shut out of. Now that it floats like the
+   * method picker, it needs the same dismissal or there would be no way to close
+   * it but to choose something.
    */
-  function closeMethodPicker() {
+  function closePickers() {
     setShowMethodPicker(false);
+    setShowStatusPicker(false);
   }
 
   const viewing = mode === 'view' && !!person;
@@ -281,10 +305,13 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           bounces={false}
           overScrollMode="never"
         >
-          {showMethodPicker && (
-            <Pressable style={styles.pickerBackdrop} onPress={closeMethodPicker} />
+          {(showMethodPicker || showStatusPicker) && (
+            <Pressable style={styles.pickerBackdrop} onPress={closePickers} />
           )}
           <View style={styles.card}>
+          {(showMethodPicker || showStatusPicker) && (
+            <Pressable style={styles.cardBackdrop} onPress={closePickers} />
+          )}
           <View style={styles.group}>
             <Text style={styles.label}>Name</Text>
             <View style={styles.fieldRow}>
@@ -292,7 +319,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 style={[styles.input, styles.fieldInput]}
                 value={name}
                 onChangeText={setName}
-                onFocus={closeMethodPicker}
+                onFocus={closePickers}
                 placeholder="Full name"
                 placeholderTextColor={Colors.textLight}
               />
@@ -300,7 +327,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   labelled section of its own — it is one bit about the person,
                   and the filled star already says which way it is set. */}
               <TouchableOpacity
-                onPress={() => { closeMethodPicker(); setStarred(!starred); }}
+                onPress={() => { closePickers(); setStarred(!starred); }}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityState={{ selected: starred }}
@@ -315,44 +342,52 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             </View>
           </View>
 
-          <View style={[styles.group, styles.pickerRow]}>
-            {/* Half a row for the field, with the other half left empty: the
-                value is a short label off a fixed list. The list it opens stays
-                full width, since some of the names need it. */}
+          <View style={[styles.group, styles.pickerRow, elevated === 'status' && styles.openPickerRow]}>
+            {/* Half a row, with the other half left empty. The list anchors to
+                the trigger itself rather than to the whole row, so it opens at
+                exactly the width the closed field already showed — a menu
+                twice the width of the control it belongs to reads as belonging
+                to something else. */}
             <View style={styles.columns}>
               <View style={styles.column}>
                 <Text style={styles.label}>Status</Text>
-                <TouchableOpacity
-                  style={styles.picker}
-                  onPress={() => { closeMethodPicker(); setShowStatusPicker(!showStatusPicker); }}
-                >
-                  {PERSON_STATUSES[status] && (
-                    <StatusIcon config={PERSON_STATUSES[status]} size={14} style={{ marginRight: 6 }} />
-                  )}
-                  <Text style={styles.pickerText}>{statusDisplayName(status)}</Text>
-                  <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-                </TouchableOpacity>
+                <View>
+                  <TouchableOpacity
+                    style={styles.picker}
+                    onPress={() => { closePickers(); setShowStatusPicker(!showStatusPicker); }}
+                  >
+                    {PERSON_STATUSES[status] && (
+                      <StatusIcon config={PERSON_STATUSES[status]} size={14} style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={styles.pickerText} numberOfLines={1}>{statusDisplayName(status)}</Text>
+                    <Ionicons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
+                  </TouchableOpacity>
+                  <DropdownMenu open={showStatusPicker}>
+                    <ScrollView
+                      style={{ maxHeight: STATUS_LIST_MAX_HEIGHT }}
+                      nestedScrollEnabled
+                      bounces={false}
+                      overScrollMode="never"
+                      {...statusScrollEdges.scrollViewProps}
+                    >
+                      {STATUS_OPTIONS.map((s, i) => (
+                        <DropdownItem
+                          key={s}
+                          label={statusDisplayName(s)}
+                          selected={status === s}
+                          showSeparator={i < STATUS_OPTIONS.length - 1}
+                          leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={{ marginRight: 8 }} />}
+                          onPress={() => { setStatus(s); setShowStatusPicker(false); }}
+                        />
+                      ))}
+                    </ScrollView>
+                    <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={statusScrollEdges.showTopFade} />
+                    <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={statusScrollEdges.showBottomFade} />
+                  </DropdownMenu>
+                </View>
               </View>
               <View style={styles.column} />
             </View>
-            {showStatusPicker && (
-              <View style={styles.dropdown}>
-                {STATUS_OPTIONS.map(s => {
-                  const cfg = PERSON_STATUSES[s];
-                  return (
-                    <TouchableOpacity
-                      key={s}
-                      style={styles.dropdownItem}
-                      onPress={() => { setStatus(s); setShowStatusPicker(false); }}
-                    >
-                      <StatusIcon config={cfg} size={14} style={{ marginRight: 8 }} />
-                      <Text style={styles.dropdownText}>{statusDisplayName(s)}</Text>
-                      {status === s && <Ionicons name="checkmark" size={16} color={Colors.control} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
           </View>
 
           <View style={[styles.group, styles.columns]}>
@@ -362,7 +397,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 style={styles.input}
                 value={phone}
                 onChangeText={setPhone}
-                onFocus={closeMethodPicker}
+                onFocus={closePickers}
                 placeholder="Phone number"
                 placeholderTextColor={Colors.textLight}
                 keyboardType="phone-pad"
@@ -381,7 +416,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 <View style={styles.methodHeader}>
                   <Text style={styles.label}>WhatsApp</Text>
                   <TouchableOpacity
-                    onPress={() => { closeMethodPicker(); setWhatsapp(null); }}
+                    onPress={() => { closePickers(); setWhatsapp(null); }}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="Remove WhatsApp"
@@ -393,7 +428,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   style={styles.input}
                   value={whatsapp}
                   onChangeText={setWhatsapp}
-                  onFocus={closeMethodPicker}
+                  onFocus={closePickers}
                   placeholder="WhatsApp number"
                   placeholderTextColor={Colors.textLight}
                   keyboardType="phone-pad"
@@ -408,7 +443,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               <View style={styles.methodHeader}>
                 <Text style={styles.label}>Messenger</Text>
                 <TouchableOpacity
-                  onPress={() => { closeMethodPicker(); setMessenger(null); }}
+                  onPress={() => { closePickers(); setMessenger(null); }}
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel="Remove Messenger"
@@ -430,7 +465,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   style={styles.input}
                   value={messenger}
                   onChangeText={setMessenger}
-                  onFocus={closeMethodPicker}
+                  onFocus={closePickers}
                   placeholder="Profile link or username"
                   placeholderTextColor={Colors.textLight}
                   autoCapitalize="none"
@@ -468,7 +503,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             <View style={[
               styles.group,
               styles.pickerRow,
-              showMethodPicker && styles.openPickerRow,
+              elevated === 'method' && styles.openPickerRow,
             ]}>
               {/* Trigger and dropdown share a wrapper so the dropdown hangs off the
                   row itself, not the group's padding box — same as the time
@@ -480,30 +515,33 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                     identical "Add address" row below has never had one. */}
                 <TouchableOpacity
                   style={styles.addMethodRow}
-                  onPress={() => setShowMethodPicker(v => !v)}
+                  // Shuts the status menu on the way, the same as every other
+                  // control in the card. It didn't have to when status sat in
+                  // the flow; now that both float, opening one over the other
+                  // would leave two menus on screen at once.
+                  onPress={() => { setShowStatusPicker(false); setShowMethodPicker(v => !v); }}
                 >
                   <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
                   <Text style={styles.addMethodText}>Add contact method</Text>
                 </TouchableOpacity>
-                {showMethodPicker && (
-                  <View style={[styles.dropdown, styles.dropdownFloating]}>
-                    {availableMethods.map(method => (
-                      <TouchableOpacity
-                        key={method.key}
-                        style={styles.dropdownItem}
-                        onPress={() => { method.add(); setShowMethodPicker(false); }}
-                      >
+                <DropdownMenu open={showMethodPicker}>
+                  {availableMethods.map((method, i) => (
+                    <DropdownItem
+                      key={method.key}
+                      label={method.label}
+                      showSeparator={i < availableMethods.length - 1}
+                      leading={
                         <MaterialCommunityIcons
                           name={method.key === 'whatsapp' ? 'whatsapp' : 'facebook-messenger'}
                           size={18}
                           color={Colors.control}
                           style={{ marginRight: 8 }}
                         />
-                        <Text style={styles.dropdownText}>{method.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                      }
+                      onPress={() => { method.add(); setShowMethodPicker(false); }}
+                    />
+                  ))}
+                </DropdownMenu>
               </View>
             </View>
           )}
@@ -516,7 +554,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               <View style={styles.methodHeader}>
                 <Text style={styles.label}>Address</Text>
                 <TouchableOpacity
-                  onPress={() => { closeMethodPicker(); setAddress(null); }}
+                  onPress={() => { closePickers(); setAddress(null); }}
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel="Remove address"
@@ -528,7 +566,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 style={styles.input}
                 value={address}
                 onChangeText={setAddress}
-                onFocus={closeMethodPicker}
+                onFocus={closePickers}
                 placeholder="Street, city, state"
                 placeholderTextColor={Colors.textLight}
                 autoCapitalize="words"
@@ -543,7 +581,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             <View style={[styles.group]}>
               <TouchableOpacity
                 style={styles.addMethodRow}
-                onPress={() => { closeMethodPicker(); setAddress(''); }}
+                onPress={() => { closePickers(); setAddress(''); }}
                 accessibilityRole="button"
               >
                 <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
@@ -558,7 +596,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               style={[styles.input, styles.notesInput]}
               value={notes}
               onChangeText={setNotes}
-              onFocus={closeMethodPicker}
+              onFocus={closePickers}
               placeholder="Notes about this person..."
               placeholderTextColor={Colors.textLight}
               multiline
@@ -672,7 +710,10 @@ function makeStyles(C: ColorPalette) {
     card: {
       backgroundColor: C.card,
       marginHorizontal: 16,
-      marginTop: 12,
+      // 18, matching PersonDetailView's card exactly. Tapping EDIT swaps one for
+      // the other in place, so any difference here is a jump in something that
+      // should read as the same card gaining fields, not as a new screen.
+      marginTop: 18,
       borderRadius: 12,
       zIndex: 20,
     },
@@ -753,6 +794,10 @@ function makeStyles(C: ColorPalette) {
     // the rows themselves.
     pickerRow: { zIndex: 20 },
     openPickerRow: { zIndex: 30 },
+    /**
+     * Dismisses an open picker on a tap outside the card. Stays below the card
+     * (20), so it covers the form's surroundings only.
+     */
     pickerBackdrop: {
       position: 'absolute',
       top: 0,
@@ -762,36 +807,27 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: 'transparent',
       zIndex: 10,
     },
-    dropdownFloating: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
-      backgroundColor: C.card,
-      shadowColor: C.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 10,
-      elevation: 12,
-      zIndex: 21,
+    /**
+     * The same job for taps that land *on* the card — a label, the padding
+     * between fields. It has to be a child of the card rather than a second
+     * sibling above it: a subview can never paint above a sibling of its
+     * parent, so a backdrop outranking the card outranks everything in it,
+     * open menu included, and the menu stops taking taps at all.
+     *
+     * Inside, the card's own layering does the work: 25 covers the groups that
+     * merely hold a trigger (pickerRow, 20) while the group whose picker is
+     * open (openPickerRow, 30) stays above it.
+     *
+     * Not a Pressable wrapped around the card, which is the other obvious way
+     * to reach the dead space — that puts a touch responder over every field
+     * and breaks any child needing a move gesture rather than a tap. See the
+     * matching note in AddEditEventModal, where it stopped the time wheels
+     * scrolling.
+     */
+    cardBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 25,
     },
-    dropdown: {
-      marginTop: 4,
-      backgroundColor: C.background,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: C.border,
-      overflow: 'hidden',
-    },
-    dropdownItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    dropdownText: { flex: 1, fontSize: 15, color: C.text },
     deleteBtn: {
       flexDirection: 'row',
       alignItems: 'center',
