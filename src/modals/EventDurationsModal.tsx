@@ -59,6 +59,7 @@ export function EventDurationsModal({ visible, onClose }: Props) {
           matching note in EventColorsModal for why it is what leaves the gap
           under the card. */}
       <View style={[styles.content, { paddingBottom: 16 + insets.bottom }]}>
+        <View style={styles.cardShadow}>
         <View style={styles.card}>
           {EVENT_TYPES.map((type, i, arr) => {
             const mins = minutesOf(type);
@@ -92,6 +93,7 @@ export function EventDurationsModal({ visible, onClose }: Props) {
             );
           })}
         </View>
+        </View>
       </View>
 
       <DurationSheet
@@ -122,7 +124,18 @@ function makeStyles(C: ColorPalette) {
     // Less above the card than beside it: the sheet header already provides
     // separation, so a full 16 there read as a gap rather than a margin.
     content: { flex: 1, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16, backgroundColor: C.background },
-    card: { flex: 1, backgroundColor: C.card, borderRadius: 12, overflow: 'hidden' },
+    // Shadow only — kept off `card` because overflow:'hidden' clips a shadow
+    // along with everything else, which on iOS erases it outright.
+    cardShadow: {
+      flex: 1,
+      borderRadius: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    card: { flex: 1, backgroundColor: C.card, borderRadius: 20, overflow: 'hidden' },
     // Rows share the card's height — see the matching note in EventColorsModal
     // for why a fixed row height cannot fit both an iPhone 14 and an SE.
     row: {

@@ -89,27 +89,27 @@ function makeStyles(C: ColorPalette) {
       gap: 2,
     },
     label: {
-      fontSize: 12,
+      fontSize: 11,
       color: C.textSecondary,
       fontWeight: '500',
       lineHeight: 16,
     },
     labelCompact: {
-      fontSize: 11,
+      fontSize: 10,
     },
     countRow: {
       flexDirection: 'row',
       alignItems: 'baseline',
     },
     count: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '700',
     },
     countCompact: {
       fontSize: 15,
     },
     goal: {
-      fontSize: 18,
+      fontSize: 20,
       color: C.textLight,
       fontWeight: '500',
     },

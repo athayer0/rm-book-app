@@ -11,7 +11,7 @@ import { usePeople, Person } from '../hooks/usePeople';
 import { PersonCard } from '../components/PersonCard';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { ImportContactsModal } from '../modals/ImportContactsModal';
-import { FAB } from '../components/FAB';
+import { FAB, FAB_SIZE, FAB_BOTTOM } from '../components/FAB';
 import {
   PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus,
 } from '../constants/personStatuses';
@@ -21,13 +21,15 @@ import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 
 type FilterSelection =
   | { kind: 'all' }
+  | { kind: 'favorites' }
   | { kind: 'group'; name: string; statuses: string[] }
   | { kind: 'status'; name: string };
 
-function matchesFilter(status: string, selection: FilterSelection): boolean {
+function matchesFilter(person: Person, selection: FilterSelection): boolean {
   if (selection.kind === 'all') return true;
-  if (selection.kind === 'group') return selection.statuses.includes(status);
-  return status === selection.name;
+  if (selection.kind === 'favorites') return !!person.starred;
+  if (selection.kind === 'group') return selection.statuses.includes(person.status);
+  return person.status === selection.name;
 }
 
 // Enough for a handful of rows on the shortest screen, so a mis-measurement can
@@ -39,7 +41,14 @@ type ListRow =
   | { kind: 'person'; person: Person; key: string };
 
 function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
-  if (selection.kind !== 'all') {
+  if (selection.kind === 'favorites') {
+    if (list.length === 0) return [];
+    return [
+      { kind: 'header', label: 'Favorites', key: 'header' },
+      ...list.map(person => ({ kind: 'person' as const, person, key: person.id })),
+    ];
+  }
+  if (selection.kind === 'group' || selection.kind === 'status') {
     if (list.length === 0) return [];
     return [
       { kind: 'header', label: selection.name, key: 'header' },
@@ -47,7 +56,13 @@ function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
     ];
   }
   const rows: ListRow[] = [];
-  for (const group of groupByStatus(list)) {
+  const favorites = list.filter(p => p.starred);
+  const rest = list.filter(p => !p.starred);
+  if (favorites.length > 0) {
+    rows.push({ kind: 'header', label: 'Favorites', key: 'header-favorites' });
+    favorites.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
+  }
+  for (const group of groupByStatus(rest)) {
     if (group.label) rows.push({ kind: 'header', label: group.label, key: `header-${group.label}` });
     group.people.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
   }
@@ -75,8 +90,15 @@ export function PeopleScreen() {
 
   const filtered = people
     .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    .filter(p => matchesFilter(p.status, filterSelection))
+    .filter(p => matchesFilter(p, filterSelection))
     .sort((a, b) => {
+      // Outside the 'all' view (which gets its own Favorites section from
+      // buildRows), a favorite just sorts to the top of whatever group/status/
+      // favorites list it's in rather than getting a header of its own.
+      if (filterSelection.kind !== 'all') {
+        const favDiff = Number(!!b.starred) - Number(!!a.starred);
+        if (favDiff !== 0) return favDiff;
+      }
       const diff = statusRank(a.status) - statusRank(b.status);
       return diff !== 0 ? diff : a.name.localeCompare(b.name);
     });
@@ -86,14 +108,17 @@ export function PeopleScreen() {
   const isFiltered = search.length > 0 || filterSelection.kind !== 'all';
 
   // The filter list is longer than the screen — every group plus every status —
-  // so it scrolls, stopping about three quarters of the way down the page. Measured
-  // from where the dropdown opens (just under the header) rather than from the top
-  // of the page, since that lower edge is what the cap is really about. Falls back
-  // to the floor until the first layout lands, when both measurements are still 0.
+  // so it scrolls, stopping clear of the FAB rather than running the page's full
+  // height. Measured from where the dropdown opens (just under the header) rather
+  // than from the top of the page, since that lower edge is what the cap is really
+  // about. The gap left above the FAB matches FAB_BOTTOM, the gap the FAB already
+  // keeps below itself, so the button reads as centred in its own clearance rather
+  // than crowded from one side. Falls back to the floor until the first layout
+  // lands, when both measurements are still 0.
   const filterListMaxHeight = Math.max(
-    pageHeight * (3 / 4) - headerBottom,
+    pageHeight - headerBottom - (FAB_BOTTOM + FAB_SIZE + FAB_BOTTOM),
     MIN_FILTER_LIST_HEIGHT,
-  );
+  ) + 10;
 
   function handleEdit(person: Person) {
     setEditingPerson(person);
@@ -154,16 +179,21 @@ export function PeopleScreen() {
                 selected={filterSelection.kind === 'all'}
                 onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
               />
-              {STATUS_GROUPS.map((g, i) => (
+              {STATUS_GROUPS.map((g) => (
                 <DropdownItem
                   key={g.name}
                   label={g.name}
                   selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
-                  // The divider below does the separating for the last one.
-                  showSeparator={i < STATUS_GROUPS.length - 1}
                   onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
                 />
               ))}
+              <DropdownItem
+                label="Favorites"
+                selected={filterSelection.kind === 'favorites'}
+                showSeparator={false}
+                leading={<Ionicons name="star" size={16} color={Colors.favorite} style={styles.filterChipIcon} />}
+                onPress={() => { setFilterSelection({ kind: 'favorites' }); setShowFilterDropdown(false); }}
+              />
               <MenuDivider />
               {STATUS_OPTIONS.map((s, i) => (
                 <DropdownItem
@@ -303,7 +333,7 @@ function makeStyles(C: ColorPalette) {
       marginHorizontal: 16,
       marginTop: -1,
       marginBottom: 0,
-      borderRadius: 10,
+      borderRadius: 14,
       paddingHorizontal: 12,
       paddingVertical: 8,
       gap: 8,

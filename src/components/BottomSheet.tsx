@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal, View, Text, Pressable, TouchableOpacity,
-  StyleSheet, Animated, Keyboard, Platform, useWindowDimensions,
+  StyleSheet, Animated, Keyboard, KeyboardEvent, LayoutAnimation, Platform, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../hooks/useColors';
@@ -48,13 +48,25 @@ export function BottomSheet({ visible, title, height, onCancel, onDone, children
   // the keyboard straight over itself. Plain state rather than an Animated
   // value on purpose: the slide below drives this same node's transform on the
   // native driver, and a JS-driven animation on the same node is what triggers
-  // RN's "moved to native" warning.
+  // RN's "moved to native" warning. LayoutAnimation is what smooths the jump
+  // instead — it animates the next layout pass rather than this node's style
+  // directly, so it doesn't touch the native-driven transform at all. Timed
+  // off the keyboard event's own duration so it rises and falls in step with
+  // the keyboard rather than at its own fixed pace.
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, e => setKeyboardHeight(e.endCoordinates.height));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    const animateTo = (next: number, e?: KeyboardEvent) => {
+      LayoutAnimation.configureNext(LayoutAnimation.create(
+        e?.duration || 250,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ));
+      setKeyboardHeight(next);
+    };
+    const showSub = Keyboard.addListener(showEvent, e => animateTo(e.endCoordinates.height, e));
+    const hideSub = Keyboard.addListener(hideEvent, e => animateTo(0, e));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
@@ -127,12 +139,14 @@ function makeStyles(C: ColorPalette) {
     sheet: {
       width: '100%',
       backgroundColor: C.card,
-      borderTopLeftRadius: 18,
-      borderTopRightRadius: 18,
+      borderRadius: 18,
       // A sheet rising off the page rather than a card sitting in it, so it gets
       // the detached menu shadow. In dark mode that shadow is invisible against
-      // a near-black background, which is what the hairline is there for.
-      borderTopWidth: StyleSheet.hairlineWidth,
+      // a near-black background, which is what the hairline is there for. Runs
+      // all the way round now that the bottom corners are rounded too: flush to
+      // the screen edge, they clip a sliver of the card away at both bottom
+      // corners, and that cut needs the same edge the top one gets.
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.menuBorder,
       shadowColor: C.menuShadow,
       shadowOffset: { width: 0, height: -2 },

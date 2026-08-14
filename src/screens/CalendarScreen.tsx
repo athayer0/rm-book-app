@@ -14,6 +14,7 @@ import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
 import { FAB, type FABAction } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
+import { EventTypeSheet } from '../modals/EventTypeSheet';
 import { CalendarEvent, renderedEventHeight, hasEndTime } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
@@ -44,6 +45,10 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   // modal resets off this prop's identity, so it has to be a fresh object per
   // pick and the same one for as long as that pick's form is open.
   const [prefill, setPrefill] = useState<Partial<CalendarEvent> | null>(null);
+  // Set only by tapping an empty slot, and read once the type sheet resolves —
+  // the slot's time has to survive the intermediary popup, since nothing else
+  // carries it forward.
+  const [pendingTapTime, setPendingTapTime] = useState<string | null>(null);
   const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
   const { getStatus, report } = useEventReport();
@@ -159,9 +164,15 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   }
 
   function handleTapEmpty(timeStr: string) {
+    setPendingTapTime(timeStr);
+  }
+
+  function handleTypeSelected(type: string) {
+    const timeStr = pendingTapTime;
+    setPendingTapTime(null);
     setEditingEvent(null);
-    setDefaultStartTime(timeStr);
-    setPrefill(null);
+    setDefaultStartTime(undefined);
+    setPrefill({ type, startTime: timeStr ?? nextHalfHour() });
     setShowEventModal(true);
   }
 
@@ -382,6 +393,12 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
       )}
 
       <FAB onPress={handleAddEvent} actions={quickActions} onSelectAction={handleQuickAdd} />
+
+      <EventTypeSheet
+        visible={pendingTapTime !== null}
+        onSelect={handleTypeSelected}
+        onClose={() => setPendingTapTime(null)}
+      />
 
       <AddEditEventModal
         visible={showEventModal}

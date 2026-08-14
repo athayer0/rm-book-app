@@ -32,23 +32,18 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-      marginBottom: 4,
+      paddingTop: 14,
+      paddingBottom: 10,
     },
     title: {
-      fontSize: 13,
+      fontSize: 17,
       fontWeight: '700',
-      letterSpacing: 0.8,
       color: C.text,
-      textTransform: 'uppercase',
     },
     action: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
       color: C.accent,
-      letterSpacing: 0.4,
     },
   });
 }

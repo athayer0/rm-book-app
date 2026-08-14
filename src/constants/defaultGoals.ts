@@ -1,3 +1,6 @@
+/** The grid only has room for so many before it turns into a wall of cards. */
+export const MAX_VISIBLE_GOALS = 10;
+
 export interface GoalDefinition {
   id: string;
   label: string;
@@ -82,7 +85,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
   },
   {
     id: 'temple_attendance',
-    label: 'Temple Attendance',
+    label: 'Temple Trips',
     icon: 'church',
     iconFamily: 'MaterialCommunityIcons',
     color: '#00B5C8',

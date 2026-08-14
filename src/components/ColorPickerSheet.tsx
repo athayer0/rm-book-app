@@ -305,7 +305,11 @@ function SpectrumPanel({
           pointerEvents="none"
           style={[
             styles.fieldThumb,
-            { left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, backgroundColor: draft },
+            {
+              left: insetPos(hsv.s, field.size.w, FIELD_THUMB),
+              top: insetPos(1 - hsv.v, field.size.h, FIELD_THUMB),
+              backgroundColor: draft,
+            },
           ]}
         />
       </View>
@@ -325,11 +329,30 @@ function SpectrumPanel({
         </View>
         <View
           pointerEvents="none"
-          style={[styles.stripThumb, { left: `${(hsv.h / 360) * 100}%`, backgroundColor: pure }]}
+          style={[
+            styles.stripThumb,
+            { left: insetPos(hsv.h / 360, hue.size.w, STRIP_THUMB), backgroundColor: pure },
+          ]}
         />
       </View>
     </View>
   );
+}
+
+/**
+ * A thumb's `left`/`top` is its centre, offset back by its own radius via a
+ * negative margin — so ranging that centre across the full 0–100% of the
+ * track lets it reach all the way to each end, and its far edge overhangs by
+ * a radius past the track's own edge. Insetting the centre's *travel* by the
+ * radius on each side keeps the whole circle within the track instead: once
+ * the track's pixel size is known (post-layout), position in pixels rather
+ * than percent, since a percentage can't express "radius plus a fraction of
+ * the remainder." Before that first layout, size is 0 and this falls back to
+ * the old percentage so the thumb isn't stranded at the origin for a frame.
+ */
+function insetPos(fraction: number, trackSize: number, thumbSize: number): number | `${number}%` {
+  if (trackSize <= 0) return `${fraction * 100}%`;
+  return thumbSize / 2 + fraction * (trackSize - thumbSize);
 }
 
 /* ------------------------------------------------------------- Sliders tab */
@@ -403,7 +426,10 @@ function SlidersPanel({
               </View>
               <View
                 pointerEvents="none"
-                style={[styles.stripThumb, { left: `${(value / 255) * 100}%`, backgroundColor: draft }]}
+                style={[
+                  styles.stripThumb,
+                  { left: insetPos(value / 255, tracks[key].size.w, STRIP_THUMB), backgroundColor: draft },
+                ]}
               />
             </View>
             <Text style={styles.channelValue}>{value}</Text>
@@ -463,10 +489,14 @@ const SELECTED_BORDER = 3;
 // The preview row's tallest dot, and the slot every dot centres inside.
 const PREVIEW_SLOT = 30;
 const STRIP_HEIGHT = 24;
+// Thumb sizes, hoisted out of makeStyles so the panels can also use them to
+// inset a thumb's travel by its own radius — see `insetPos`.
+const STRIP_THUMB = STRIP_HEIGHT + 6;
+const FIELD_THUMB = 26;
 
 function makeStyles(C: ColorPalette) {
-  const stripThumb = STRIP_HEIGHT + 6;
-  const fieldThumb = 26;
+  const stripThumb = STRIP_THUMB;
+  const fieldThumb = FIELD_THUMB;
   return StyleSheet.create({
     // The sheet frame, backdrop and Cancel/title/Done header all live in
     // `BottomSheet` now — shared with `DurationSheet` so the two editors opened

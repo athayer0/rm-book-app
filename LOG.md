@@ -24,15 +24,17 @@ FEATURES
 [x] be able to import people from contacts app on your phone
 [x] add color picker for event colors and a different way to select default duration for events
 [x] daily review and event notifications
+[x] fix graph y axis labels
+[x] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
 
-[ ] fix graph y axis labels
-[ ] swiping time spacing calendar bug
 [ ] save recent convert info on where they are on the covenant path
-[ ] onboarding
-[ ] make friends and districts, be able to view each others KIs
-[ ] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
-[ ] add more hideable kis for the other event types (hours worked, hours of school, etc.) or add the ability to tie custom events to kis so that reporting them makes them 
+[ ] simple onboarding
+[ ] add the ability to add and hide events and when adding an event you have the option to add a corresponding ki that gets incremented by reporting it
+[ ] monthly goals
+[ ] color menu and edit goal menu animation quitting early bug
+[ ] fix first time load white flash (skeleton loading?)
 [ ] add spanish portuguese and french
+[ ] swiping time spacing calendar bug?
 
 DEPLOYMENT TASKS
 [ ] Choose an official name and make support email. Then, be able to sign in/make an account with apple and google (and facebook?)
@@ -44,3 +46,9 @@ DEPLOYMENT TASKS
 [ ] deploy to google play store
 [ ] deploy to app store
 [ ] FIGURE OUT THE MONEY MAKER $$$
+[ ] tip $5
+
+POST 1.0.0
+[ ] add friends and districts, be able to add events to their calendars
+[ ] add snapchat map and ping friends 
+[ ] ki for doing something with one of your friends

@@ -48,7 +48,7 @@ export interface AppSettings {
   eventReminderMinutes: number;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   weekStart: 'monday',
   theme: 'light',
   themeColor: DEFAULT_THEME_COLOR,

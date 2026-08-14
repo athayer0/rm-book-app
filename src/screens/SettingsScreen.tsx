@@ -12,13 +12,14 @@ import {
   DEFAULT_SECONDARY_COLOR_LIGHT, DEFAULT_SECONDARY_COLOR_DARK,
   DEFAULT_TERTIARY_COLOR_LIGHT, DEFAULT_TERTIARY_COLOR_DARK,
 } from '../constants/colors';
-import { EventSizes, EVENT_SIZE_OPTIONS, DEFAULT_EVENT_SIZE, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
+import { EventSizes, EVENT_SIZE_OPTIONS, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
-import { DropdownMenu, DropdownItem, Collapsible } from '../components/DropdownMenu';
+import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
+import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { EventColorsModal } from '../modals/EventColorsModal';
 import { EventDurationsModal } from '../modals/EventDurationsModal';
 import { normalizeHex } from '../utils/colorUtils';
-import { useSettings, type AppSettings } from '../hooks/useSettings';
+import { useSettings, DEFAULT_SETTINGS, type AppSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { eventTypeColor, eventTypeDefaultMinutes } from '../utils/eventUtils';
@@ -33,6 +34,12 @@ import { requestNotificationPermissions, scheduleDailyReview, cancelDailyReview 
 
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
 const END_HOUR_OPTIONS = [21, 22, 23, 24];
+
+// The only dropdown in this screen long enough to need capping — twelve rows
+// unbounded runs off the bottom of shorter phones. Ends on half a row rather
+// than a whole one, same as the status picker's list, so what's left says
+// "more below" without needing a visible scrollbar to say it.
+const EVENT_REMINDER_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
 
 function hourLabel(h: number): string {
   if (h === 0 || h === 24) return '12 AM';
@@ -104,6 +111,7 @@ export function SettingsScreen() {
   // Primary always shows; secondary/tertiary show only their current-theme variant.
   const visibleColorRows = THEME_COLOR_ROWS.filter(row => !row.mode || row.mode === (isDark ? 'dark' : 'light'));
   const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
+  const eventReminderScrollEdges = useScrollEdges();
   // Which theme colour the picker sheet is editing, if any.
   const [colorSheet, setColorSheet] = useState<ThemeColorRowKey | null>(null);
   // Which of the two event-type screens is open.
@@ -467,6 +475,107 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* Daily Review Reminder — a local notification, off by default, that
+            opens straight to the unreported-events backlog when tapped. */}
+        {/* No lift: the time wheel opens in the flow, so no backdrop goes up
+            for it and there is nothing for the section to rise over. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>DAILY REVIEW</Text>
+          <View style={styles.card}>
+            <View style={[styles.row, !settings.dailyReviewEnabled && styles.rowLast]}>
+              <Text style={styles.rowLabel}>Notifications</Text>
+              <Switch
+                value={settings.dailyReviewEnabled}
+                onValueChange={handleToggleDailyReview}
+                trackColor={{ true: Colors.control }}
+                thumbColor={Colors.white}
+              />
+            </View>
+            {settings.dailyReviewEnabled && (
+              <>
+                <TouchableOpacity
+                  style={[styles.row, openDropdown !== 'dailyReviewTime' && styles.rowLast]}
+                  onPress={() => toggleDropdown('dailyReviewTime')}
+                >
+                  <Text style={styles.rowLabel}>Time</Text>
+                  <Text style={styles.rowValue}>
+                    {formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
+                  </Text>
+                  <Ionicons
+                    name={openDropdown === 'dailyReviewTime' ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={Colors.textLight}
+                    style={{ marginLeft: 6 }}
+                  />
+                </TouchableOpacity>
+                <Collapsible open={openDropdown === 'dailyReviewTime'}>
+                  <View style={styles.timeWheelPanel}>
+                    <TimeWheelPicker
+                      value={formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
+                      onChange={handleSelectDailyReviewTime}
+                    />
+                  </View>
+                </Collapsible>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Event Reminders — a second, independent local notification: one
+            per upcoming event occurrence rather than a single daily one. */}
+        <View style={[styles.section, elevatedDropdown === 'eventReminderLead' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>EVENT REMINDERS</Text>
+          <View style={styles.card}>
+            <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
+              <Text style={styles.rowLabel}>Notifications</Text>
+              <Switch
+                value={settings.eventReminderEnabled}
+                onValueChange={handleToggleEventReminders}
+                trackColor={{ true: Colors.control }}
+                thumbColor={Colors.white}
+              />
+            </View>
+            {settings.eventReminderEnabled && (
+              <View style={[styles.fieldRow, elevatedDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
+                <TouchableOpacity
+                  style={[styles.row, styles.rowLast]}
+                  onPress={() => toggleDropdown('eventReminderLead')}
+                >
+                  <Text style={styles.rowLabel}>Time Before</Text>
+                  <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
+                  <Ionicons
+                    name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={Colors.textLight}
+                    style={{ marginLeft: 6 }}
+                  />
+                </TouchableOpacity>
+                <DropdownMenu open={openDropdown === 'eventReminderLead'}>
+                  <ScrollView
+                    style={{ maxHeight: EVENT_REMINDER_LIST_MAX_HEIGHT }}
+                    nestedScrollEnabled
+                    bounces={false}
+                    overScrollMode="never"
+                    {...eventReminderScrollEdges.scrollViewProps}
+                  >
+                    {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
+                      <DropdownItem
+                        key={minutes}
+                        label={eventReminderLabel(minutes)}
+                        selected={settings.eventReminderMinutes === minutes}
+                        showSeparator={i < arr.length - 1}
+                        onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
+                      />
+                    ))}
+                  </ScrollView>
+                  <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={eventReminderScrollEdges.showTopFade} />
+                  <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={eventReminderScrollEdges.showBottomFade} />
+                </DropdownMenu>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Week Start */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>WEEK START</Text>
@@ -716,97 +825,6 @@ export function SettingsScreen() {
           </View>
         )}
 
-        {/* Daily Review Reminder — a local notification, off by default, that
-            opens straight to the unreported-events backlog when tapped. */}
-        {/* No lift: the time wheel opens in the flow, so no backdrop goes up
-            for it and there is nothing for the section to rise over. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DAILY REVIEW</Text>
-          <View style={styles.card}>
-            <View style={[styles.row, !settings.dailyReviewEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>Notifications</Text>
-              <Switch
-                value={settings.dailyReviewEnabled}
-                onValueChange={handleToggleDailyReview}
-                trackColor={{ true: Colors.control }}
-                thumbColor={Colors.white}
-              />
-            </View>
-            {settings.dailyReviewEnabled && (
-              <>
-                <TouchableOpacity
-                  style={[styles.row, openDropdown !== 'dailyReviewTime' && styles.rowLast]}
-                  onPress={() => toggleDropdown('dailyReviewTime')}
-                >
-                  <Text style={styles.rowLabel}>Time</Text>
-                  <Text style={styles.rowValue}>
-                    {formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
-                  </Text>
-                  <Ionicons
-                    name={openDropdown === 'dailyReviewTime' ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color={Colors.textLight}
-                    style={{ marginLeft: 6 }}
-                  />
-                </TouchableOpacity>
-                <Collapsible open={openDropdown === 'dailyReviewTime'}>
-                  <View style={styles.timeWheelPanel}>
-                    <TimeWheelPicker
-                      value={formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
-                      onChange={handleSelectDailyReviewTime}
-                    />
-                  </View>
-                </Collapsible>
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Event Reminders — a second, independent local notification: one
-            per upcoming event occurrence rather than a single daily one. */}
-        <View style={[styles.section, elevatedDropdown === 'eventReminderLead' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>EVENT REMINDERS</Text>
-          <View style={styles.card}>
-            <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>Notifications</Text>
-              <Switch
-                value={settings.eventReminderEnabled}
-                onValueChange={handleToggleEventReminders}
-                trackColor={{ true: Colors.control }}
-                thumbColor={Colors.white}
-              />
-            </View>
-            {settings.eventReminderEnabled && (
-              <View style={[styles.fieldRow, elevatedDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
-                <TouchableOpacity
-                  style={[styles.row, styles.rowLast]}
-                  onPress={() => toggleDropdown('eventReminderLead')}
-                >
-                  <Text style={styles.rowLabel}>Time Before</Text>
-                  <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
-                  <Ionicons
-                    name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color={Colors.textLight}
-                    style={{ marginLeft: 6 }}
-                  />
-                </TouchableOpacity>
-                <DropdownMenu open={openDropdown === 'eventReminderLead'}>
-                  {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
-                    <DropdownItem
-                      key={minutes}
-                      label={eventReminderLabel(minutes)}
-                      selected={settings.eventReminderMinutes === minutes}
-                      showSeparator={i < arr.length - 1}
-                      onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
-                    />
-                  ))}
-                </DropdownMenu>
-              </View>
-            )}
-          </View>
-        </View>
-
         {/* Data */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>DATA</Text>
@@ -820,26 +838,14 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset the theme colors, all event colors, default durations, the default contact method, schedule hours, event size, and the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
+                  'This will reset every setting on this screen — theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, country code, maps app, and notification reminders — along with the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
                       text: 'Reset',
                       style: 'destructive',
                       onPress: () => {
-                        updateSettings({
-                          themeColor: DEFAULT_THEME_COLOR,
-                          secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
-                          secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,
-                          tertiaryColorLight: DEFAULT_TERTIARY_COLOR_LIGHT,
-                          tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
-                          defaultContactMethod: DEFAULT_CONTACT_METHOD,
-                          eventTypeColors: {},
-                          eventTypeDefaultMinutes: {},
-                          gridStartHour: 6,
-                          gridEndHour: 24,
-                          eventSize: DEFAULT_EVENT_SIZE,
-                        });
+                        updateSettings(DEFAULT_SETTINGS);
                         resetBuiltInDefinitions();
                       },
                     },
@@ -975,11 +981,11 @@ function makeStyles(C: ColorPalette) {
     // need clipping to the rounded corners.
     card: {
       backgroundColor: C.card,
-      borderRadius: 12,
+      borderRadius: 20,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.06,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
       elevation: 2,
     },
     row: {
@@ -1048,8 +1054,8 @@ function makeStyles(C: ColorPalette) {
     // Same reasoning as expandedPanelLast above.
     dropdownItemLast: {
       borderBottomWidth: 0,
-      borderBottomLeftRadius: 12,
-      borderBottomRightRadius: 12,
+      borderBottomLeftRadius: 20,
+      borderBottomRightRadius: 20,
     },
     dropdownItemText: {
       flex: 1,

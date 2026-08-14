@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, TextInput, Keyboard, Platform,
+  StyleSheet, TextInput, Keyboard, Platform, Animated, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
@@ -18,13 +18,25 @@ import { SheetModal } from '../components/SheetModal';
 const MIN_OFFSET = -5;
 const MAX_OFFSET = 3;
 
-// Shared by the number pills and the divider so their glyphs centre on the same line.
+// The number pill's line box, so the glyphs centre by this rule instead of
+// the font size settling to its own metrics.
 const NUM_ROW_H = 36;
 
-interface EditingField {
+// Same curves and timings as DropdownMenu and EventTypeSheet, so this dialog
+// settles in with the same weight as every other popup in the app rather than
+// reading as a different piece of software.
+const DIALOG_OPEN_MS = 190;
+const DIALOG_CLOSE_MS = 130;
+const DIALOG_EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
+const DIALOG_EASE_IN = Easing.bezier(0.4, 0, 1, 1);
+
+interface EditingRow {
   id: string;
-  field: 'actual' | 'goal';
-  tempValue: string;
+  actualValue: string;
+  goalValue: string;
+  // False on a future week with no goal set yet — there's nothing achieved
+  // against it to edit, so the dialog offers only the goal field.
+  showActual: boolean;
 }
 
 interface RowData {
@@ -37,9 +49,11 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   definitions: GoalDefinition[];
+  /** Which tab the sheet opens on. Defaults to 'goals'. */
+  initialTab?: 'graph' | 'goals';
 }
 
-export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
+export function GoalWeeklyModal({ visible, onClose, definitions, initialTab = 'goals' }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -49,7 +63,12 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
   const [activeTab, setActiveTab] = useState<'graph' | 'goals'>('goals');
   const [weekOffset, setWeekOffset] = useState(0);
   const [rowData, setRowData] = useState<Record<string, RowData>>({});
-  const [editingField, setEditingField] = useState<EditingField | null>(null);
+  const [editingRow, setEditingRow] = useState<EditingRow | null>(null);
+  // Drives the dialog's own fade/scale and the backdrop's fade together. Left
+  // at 1 through the close animation — editingRow isn't cleared until that
+  // animation's callback, so the dialog has its data to render for the whole
+  // exit rather than blanking out mid-fade.
+  const dialogAnim = useRef(new Animated.Value(0)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
@@ -85,12 +104,12 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
 
   useEffect(() => {
     if (visible) {
-      setActiveTab('goals');
+      setActiveTab(initialTab);
       setWeekOffset(0);
-      setEditingField(null);
+      setEditingRow(null);
       loadWeek(0);
     }
-  }, [visible]);
+  }, [visible, initialTab]);
 
   useEffect(() => {
     if (visible) {
@@ -106,48 +125,62 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
     if (weekOffset < MAX_OFFSET) setWeekOffset(o => o + 1);
   }
 
-  function openEdit(id: string, field: 'actual' | 'goal') {
+  function openEdit(id: string) {
     const current = rowData[id];
     if (!current) return;
-    const value = field === 'actual' ? current.actual : current.goal;
-    setEditingField({
+    setEditingRow({
       id,
-      field,
-      tempValue: value == null ? '' : String(value),
+      actualValue: String(current.actual),
+      goalValue: current.goal == null ? '' : String(current.goal),
+      showActual: current.goal !== null,
     });
+    dialogAnim.setValue(0);
+    Animated.timing(dialogAnim, {
+      toValue: 1, duration: DIALOG_OPEN_MS, easing: DIALOG_EASE_OUT, useNativeDriver: true,
+    }).start();
+  }
+
+  // editingRow clears only once this finishes, so the dialog keeps rendering
+  // its last values for the whole exit instead of blanking out mid-fade.
+  function closeEdit() {
+    Animated.timing(dialogAnim, {
+      toValue: 0, duration: DIALOG_CLOSE_MS, easing: DIALOG_EASE_IN, useNativeDriver: true,
+    }).start(({ finished }) => { if (finished) setEditingRow(null); });
   }
 
   async function confirmEdit() {
-    if (!editingField) return;
-    const { id, field, tempValue } = editingField;
-    const parsed = parseInt(tempValue, 10);
-    const value = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    if (!editingRow) return;
+    const { id, actualValue, goalValue, showActual } = editingRow;
+    const parsedGoal = parseInt(goalValue, 10);
+    const goal = isNaN(parsedGoal) || parsedGoal < 0 ? 0 : parsedGoal;
 
-    setRowData(prev => ({
-      ...prev,
-      [id]: { ...prev[id], [field]: value },
-    }));
+    // A future week's actual isn't part of this dialog, so its stored value
+    // (always 0, nothing has happened yet) passes through untouched.
+    const parsedActual = parseInt(actualValue, 10);
+    const actual = showActual
+      ? (isNaN(parsedActual) || parsedActual < 0 ? 0 : parsedActual)
+      : rowData[id]?.actual ?? 0;
 
-    if (field === 'actual') {
-      await saveCountForWeek(id, weekKey, value);
-    } else {
-      await saveGoalForWeek(id, weekKey, value);
-    }
+    setRowData(prev => ({ ...prev, [id]: { actual, goal } }));
 
-    setEditingField(null);
+    if (showActual) await saveCountForWeek(id, weekKey, actual);
+    await saveGoalForWeek(id, weekKey, goal);
+
+    closeEdit();
   }
 
-  // Steps the field without opening the keyboard; an empty box counts as 0.
-  function stepValue(delta: number) {
-    setEditingField(prev => {
+  // Steps a field without opening the keyboard; an empty box counts as 0.
+  function stepValue(field: 'actual' | 'goal', delta: number) {
+    setEditingRow(prev => {
       if (!prev) return prev;
-      const parsed = parseInt(prev.tempValue, 10);
+      const key = field === 'actual' ? 'actualValue' : 'goalValue';
+      const parsed = parseInt(prev[key], 10);
       const base = isNaN(parsed) ? 0 : parsed;
-      return { ...prev, tempValue: String(Math.max(0, base + delta)) };
+      return { ...prev, [key]: String(Math.max(0, base + delta)) };
     });
   }
 
-  const editingDef = editingField ? definitions.find(d => d.id === editingField.id) : null;
+  const editingDef = editingRow ? definitions.find(d => d.id === editingRow.id) : null;
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
@@ -215,104 +248,145 @@ export function GoalWeeklyModal({ visible, onClose, definitions }: Props) {
           bounces={false}
           overScrollMode="never"
         >
-          <View style={styles.goalCard}>
-            {visibleDefs.map((def, index) => {
-              const row = rowData[def.id] ?? { actual: 0, goal: resolveGoal(undefined, isFuture) };
+          {/* Split in two: shadow on the outer view, clipping on the inner one.
+              The two can't share a view — overflow:hidden clips a shadow along
+              with everything else, which on iOS erases it outright. */}
+          <View style={styles.goalCardShadow}>
+            <View style={styles.goalCard}>
+              {visibleDefs.map((def, index) => {
+                const row = rowData[def.id] ?? { actual: 0, goal: resolveGoal(undefined, isFuture) };
 
-              return (
-                <View
-                  key={def.id}
-                  style={[styles.kiRow, index === visibleDefs.length - 1 && styles.kiRowLast]}
-                >
-                  <View style={[styles.iconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                    <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={isDark ? lightenColor(def.color) : def.color} />
-                  </View>
+                return (
+                  <View
+                    key={def.id}
+                    style={[styles.kiRow, index === visibleDefs.length - 1 && styles.kiRowLast]}
+                  >
+                    <View style={[styles.iconBadge, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
+                      <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={isDark ? lightenColor(def.color) : def.color} />
+                    </View>
 
-                  <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
+                    <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
 
-                  {/* Grouped so the row's gap applies before the numbers, not between them. */}
-                  <View style={styles.numGroup}>
                     {/* A future week with no goal set yet has nothing to show a ratio
-                        against — just the "Set goals" prompt. Once a goal exists, show
-                        it as 0/goal like any other week. */}
-                    {row.goal !== null && (
-                      <>
-                        <TouchableOpacity
-                          onPress={() => openEdit(def.id, 'actual')}
-                          style={styles.numBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Text style={styles.numText}>
-                            {row.actual}
-                          </Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.divider}>/</Text>
-                      </>
-                    )}
-
-                    <TouchableOpacity
-                      onPress={() => openEdit(def.id, 'goal')}
-                      style={row.goal === null ? styles.setGoalBtn : styles.numBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      {row.goal === null ? (
-                        <Text style={styles.setGoalText}>Set goals</Text>
-                      ) : (
-                        <Text style={styles.numText}>
-                          {row.goal}
+                        against — just the "Set goals" prompt. Once a goal exists, the
+                        whole "actual/goal" reads as one tap target: it opens a single
+                        dialog that edits both numbers together, so it's shown as one
+                        pill rather than the two separately-tappable boxes it used to be. */}
+                    {row.goal !== null ? (
+                      <TouchableOpacity
+                        onPress={() => openEdit(def.id)}
+                        style={styles.numPill}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.numPillText}>
+                          {row.actual}<Text style={styles.numPillSlash}> / </Text>{row.goal}
                         </Text>
-                      )}
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => openEdit(def.id)}
+                        style={styles.setGoalBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.setGoalText}>Set goals</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
 
           <View style={{ height: 40 }} />
         </ScrollView>
 
         {/* The sheet itself stays put; only this dialog re-centres above the keyboard. */}
-        {editingField && (
+        {editingRow && (
           <View style={[styles.editOverlay, { paddingBottom: keyboardHeight }]}>
-            {/* Dismissing commits — there is no explicit Done. */}
-            <TouchableOpacity style={styles.editOverlayBg} onPress={confirmEdit} activeOpacity={1} />
-            <View style={styles.editSheet}>
+            {/* Dismissing commits both fields — there is no explicit Done. */}
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={confirmEdit} activeOpacity={1}>
+              <Animated.View style={[styles.editOverlayBg, { opacity: dialogAnim }]} />
+            </TouchableOpacity>
+            <Animated.View
+              style={[
+                styles.editSheet,
+                {
+                  opacity: dialogAnim,
+                  transform: [
+                    { scale: dialogAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+                    { translateY: dialogAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+                  ],
+                },
+              ]}
+            >
                 <Text style={styles.editTitle}>
                   {editingDef?.label ?? ''}
                 </Text>
-                <Text style={styles.editSubtitle}>
-                  {editingField.field === 'actual' ? 'Actual achieved this week' : 'Weekly goal'}
-                </Text>
-                <View style={styles.stepperRow}>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editingField.tempValue}
-                    onChangeText={v => setEditingField(prev => prev ? { ...prev, tempValue: v } : null)}
-                    keyboardType="number-pad"
-                    selectTextOnFocus
-                    maxLength={4}
-                  />
 
-                  <View style={styles.stepperCol}>
-                    <TouchableOpacity
-                      onPress={() => stepValue(1)}
-                      style={styles.stepBtn}
-                      hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="add" size={20} color={Colors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => stepValue(-1)}
-                      style={styles.stepBtn}
-                      hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="remove" size={20} color={Colors.text} />
-                    </TouchableOpacity>
+                <View style={styles.editFieldsRow}>
+                  {editingRow.showActual && (
+                    <View style={styles.editFieldRow}>
+                      <Text style={styles.editFieldLabel}>Actual</Text>
+                      <View style={styles.stepperRow}>
+                        <TextInput
+                          style={styles.editInput}
+                          value={editingRow.actualValue}
+                          onChangeText={v => setEditingRow(prev => prev ? { ...prev, actualValue: v } : null)}
+                          keyboardType="number-pad"
+                          selectTextOnFocus
+                          maxLength={4}
+                        />
+                        <View style={styles.stepperCol}>
+                          <TouchableOpacity
+                            onPress={() => stepValue('actual', 1)}
+                            style={styles.stepBtn}
+                            hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="add" size={20} color={Colors.text} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => stepValue('actual', -1)}
+                            style={styles.stepBtn}
+                            hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="remove" size={20} color={Colors.text} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={styles.editFieldRow}>
+                    <Text style={styles.editFieldLabel}>Goal</Text>
+                    <View style={styles.stepperRow}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editingRow.goalValue}
+                        onChangeText={v => setEditingRow(prev => prev ? { ...prev, goalValue: v } : null)}
+                        keyboardType="number-pad"
+                        selectTextOnFocus
+                        maxLength={4}
+                      />
+                      <View style={styles.stepperCol}>
+                        <TouchableOpacity
+                          onPress={() => stepValue('goal', 1)}
+                          style={styles.stepBtn}
+                          hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="add" size={20} color={Colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => stepValue('goal', -1)}
+                          style={styles.stepBtn}
+                          hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="remove" size={20} color={Colors.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
                 </View>
-            </View>
+            </Animated.View>
           </View>
         )}
 
@@ -387,16 +461,21 @@ function makeStyles(C: ColorPalette) {
     },
     arrowDisabled: { opacity: 0.35 },
     scroll: { flex: 1 },
-    listContent: { paddingHorizontal: 12, paddingTop: 12 },
+    listContent: { paddingHorizontal: 16, paddingTop: 16 },
+    // Shadow only — kept off the clipped view below because overflow:'hidden'
+    // clips a shadow along with everything else, which on iOS erases it outright.
+    goalCardShadow: {
+      borderRadius: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
     goalCard: {
       backgroundColor: C.card,
-      borderRadius: 12,
+      borderRadius: 20,
       overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 3,
-      elevation: 1,
     },
     kiRow: {
       flexDirection: 'row',
@@ -417,28 +496,28 @@ function makeStyles(C: ColorPalette) {
       flexShrink: 0,
     },
     kiLabel: { flex: 1, fontSize: 17, fontWeight: '500', color: C.text },
-    numGroup: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    numBtn: {
-      minWidth: 28,
+    // One tap target for the whole "actual/goal" ratio, not two separately-
+    // tappable boxes either side of a divider — a single pill is what says
+    // "tap here" without implying the two numbers are separately editable.
+    numPill: {
       height: NUM_ROW_H,
-      paddingHorizontal: 2,
+      paddingHorizontal: 12,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 8,
       backgroundColor: C.background,
     },
-    // Both share the pill's height as their line box, so the glyphs centre by the same
-    // rule instead of each font size settling to its own metrics.
-    numText: {
-      fontSize: 26,
-      fontWeight: '500',
+    numPillText: {
+      fontSize: 22,
+      fontWeight: '600',
       color: C.text,
       lineHeight: NUM_ROW_H,
       includeFontPadding: false,
       textAlignVertical: 'center',
+    },
+    numPillSlash: {
+      fontWeight: '300',
+      color: C.textLight,
     },
     // Stands in for the goal on a future week with none set yet: plain text, no chrome.
     setGoalBtn: {
@@ -447,17 +526,6 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'center',
     },
     setGoalText: { fontSize: 15, fontWeight: '700', color: C.goalTextAction },
-    divider: {
-      fontSize: 33,
-      fontWeight: '300',
-      color: C.text,
-      width: 15,
-      textAlign: 'center',
-      height: NUM_ROW_H,
-      lineHeight: NUM_ROW_H,
-      includeFontPadding: false,
-      textAlignVertical: 'center',
-    },
     editOverlay: {
       ...StyleSheet.absoluteFillObject,
       justifyContent: 'center',
@@ -465,15 +533,15 @@ function makeStyles(C: ColorPalette) {
     },
     editOverlayBg: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      backgroundColor: C.modalBackdrop,
     },
     editSheet: {
       backgroundColor: C.card,
       borderRadius: 20,
       padding: 24,
-      gap: 8,
+      gap: 18,
       width: '100%',
-      maxWidth: 360,
+      maxWidth: 380,
       alignSelf: 'center',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -482,12 +550,20 @@ function makeStyles(C: ColorPalette) {
       elevation: 8,
     },
     editTitle: { fontSize: 16, fontWeight: '700', color: C.text, textAlign: 'center' },
-    editSubtitle: { fontSize: 13, color: C.textSecondary, textAlign: 'center', marginBottom: 8 },
+    // Side by side rather than stacked, so editing both numbers reads as one
+    // dialog rather than two. A lone field (a future week's "Set goals") still
+    // centres, since it's the only flex:1 child in the row.
+    editFieldsRow: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    editFieldRow: { flex: 1, alignItems: 'center', gap: 8 },
+    editFieldLabel: { fontSize: 13, fontWeight: '600', color: C.textSecondary, textAlign: 'center' },
     stepperRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 10,
+      gap: 8,
     },
     stepperCol: {
       gap: 6,
@@ -501,13 +577,13 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.background,
     },
     editInput: {
-      width: 88,
+      width: 76,
       borderWidth: 1.5,
       borderColor: C.border,
       borderRadius: 12,
-      paddingHorizontal: 8,
-      paddingVertical: 14,
-      fontSize: 28,
+      paddingHorizontal: 6,
+      paddingVertical: 12,
+      fontSize: 24,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',

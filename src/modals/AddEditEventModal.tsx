@@ -685,12 +685,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           </Collapsible>
 
-          {/* Half a row, with the other half left empty: the value is a short
+          {/* Two-thirds of the row, with the rest left empty: the value is a short
               label off a fixed list, and stretching it the full width made it
               read as a longer field than it is. */}
           {usesContactMethod(type) && (
             <View style={[styles.group, styles.columns, styles.pickerRow, elevatedPicker === 'method' && styles.openPickerRow]}>
-              <View style={styles.column}>
+              <View style={[styles.column, styles.columnWide]}>
                 <Text style={styles.label}>{methodFieldLabel(type)}</Text>
                 <View>
                   <TouchableOpacity style={styles.picker} onPress={() => togglePicker('method')}>
@@ -735,28 +735,31 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 the group is and the link below says what to do about it; a line
                 of prose between them only repeated that the list was empty. */}
             {attendees.length > 0 && (
-              <View>
-                {attendees.map((id, i) => {
-                  const attendee = peopleById.get(id);
-                  return (
-                    <View key={id} style={[styles.personRow, i === 0 && styles.personRowFirst]}>
-                      <StatusIcon config={statusConfigOf(attendee)} size={18} style={styles.personIcon} />
-                      {/* A person deleted (or not yet synced) still has an id on the
-                          event; showing the gap is better than dropping them silently. */}
-                      <Text style={styles.personName} numberOfLines={1}>
-                        {attendee?.name ?? 'Unknown person'}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => { closePickers(); toggleAttendee(id); }}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${attendee?.name ?? 'this person'}`}
-                      >
-                        <Ionicons name="close" size={16} color={Colors.textLight} />
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
+              <View style={styles.columns}>
+                <View style={[styles.column, styles.columnWide]}>
+                  {attendees.map(id => {
+                    const attendee = peopleById.get(id);
+                    return (
+                      <View key={id} style={styles.personRow}>
+                        <StatusIcon config={statusConfigOf(attendee)} size={18} style={styles.personIcon} />
+                        {/* A person deleted (or not yet synced) still has an id on the
+                            event; showing the gap is better than dropping them silently. */}
+                        <Text style={styles.personName} numberOfLines={1}>
+                          {attendee?.name ?? 'Unknown person'}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => { closePickers(); toggleAttendee(id); }}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${attendee?.name ?? 'this person'}`}
+                        >
+                          <Ionicons name="close" size={16} color={Colors.textLight} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+                <View style={styles.column} />
               </View>
             )}
 
@@ -948,9 +951,17 @@ function makeStyles(C: ColorPalette) {
       marginHorizontal: 16,
       // 18, matching EventDetailView's card exactly. Tapping EDIT swaps one for
       // the other in place, so any difference here is a jump in something that
-      // should read as the same card gaining fields, not as a new screen.
+      // should read as the same card gaining fields, not as a new screen. Same
+      // for the radius and shadow below — EventDetailView's card needs a
+      // shadow/clip split for its own overflow:'hidden'; this one has no such
+      // conflict, so the shadow lands directly on the one view.
       marginTop: 18,
-      borderRadius: 12,
+      borderRadius: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
       zIndex: 20,
     },
     // No rule between groups: the form is already full of hairlines under the
@@ -960,6 +971,9 @@ function makeStyles(C: ColorPalette) {
     // Two fields sharing a group's width — type and date, start and end.
     columns: { flexDirection: 'row', gap: 8 },
     column: { flex: 1 },
+    // Method only: widens its column from the shared half-row split to 2/3 of
+    // the row, since the placeholder column beside it still takes flex: 1.
+    columnWide: { flex: 2 },
     // Layers within the card, low to high: plain groups (auto) < any group holding a
     // picker trigger (20) < the group whose picker is open (30). Keeping every trigger
     // above its neighbours is what lets one tap switch dropdowns instead of just dismissing.
@@ -1014,12 +1028,6 @@ function makeStyles(C: ColorPalette) {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 9,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-    },
-    personRowFirst: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: C.border,
     },
     personIcon: { marginRight: 10 },
     personName: { flex: 1, fontSize: 15, color: C.text },

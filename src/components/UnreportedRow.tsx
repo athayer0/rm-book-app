@@ -56,14 +56,14 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       gap: 12,
       backgroundColor: C.card,
-      marginBottom: 12,
+      borderRadius: 20,
       paddingHorizontal: 16,
-      paddingVertical: 14,
-      // Matches the goal and favourites cards either side of it.
+      paddingVertical: 16,
+      // Matches the goal card either side of it.
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.06,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
       elevation: 2,
     },
     labels: {

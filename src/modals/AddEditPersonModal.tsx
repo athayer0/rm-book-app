@@ -42,7 +42,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const [name, setName] = useState('');
-  const [status, setStatus] = useState('Other');
+  const [status, setStatus] = useState('Mission Friends');
   const [phone, setPhone] = useState('');
   // null means the section is not on this person. '' means it is, but empty.
   const [whatsapp, setWhatsapp] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setStarred(person.starred);
     } else {
       setName('');
-      setStatus('Other');
+      setStatus('Mission Friends');
       setPhone('');
       setWhatsapp(null);
       setMessenger(null);
@@ -348,13 +348,13 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </View>
 
           <View style={[styles.group, styles.pickerRow, elevated === 'status' && styles.openPickerRow]}>
-            {/* Half a row, with the other half left empty. The list anchors to
-                the trigger itself rather than to the whole row, so it opens at
-                exactly the width the closed field already showed — a menu
-                twice the width of the control it belongs to reads as belonging
-                to something else. */}
+            {/* Two-thirds of the row, with the rest left empty. The list anchors
+                to the trigger itself rather than to the whole row, so it opens
+                at exactly the width the closed field already showed — a menu
+                wider than the control it belongs to reads as belonging to
+                something else. */}
             <View style={styles.columns}>
-              <View style={styles.column}>
+              <View style={[styles.column, styles.columnWide]}>
                 <Text style={styles.label}>Status</Text>
                 <View>
                   <TouchableOpacity
@@ -396,7 +396,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           </View>
 
           <View style={[styles.group, styles.columns]}>
-            <View style={styles.column}>
+            <View style={[styles.column, styles.columnWide]}>
               <Text style={styles.label}>Phone</Text>
               <TextInput
                 style={styles.input}
@@ -411,13 +411,13 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             <View style={styles.column} />
           </View>
 
-          {/* Half a row, header included, so the × that removes the section stays
-              over the right edge of the field it belongs to. Messenger and
-              Address keep the full width — a profile URL and a street address
-              both need it. */}
+          {/* Two-thirds of the row, header included, so the × that removes the
+              section stays over the right edge of the field it belongs to.
+              Messenger and Address keep the full width — a profile URL and a
+              street address both need it. */}
           {whatsapp !== null && (
             <View style={[styles.group, styles.columns]}>
-              <View style={styles.column}>
+              <View style={[styles.column, styles.columnWide]}>
                 <View style={styles.methodHeader}>
                   <Text style={styles.label}>WhatsApp</Text>
                   <TouchableOpacity
@@ -717,9 +717,17 @@ function makeStyles(C: ColorPalette) {
       marginHorizontal: 16,
       // 18, matching PersonDetailView's card exactly. Tapping EDIT swaps one for
       // the other in place, so any difference here is a jump in something that
-      // should read as the same card gaining fields, not as a new screen.
+      // should read as the same card gaining fields, not as a new screen. Same
+      // for the radius and shadow below — PersonDetailView's card needs a
+      // shadow/clip split for its own overflow:'hidden'; this one has no such
+      // conflict, so the shadow lands directly on the one view.
       marginTop: 18,
-      borderRadius: 12,
+      borderRadius: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
       zIndex: 20,
     },
     // No rule between groups: the form is already full of hairlines under the
@@ -731,6 +739,9 @@ function makeStyles(C: ColorPalette) {
     // up exactly with a half in the event form.
     columns: { flexDirection: 'row', gap: 8 },
     column: { flex: 1 },
+    // Status only: widens its column from the shared half-row split to 2/3 of
+    // the row, since the placeholder column beside it still takes flex: 1.
+    columnWide: { flex: 2 },
     label: {
       fontSize: 12,
       fontWeight: '600',
@@ -840,7 +851,7 @@ function makeStyles(C: ColorPalette) {
       gap: 8,
       margin: 16,
       padding: 14,
-      borderRadius: 12,
+      borderRadius: 14,
       backgroundColor: C.danger + '12',
     },
     deleteText: {

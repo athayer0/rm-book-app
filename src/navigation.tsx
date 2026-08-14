@@ -8,6 +8,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { PeopleScreen } from './screens/PeopleScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { TAB_BAR_HEIGHT } from './constants/layout';
 
 const Tab = createBottomTabNavigator();
 
@@ -32,7 +33,7 @@ export function AppNavigation() {
             borderTopWidth: 1,
             paddingBottom: 10,
             paddingTop: 10,
-            height: 105,
+            height: TAB_BAR_HEIGHT,
           },
           tabBarLabelStyle: {
             fontSize: 11,

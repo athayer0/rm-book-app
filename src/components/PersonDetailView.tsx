@@ -219,6 +219,7 @@ export function PersonDetailView({
 
   return (
     <ScrollView style={styles.scroll} bounces={false} overScrollMode="never">
+      <View style={styles.cardShadow}>
       <View style={styles.card}>
         <View style={styles.hero}>
           <Text style={styles.heroName}>{trimmedName || 'Unnamed'}</Text>
@@ -231,6 +232,7 @@ export function PersonDetailView({
             {group.node}
           </View>
         ))}
+      </View>
       </View>
 
       <View style={{ height: 40 }} />
@@ -255,11 +257,21 @@ function makeStyles(C: ColorPalette) {
     // One card for the whole person. The padding lives on the groups instead, so
     // the rules between them run the full width and read as divisions of one
     // thing rather than as gaps between several.
-    card: {
-      backgroundColor: C.card,
+    // Shadow only — kept off `card` because overflow:'hidden' clips a shadow
+    // along with everything else, which on iOS erases it outright.
+    cardShadow: {
       marginHorizontal: 16,
       marginTop: 18,
-      borderRadius: 12,
+      borderRadius: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    card: {
+      backgroundColor: C.card,
+      borderRadius: 20,
       overflow: 'hidden',
     },
     group: { padding: 12 },

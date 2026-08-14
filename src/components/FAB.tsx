@@ -31,8 +31,8 @@ interface Props {
   onSelectAction?: (key: string) => void;
 }
 
-const FAB_SIZE = 56;
-const FAB_BOTTOM = 24;
+export const FAB_SIZE = 56;
+export const FAB_BOTTOM = 24;
 const FAB_RIGHT = 20;
 const BUBBLE = 44;
 const ROW_GAP = 10;

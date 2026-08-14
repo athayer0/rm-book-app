@@ -1,11 +1,9 @@
 /**
- * A deep verdant green — dark enough that white lettering clears 7:1 on it, and
- * far enough from the greens in `EventColors` that a header is never mistaken
- * for an event. `primary` is a setting, so this is only the starting point:
- * `useColors` swaps in the user's choice, and everything that reads `primary`
- * (headers, the active tab pill, the now-line) follows.
+ * The crimson the app shipped with. `primary` is a setting, so this is only
+ * the starting point: `useColors` swaps in the user's choice, and everything
+ * that reads `primary` (headers, the active tab pill, the now-line) follows.
  */
-export const DEFAULT_THEME_COLOR = '#1B5E3F';
+export const DEFAULT_THEME_COLOR = '#8B1A4A';
 
 // Defaults for the other two user-editable theme colors — light/dark are
 // independent settings, not a lift computed from one value, so each needs its

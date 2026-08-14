@@ -132,7 +132,7 @@ export function ImportContactsModal({ visible, onClose }: Props) {
     for (const contact of toAdd) {
       await addPerson({
         name: contact.name,
-        status: 'Other',
+        status: 'Mission Friends',
         phone: contact.phone ?? '',
         address: contact.address,
         starred: false,
@@ -331,7 +331,7 @@ function makeStyles(C: ColorPalette) {
       marginTop: 12,
       paddingHorizontal: 12,
       paddingVertical: 8,
-      borderRadius: 10,
+      borderRadius: 14,
     },
     searchIcon: { marginRight: 8 },
     searchInput: { flex: 1, fontSize: 15, color: C.text, padding: 0 },
