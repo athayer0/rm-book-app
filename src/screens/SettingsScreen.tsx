@@ -247,7 +247,7 @@ export function SettingsScreen() {
   }
 
   function handleResetWeek() {
-    Alert.alert('Reset Week', 'This will clear all goal counts for the current week. Continue?', [
+    Alert.alert('Reset Week', 'This will clear all goal counts and targets for the current week. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reset', style: 'destructive', onPress: resetAll },
     ]);
@@ -825,12 +825,12 @@ export function SettingsScreen() {
           </View>
         )}
 
-        {/* Data */}
+        {/* Dev Tools */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DATA</Text>
+          <Text style={styles.sectionTitle}>DEV TOOLS</Text>
           <View style={styles.card}>
             <TouchableOpacity style={styles.row} onPress={handleResetWeek}>
-              <Text style={[styles.rowLabel, { color: Colors.danger }]}>Reset Current Week</Text>
+              <Text style={[styles.rowLabel, { color: Colors.danger }]}>Reset Counts & Targets</Text>
               <Ionicons name="refresh" size={18} color={Colors.danger} />
             </TouchableOpacity>
             <TouchableOpacity
