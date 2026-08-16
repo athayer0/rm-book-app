@@ -32,6 +32,7 @@ import { formatTime, parseTimeString } from '../utils/dateUtils';
 import { EVENT_REMINDER_MINUTE_OPTIONS, eventReminderLabel } from '../constants/eventReminders';
 import { scheduleDailyReview } from '../lib/notifications';
 import { useNotificationToggles } from '../hooks/useNotificationToggles';
+import { useOnboardingReplay } from '../hooks/useOnboarding';
 
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
 const END_HOUR_OPTIONS = [21, 22, 23, 24];
@@ -106,6 +107,7 @@ export function SettingsScreen() {
   const { deleteAllEvents } = useCalendarEvents();
   const { signOut } = useAuth();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
+  const replayOnboarding = useOnboardingReplay();
   // Same resolution useColors() does internally — needed here too so the
   // theme-color list can show only the variant that's actually in effect.
   const systemScheme = useColorScheme();
@@ -874,6 +876,10 @@ export function SettingsScreen() {
               <Text style={styles.rowLabel}>Version</Text>
               <Text style={styles.rowValue}>1.0.0</Text>
             </View>
+            <TouchableOpacity style={styles.row} onPress={replayOnboarding}>
+              <Text style={styles.rowLabel}>Replay Onboarding</Text>
+              <Ionicons name="play-circle-outline" size={18} color={Colors.textLight} />
+            </TouchableOpacity>
             <View style={[styles.row, styles.scriptureRow]}>
               <Text style={styles.scripture}>
                 "But be ye doers of the word, and not hearers only."

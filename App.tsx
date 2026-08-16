@@ -8,10 +8,12 @@ import * as Notifications from 'expo-notifications';
 import { AppNavigation, navigationRef } from './src/navigation';
 import { AuthProvider, useAuth } from './src/lib/AuthContext';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { supabase } from './src/lib/supabase';
 import { drainQueue, pullAll, startAutoDrain } from './src/lib/sync';
 import { peekQueue } from './src/lib/syncQueue';
 import { SettingsContext, useSettings, useSettingsState } from './src/hooks/useSettings';
+import { OnboardingContext, useOnboardingState } from './src/hooks/useOnboarding';
 import { useCalendarEvents } from './src/hooks/useCalendarEvents';
 import {
   requestNotificationPermissions, scheduleDailyReview, cancelDailyReview, isDailyReviewResponse,
@@ -56,6 +58,7 @@ function AppRoot() {
   const { settings, loaded: settingsLoaded } = useSettings();
   const { events } = useCalendarEvents();
   const [synced, setSynced] = useState(false);
+  const onboarding = useOnboardingState(synced);
 
   // Push anything queued, then pull the server's copy down. Screens adopt the
   // pulled data through the storage subscriptions, so this gate is only here to
@@ -205,7 +208,12 @@ function AppRoot() {
   if (loading) return null;
   if (!session) return <AuthScreen />;
   if (!synced) return <Splash />;
-  return <AppNavigation />;
+  return (
+    <OnboardingContext.Provider value={{ replay: onboarding.replay }}>
+      <AppNavigation />
+      <OnboardingScreen visible={onboarding.visible} onComplete={onboarding.complete} />
+    </OnboardingContext.Provider>
+  );
 }
 
 function SettingsProvider({ children }: { children: React.ReactNode }) {

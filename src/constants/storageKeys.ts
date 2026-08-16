@@ -11,6 +11,8 @@ export const SETTINGS_KEY = 'settings';
 /** Device-local: which week the counts were last rolled over for. Never synced. */
 export const LAST_RESET_KEY = 'last_reset_date';
 export const LAST_SYNCED_KEY = 'last_synced_at';
+/** Device-local: whether the welcome flow has played on this device for the current account. Never synced. */
+export const HAS_ONBOARDED_KEY = 'has_onboarded';
 
 /**
  * The user's own data: the rows they created, and nothing else. This is both
@@ -39,7 +41,7 @@ const APP_DATA_PREFIXES = ['goal_counts_', 'goal_targets_'];
  * `last_synced_at` makes the first pull run incrementally against a watermark
  * from another session and come back empty.
  */
-const DEVICE_LOCAL_KEYS = [LAST_SYNCED_KEY, LAST_RESET_KEY];
+const DEVICE_LOCAL_KEYS = [LAST_SYNCED_KEY, LAST_RESET_KEY, HAS_ONBOARDED_KEY];
 
 /** True for the user's own data — the export allowlist, and most of the wipe. */
 export function isAppDataKey(key: string): boolean {
