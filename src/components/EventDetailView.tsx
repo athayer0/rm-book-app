@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels } from '../constants/colors';
+import { EventColors } from '../constants/colors';
 import {
   CalendarEvent, EventStatus, isReportableType, isCheckboxType, hasEndTime,
 } from '../utils/eventUtils';
@@ -18,6 +18,7 @@ import { StatusPicker, STATUS_LABELS } from './StatusPicker';
 import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { usePeople, Person } from '../hooks/usePeople';
 import { AppSettings } from '../hooks/useSettings';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 
 interface Props {
   /**
@@ -79,6 +80,11 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people: allPeople } = usePeople();
+  const { definitions: eventTypeDefs, byId: eventTypeById } = useEventTypeDefinitions();
+  const customTypeIds = useMemo(
+    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
+    [eventTypeDefs],
+  );
 
   const peopleById = useMemo(
     () => new Map(allPeople.map(p => [p.id, p])),
@@ -133,7 +139,7 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
     ),
   });
 
-  if (!isBackup && isReportableType(event.type)) {
+  if (!isBackup && isReportableType(event.type, customTypeIds)) {
     groups.push({
       key: 'status',
       node: (
@@ -171,7 +177,7 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
         <Text style={styles.label}>Event Type</Text>
         <View style={styles.inlineValue}>
           <View style={[styles.colorDot, { backgroundColor: color }]} />
-          <Text style={styles.value}>{EventTypeLabels[event.type] ?? event.type}</Text>
+          <Text style={styles.value}>{eventTypeById[event.type]?.label ?? event.type}</Text>
         </View>
       </>
     ),

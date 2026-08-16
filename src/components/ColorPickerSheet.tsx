@@ -84,9 +84,15 @@ interface Props {
   onDone: (hex: string) => void;
 }
 
-export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel, onDone }: Props) {
+/** `useColors()` + this file's styles, in one call — shared by the sheet below and the embedded picker. */
+export function useColorPickerStyles() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  return { Colors, styles };
+}
+
+export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel, onDone }: Props) {
+  const { Colors, styles } = useColorPickerStyles();
   const { height } = useWindowDimensions();
 
   // A solid half of the screen, with a floor so a small device still gets a
@@ -121,8 +127,6 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
     setHexEdit(null);
   }
 
-  const showReset = !!defaultColor && normalizeHex(defaultColor) !== draft;
-
   return (
     <BottomSheet
       visible={visible}
@@ -131,6 +135,96 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
       onCancel={onCancel}
       onDone={() => onDone(draft)}
     >
+      <ColorPickerBody
+        styles={styles}
+        Colors={Colors}
+        hsv={hsv}
+        draft={draft}
+        opened={opened}
+        defaultColor={defaultColor}
+        tab={tab}
+        hexEdit={hexEdit}
+        onPick={pick}
+        onChangeHsv={setHsv}
+        onTabChange={setTab}
+        onHexEdit={setHexEdit}
+      />
+    </BottomSheet>
+  );
+}
+
+/**
+ * State for a colour picker embedded directly in a caller's own sheet, rather
+ * than opened as a second nested BottomSheet.
+ *
+ * EditGoalSheet and EditEventTypeSheet used to open `ColorPickerSheet` as a
+ * Modal stacked on top of their *own* BottomSheet Modal — three native Modals
+ * deep, counting the list sheet underneath. iOS won't reliably present a third
+ * nested modal at once, which is what read as "tapping Color does nothing and
+ * the app is stuck." Embedding the picker as a step inside the caller's own
+ * BottomSheet (see ColorPickerBody) keeps the whole flow to one Modal, the way
+ * EventColorsModal's flat list → picker already does.
+ *
+ * `active` plays the role `visible` plays for ColorPickerSheet above: state
+ * resets whenever it flips to true, since this stays mounted the whole time
+ * rather than mounting fresh per visit.
+ */
+export function useEmbeddedColorPicker(active: boolean, color: string) {
+  const [hsv, setHsv] = useState<HSV>(() => hexToHsv(normalizeHex(color) ?? '#000000'));
+  const [tab, setTab] = useState<Tab>('grid');
+  const [opened, setOpened] = useState(() => normalizeHex(color) ?? '#000000');
+  const [hexEdit, setHexEdit] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const start = normalizeHex(color) ?? '#000000';
+    setOpened(start);
+    setHsv(hexToHsv(start));
+    setTab('grid');
+    setHexEdit(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  const draft = hsvToHex(hsv.h, hsv.s, hsv.v);
+
+  function pick(hex: string) {
+    Haptics.selectionAsync();
+    setHsv(hexToHsv(hex));
+    setHexEdit(null);
+  }
+
+  return { hsv, setHsv, tab, setTab, hexEdit, setHexEdit, opened, draft, pick };
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+
+/**
+ * The picker itself — preview swatches, tabs, grid/spectrum/sliders — with no
+ * opinion on what wraps it. `ColorPickerSheet` puts this in its own BottomSheet;
+ * EditGoalSheet/EditEventTypeSheet render it as a step inside their own, via
+ * `useEmbeddedColorPicker`. Fully controlled, so either caller's state drives it.
+ */
+export function ColorPickerBody({
+  styles, Colors, hsv, draft, opened, defaultColor, tab, hexEdit,
+  onPick, onChangeHsv, onTabChange, onHexEdit,
+}: {
+  styles: Styles;
+  Colors: ColorPalette;
+  hsv: HSV;
+  draft: string;
+  opened: string;
+  defaultColor?: string;
+  tab: Tab;
+  hexEdit: string | null;
+  onPick: (hex: string) => void;
+  onChangeHsv: (next: HSV) => void;
+  onTabChange: (t: Tab) => void;
+  onHexEdit: (v: string | null) => void;
+}) {
+  const showReset = !!defaultColor && normalizeHex(defaultColor) !== draft;
+
+  return (
+    <>
       {/* Where this visit started and where it stands, unlabelled — two swatches
           either side of an arrow say "from, to" without needing to be told.
           Everything sits on one line, so the row centres between the header and
@@ -148,7 +242,7 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
         {showReset && defaultColor && (
           <TouchableOpacity
             style={styles.defaultBtn}
-            onPress={() => pick(defaultColor)}
+            onPress={() => onPick(defaultColor)}
             activeOpacity={0.7}
             hitSlop={8}
           >
@@ -166,7 +260,7 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
           <TouchableOpacity
             key={t.key}
             style={styles.tabBtn}
-            onPress={() => setTab(t.key)}
+            onPress={() => onTabChange(t.key)}
             activeOpacity={0.75}
           >
             <Text style={[styles.tabLabel, tab === t.key && styles.tabLabelActive]}>{t.label}</Text>
@@ -180,10 +274,10 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
           field would come back unmeasured for a frame. */}
       <View style={styles.panel}>
         <View style={[styles.panelPage, tab !== 'grid' && styles.panelHidden]} pointerEvents={tab === 'grid' ? 'auto' : 'none'}>
-          <GridPanel styles={styles} selected={draft} onPick={pick} />
+          <GridPanel styles={styles} selected={draft} onPick={onPick} />
         </View>
         <View style={[styles.panelPage, tab !== 'spectrum' && styles.panelHidden]} pointerEvents={tab === 'spectrum' ? 'auto' : 'none'}>
-          <SpectrumPanel styles={styles} hsv={hsv} draft={draft} onChange={setHsv} />
+          <SpectrumPanel styles={styles} hsv={hsv} draft={draft} onChange={onChangeHsv} />
         </View>
         <View style={[styles.panelPage, tab !== 'sliders' && styles.panelHidden]} pointerEvents={tab === 'sliders' ? 'auto' : 'none'}>
           <SlidersPanel
@@ -191,16 +285,14 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
             Colors={Colors}
             draft={draft}
             hexEdit={hexEdit}
-            onHexEdit={setHexEdit}
-            onChange={setHsv}
+            onHexEdit={onHexEdit}
+            onChange={onChangeHsv}
           />
         </View>
       </View>
-    </BottomSheet>
+    </>
   );
 }
-
-type Styles = ReturnType<typeof makeStyles>;
 
 /* ---------------------------------------------------------------- Grid tab */
 

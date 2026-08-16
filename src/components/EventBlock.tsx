@@ -11,6 +11,7 @@ import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constant
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
 import { GoalIcon } from './GoalIcon';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
@@ -90,6 +91,11 @@ export function EventBlock({
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { definitions: eventTypeDefs } = useEventTypeDefinitions();
+  const customTypeIds = useMemo(
+    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
+    [eventTypeDefs],
+  );
 
   const statusColor: Record<EventStatus, string> = {
     completed: Colors.statusCompleted,
@@ -111,7 +117,7 @@ export function EventBlock({
   // badge belongs here. Synthesising pending locally is what let this drift from
   // the unreported sweep's idea of the same word.
   const effectiveStatus: EventStatus | undefined =
-    isBackup || isCheckbox ? undefined : resolveEventStatus(event, status);
+    isBackup || isCheckbox ? undefined : resolveEventStatus(event, status, customTypeIds);
   const showBadge = isCheckbox || !!effectiveStatus;
 
   const isDraggingRef = useRef(false);

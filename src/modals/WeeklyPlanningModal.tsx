@@ -8,7 +8,8 @@ import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { GoalDefinition, MAX_VISIBLE_GOALS } from '../constants/defaultGoals';
+import { DEFAULT_GOALS, GoalDefinition, MAX_VISIBLE_GOALS } from '../constants/defaultGoals';
+import { EventTypeDefinition } from '../constants/eventTypeDefaults';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { EditGoalSheet, GoalDraft } from './EditGoalSheet';
@@ -26,19 +27,27 @@ interface Props {
   onClose: () => void;
   definitions: GoalDefinition[];
   onUpdateDefinitions: (defs: GoalDefinition[]) => Promise<void>;
+  eventTypeDefs: EventTypeDefinition[];
+  onUpdateEventTypeDefs: (defs: EventTypeDefinition[]) => Promise<void>;
 }
 
-export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDefinitions }: Props) {
+export function WeeklyPlanningModal({
+  visible, onClose, definitions, onUpdateDefinitions, eventTypeDefs, onUpdateEventTypeDefs,
+}: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const [localDefs, setLocalDefs] = useState<GoalDefinition[]>(definitions);
+  // Mirrors localDefs, on the event-type side — only ever touched here to keep
+  // a goal's link in step, since a link is stored on the type's own `goalId`.
+  const [localEventTypeDefs, setLocalEventTypeDefs] = useState<EventTypeDefinition[]>(eventTypeDefs);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
 
   useEffect(() => {
     if (visible) {
       setLocalDefs(definitions);
+      setLocalEventTypeDefs(eventTypeDefs);
       setEditTarget(null);
     }
   }, [visible]);
@@ -50,6 +59,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   function handleClose() {
     onClose();
     onUpdateDefinitions(localDefs);
+    onUpdateEventTypeDefs(localEventTypeDefs);
   }
 
   const visibleCount = localDefs.filter(d => d.visible).length;
@@ -57,6 +67,11 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
 
   function removeGoal(id: string) {
     setLocalDefs(prev => prev.filter(d => d.id !== id));
+    // Frees up the type that pointed at this goal, so it reappears as
+    // available in future pickers instead of staying claimed forever.
+    setLocalEventTypeDefs(prev => prev.map(d => (
+      d.goalId === id ? { ...d, goalId: undefined, goalMode: undefined } : d
+    )));
   }
 
   function patchGoal(id: string, patch: Partial<GoalDefinition>) {
@@ -71,19 +86,41 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
   }
 
   function saveEdit(draft: GoalDraft) {
+    const { eventTypeId, ...goalPatch } = draft;
     if (editTarget?.kind === 'goal') {
-      patchGoal(editTarget.id, draft);
+      applyEventTypeLink(editTarget.id, eventTypeId);
+      patchGoal(editTarget.id, goalPatch);
     } else if (editTarget?.kind === 'new') {
       if (atVisibleLimit) { setEditTarget(null); return; }
+      const newId = `custom_${Date.now()}`;
       setLocalDefs(prev => [...prev, {
-        id: `custom_${Date.now()}`,
-        ...draft,
+        id: newId,
+        ...goalPatch,
         visible: true,
         monthlyVisible: false,
         builtIn: false,
       }]);
+      applyEventTypeLink(newId, eventTypeId);
     }
     setEditTarget(null);
+  }
+
+  /**
+   * Keeps a goal's link in step with the event-type side, where it's actually
+   * stored. If the goal previously had a different type linked, that type is
+   * freed; if a new type is picked, it's claimed.
+   */
+  function applyEventTypeLink(goalId: string, newTypeId: string | undefined) {
+    setLocalEventTypeDefs(prev => prev.map(d => {
+      if (d.goalId === goalId && d.id !== newTypeId) return { ...d, goalId: undefined, goalMode: undefined };
+      if (d.id === newTypeId) return { ...d, goalId, goalMode: d.goalMode ?? 'count' };
+      return d;
+    }));
+  }
+
+  /** Custom types with no linked goal, plus whichever one currently links to this goal. */
+  function availableEventTypesFor(goalId: string | undefined): EventTypeDefinition[] {
+    return localEventTypeDefs.filter(t => !t.builtIn && (!t.goalId || t.goalId === goalId));
   }
 
   // The sheet stays mounted through its own exit, so closing it (Cancel, Save,
@@ -186,6 +223,8 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
       <EditGoalSheet
         visible={editTarget !== null}
         goal={editingGoal}
+        defaultColor={editingGoal?.builtIn ? DEFAULT_GOALS.find(g => g.id === editingGoal.id)?.color : undefined}
+        availableEventTypes={availableEventTypesFor(editingGoal?.id)}
         onCancel={() => setEditTarget(null)}
         onSave={saveEdit}
       />

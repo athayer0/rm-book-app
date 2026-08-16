@@ -12,6 +12,7 @@ import {
 import { useStoredState } from './useStoredState';
 import { useCalendarEvents } from './useCalendarEvents';
 import { useEventStatuses } from './useEventStatuses';
+import { useEventTypeDefinitions } from './useEventTypeDefinitions';
 import { enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
@@ -75,6 +76,7 @@ export function useWeeklyGoals() {
 
   const { events } = useCalendarEvents();
   const { getStatus } = useEventStatuses();
+  const { customLinks } = useEventTypeDefinitions();
 
   const definitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_GOALS;
   const goals = targetsState.value;
@@ -85,8 +87,8 @@ export function useWeeklyGoals() {
   );
 
   const derived = useMemo(
-    () => deriveWeekGoalCounts(events, isCompleted, getWeekDates(weekKey)),
-    [events, isCompleted, weekKey],
+    () => deriveWeekGoalCounts(events, isCompleted, getWeekDates(weekKey), customLinks),
+    [events, isCompleted, weekKey, customLinks],
   );
 
   const counts = useMemo(
@@ -175,8 +177,8 @@ export function useWeeklyGoals() {
   /** Derive any week's contributions. The current week is already memoised above. */
   const derivedFor = useCallback(
     (wk: string): WeeklyCounts =>
-      wk === weekKey ? derived : deriveWeekGoalCounts(events, isCompleted, getWeekDates(wk)),
-    [weekKey, derived, events, isCompleted],
+      wk === weekKey ? derived : deriveWeekGoalCounts(events, isCompleted, getWeekDates(wk), customLinks),
+    [weekKey, derived, events, isCompleted, customLinks],
   );
 
   const getWeekData = useCallback(async (wk: string): Promise<{ counts: WeeklyCounts; goals: Record<string, number> }> => {

@@ -26,15 +26,20 @@ FEATURES
 [x] daily review and event notifications
 [x] fix graph y axis labels
 [x] add event type select menu that pops up when tapping empty space on the calendar that then redirects to the create event menu with that event type selected
+[x] save recent convert info on where they are on the covenant path
+[x] simple onboarding
+[x] monthly goals
 
-[ ] save recent convert info on where they are on the covenant path
-[ ] simple onboarding
 [ ] add the ability to add and hide events and when adding an event you have the option to add a corresponding ki that gets incremented by reporting it
-[ ] monthly goals
+[ ] quantity reported events (1 event, report like 30 pushups, weekly goal of 100)
+[ ] add spanish portuguese french etc
+
+BUGS
+[x] app startup console.log errors?
 [ ] color menu and edit goal menu animation quitting early bug
 [ ] fix first time load white flash (skeleton loading?)
-[ ] add spanish portuguese and french
 [ ] swiping time spacing calendar bug?
+[ ] use the app for a day and find bugs
 
 DEPLOYMENT TASKS
 [ ] Choose an official name and make support email. Then, be able to sign in/make an account with apple and google (and facebook?)

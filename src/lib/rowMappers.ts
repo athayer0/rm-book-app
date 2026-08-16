@@ -22,6 +22,12 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     builtIn: 'built_in',
     monthlyVisible: 'monthly_visible',
   },
+  event_type_definitions: {
+    iconFamily: 'icon_family',
+    builtIn: 'built_in',
+    goalId: 'goal_id',
+    goalMode: 'goal_mode',
+  },
   goal_entries: {},
   goal_monthly_entries: {},
   event_statuses: {},
@@ -64,6 +70,10 @@ const COLUMNS: Record<string, string[]> = {
     'user_id', 'id', 'label', 'icon', 'icon_family', 'color',
     'visible', 'monthly_visible', 'built_in', 'updated_at', 'deleted_at',
   ],
+  event_type_definitions: [
+    'user_id', 'id', 'label', 'icon', 'icon_family',
+    'visible', 'built_in', 'goal_id', 'goal_mode', 'updated_at', 'deleted_at',
+  ],
   goal_entries: [
     'user_id', 'goal_id', 'week_key', 'count', 'target', 'updated_at', 'deleted_at',
   ],
@@ -96,6 +106,7 @@ export const PK_COLUMNS: Record<string, string[]> = {
   people: ['user_id', 'id'],
   calendar_events: ['user_id', 'id'],
   goal_definitions: ['user_id', 'id'],
+  event_type_definitions: ['user_id', 'id'],
   goal_entries: ['user_id', 'goal_id', 'week_key'],
   goal_monthly_entries: ['user_id', 'goal_id', 'month_key'],
   event_statuses: ['user_id', 'event_id', 'occurrence_date'],

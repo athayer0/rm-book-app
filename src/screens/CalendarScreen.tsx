@@ -6,9 +6,10 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
-import { EventTypeIcons, EventTypeLabels, type ColorPalette } from '../constants/colors';
+import { type ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useSettings } from '../hooks/useSettings';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { TimeGrid } from '../components/TimeGrid';
 import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
@@ -51,6 +52,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   const [pendingTapTime, setPendingTapTime] = useState<string | null>(null);
   const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
+  const { byId: eventTypeById } = useEventTypeDefinitions();
   const { getStatus, report } = useEventReport();
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, grabOffsetY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
@@ -64,17 +66,17 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   const { slotHeight: SLOT_HEIGHT, fontSize: eventFontSize } = EventSizes[resolveEventSize(settings.eventSize)];
   const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 
-  // Nothing here varies at runtime — the bubbles take their colour from the
-  // button, not from the type — so this is built once and handed down stable.
+  // The bubbles take their colour from the button, not from the type, so only
+  // label/icon vary — and only with which types are currently visible.
   const quickActions = useMemo<FABAction[]>(
     () =>
-      QUICK_ADD_TYPES.map(type => ({
+      QUICK_ADD_TYPES.filter(type => eventTypeById[type]?.visible !== false).map(type => ({
         key: type,
-        label: EventTypeLabels[type] ?? type,
-        icon: EventTypeIcons[type]?.icon ?? 'ellipse',
-        iconFamily: EventTypeIcons[type]?.iconFamily,
+        label: eventTypeById[type]?.label ?? type,
+        icon: eventTypeById[type]?.icon ?? 'ellipse',
+        iconFamily: eventTypeById[type]?.iconFamily,
       })),
-    [],
+    [eventTypeById],
   );
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');

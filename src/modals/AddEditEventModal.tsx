@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels, EventTypeConfig } from '../constants/colors';
+import { EventColors, EventTypeConfig } from '../constants/colors';
 import {
   CalendarEvent, EventStatus, RecurringRule, defaultRecurrenceEnd,
   isCheckboxType, hasOptionalEnd, resolveEventStatus,
@@ -23,6 +23,7 @@ import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { addMinutesToTimeString, parseTimeString } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { usePeople, Person } from '../hooks/usePeople';
 import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
@@ -50,8 +51,6 @@ interface Props {
   onDelete?: (id: string, occurrenceDate: string, mode: 'single' | 'future') => void;
   onClose: () => void;
 }
-
-const EVENT_TYPES = Object.keys(EventColors);
 
 // Ends on half a row rather than a whole one, so a list longer than this says so
 // by being visibly cut. Read off MENU_ITEM_HEIGHT rather than written as a number:
@@ -108,6 +107,25 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people: allPeople } = usePeople();
+  const { definitions: eventTypeDefs, visibleDefinitions, byId: eventTypeById } = useEventTypeDefinitions();
+
+  // The type dropdown's list must include the event's current type even if it
+  // has since been hidden — otherwise editing an existing event strands it off
+  // its own picker.
+  const EVENT_TYPES = useMemo(() => {
+    const ids = visibleDefinitions.map(d => d.id);
+    const current = event?.type;
+    return current && !ids.includes(current) ? [...ids, current] : ids;
+  }, [visibleDefinitions, event?.type]);
+
+  const customTypeIds = useMemo(
+    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
+    [eventTypeDefs],
+  );
+
+  function typeLabel(t: string): string {
+    return eventTypeById[t]?.label ?? t;
+  }
 
   /**
    * What the event's status actually is, rather than only what has been written.
@@ -122,7 +140,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
    * CalendarEvent has no status field for onSave to carry, so opening this and
    * closing it writes nothing. Pending stays derived.
    */
-  const resolvedStatus = event ? resolveEventStatus(event, currentStatus) : undefined;
+  const resolvedStatus = event ? resolveEventStatus(event, currentStatus, customTypeIds) : undefined;
 
   const [title, setTitle] = useState('');
   const [type, setType] = useState('scripture');
@@ -252,7 +270,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
   function handleTypeChange(newType: string) {
     setType(newType);
-    if (!title) setTitle(EventTypeLabels[newType] ?? '');
+    if (!title) setTitle(typeLabel(newType));
     setEndTime(addMinutesToTimeString(startTime, resolvedDefaultMinutes(newType, settings)));
     // Types offer different methods, so a retype can strand the current one on a
     // list that no longer contains it.
@@ -374,7 +392,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
    */
   function buildEventData(): Omit<CalendarEvent, 'id'> {
     return {
-      title: title.trim() || (EventTypeLabels[type] ?? type),
+      title: title.trim() || typeLabel(type),
       type,
       color: resolvedColor(type, settings),
       date,
@@ -546,7 +564,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 value={title}
                 onChangeText={setTitle}
                 onFocus={closePickers}
-                placeholder={EventTypeLabels[type] ?? 'Event title'}
+                placeholder={typeLabel(type) || 'Event title'}
                 placeholderTextColor={Colors.textLight}
               />
               {event && onDelete && (
@@ -568,7 +586,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               <View>
                 <TouchableOpacity style={styles.picker} onPress={() => togglePicker('type')}>
                   <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
-                  <Text style={styles.pickerText}>{EventTypeLabels[type]}</Text>
+                  <Text style={styles.pickerText}>{typeLabel(type)}</Text>
                   <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
                 </TouchableOpacity>
                 <DropdownMenu open={showTypePicker}>
@@ -583,7 +601,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     {EVENT_TYPES.map((t, i) => (
                       <DropdownItem
                         key={t}
-                        label={EventTypeLabels[t]}
+                        label={typeLabel(t)}
                         selected={type === t}
                         showSeparator={i < EVENT_TYPES.length - 1}
                         leading={<View style={[styles.colorDot, { backgroundColor: resolvedColor(t, settings) }]} />}

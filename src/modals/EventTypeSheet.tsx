@@ -6,13 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TAB_BAR_HEIGHT } from '../constants/layout';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { EventColors, EventTypeLabels } from '../constants/colors';
 import { DropdownMenu, DropdownItem } from '../components/DropdownMenu';
 import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { eventTypeColor } from '../utils/eventUtils';
 import { useSettings } from '../hooks/useSettings';
-
-const EVENT_TYPES = Object.keys(EventColors);
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 
 // Matches DropdownMenu's own open/close timing so the backdrop and the card it
 // frames finish their animations together rather than one lagging the other.
@@ -44,6 +42,7 @@ export function EventTypeSheet({ visible, onSelect, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
+  const { visibleDefinitions } = useEventTypeDefinitions();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const typeScrollEdges = useScrollEdges();
@@ -97,13 +96,13 @@ export function EventTypeSheet({ visible, onSelect, onClose }: Props) {
                 showsVerticalScrollIndicator={false}
                 {...typeScrollEdges.scrollViewProps}
               >
-                {EVENT_TYPES.map((t, i) => (
+                {visibleDefinitions.map((def, i) => (
                   <DropdownItem
-                    key={t}
-                    label={EventTypeLabels[t]}
-                    showSeparator={i < EVENT_TYPES.length - 1}
-                    leading={<View style={[styles.dot, { backgroundColor: eventTypeColor(t, settings.eventTypeColors) }]} />}
-                    onPress={() => onSelect(t)}
+                    key={def.id}
+                    label={def.label}
+                    showSeparator={i < visibleDefinitions.length - 1}
+                    leading={<View style={[styles.dot, { backgroundColor: eventTypeColor(def.id, settings.eventTypeColors) }]} />}
+                    onPress={() => onSelect(def.id)}
                   />
                 ))}
               </ScrollView>

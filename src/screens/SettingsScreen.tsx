@@ -18,9 +18,11 @@ import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../co
 import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { EventColorsModal } from '../modals/EventColorsModal';
 import { EventDurationsModal } from '../modals/EventDurationsModal';
+import { EventTypesModal } from '../modals/EventTypesModal';
 import { normalizeHex } from '../utils/colorUtils';
 import { useSettings, DEFAULT_SETTINGS, type AppSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { eventTypeColor, eventTypeDefaultMinutes } from '../utils/eventUtils';
 import { useAuth } from '../lib/AuthContext';
@@ -103,7 +105,8 @@ export function SettingsScreen() {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const { settings, updateSettings } = useSettings();
-  const { resetAll, resetBuiltInDefinitions } = useWeeklyGoals();
+  const { resetAll, resetBuiltInDefinitions, definitions: goalDefinitions } = useWeeklyGoals();
+  const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
   const { deleteAllEvents } = useCalendarEvents();
   const { signOut } = useAuth();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
@@ -118,8 +121,8 @@ export function SettingsScreen() {
   const eventReminderScrollEdges = useScrollEdges();
   // Which theme colour the picker sheet is editing, if any.
   const [colorSheet, setColorSheet] = useState<ThemeColorRowKey | null>(null);
-  // Which of the two event-type screens is open.
-  const [eventSheet, setEventSheet] = useState<'colors' | 'durations' | null>(null);
+  // Which of the event-type screens is open.
+  const [eventSheet, setEventSheet] = useState<'colors' | 'durations' | 'types' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
@@ -686,6 +689,18 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* Event Types — which types show on the calendar's pickers, plus any
+            custom ones the user has added and optionally linked to a goal. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => setEventSheet('types')}>
+              <Text style={styles.rowLabel}>Customize</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Default Contact Method. The section title names the setting, so the
             row carries the value alone rather than repeating it as a label. */}
         <View style={[styles.section, elevatedDropdown === 'method' && styles.sectionFloating]}>
@@ -914,6 +929,13 @@ export function SettingsScreen() {
 
       <EventColorsModal visible={eventSheet === 'colors'} onClose={() => setEventSheet(null)} />
       <EventDurationsModal visible={eventSheet === 'durations'} onClose={() => setEventSheet(null)} />
+      <EventTypesModal
+        visible={eventSheet === 'types'}
+        onClose={() => setEventSheet(null)}
+        definitions={eventTypeDefinitions}
+        onUpdateDefinitions={updateEventTypeDefinitions}
+        goalDefinitions={goalDefinitions}
+      />
     </SafeAreaView>
   );
 }

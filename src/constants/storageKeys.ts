@@ -5,6 +5,7 @@
 export const PEOPLE_KEY = 'people';
 export const CALENDAR_EVENTS_KEY = 'calendar_events';
 export const GOAL_DEFINITIONS_KEY = 'goal_definitions';
+export const EVENT_TYPE_DEFINITIONS_KEY = 'event_type_definitions';
 export const EVENT_STATUSES_KEY = 'event_statuses';
 export const SETTINGS_KEY = 'settings';
 export const CONVERT_PROGRESS_KEY = 'convert_progress';
@@ -29,6 +30,7 @@ const APP_DATA_KEYS = [
   PEOPLE_KEY,
   CALENDAR_EVENTS_KEY,
   GOAL_DEFINITIONS_KEY,
+  EVENT_TYPE_DEFINITIONS_KEY,
   EVENT_STATUSES_KEY,
   SETTINGS_KEY,
   CONVERT_PROGRESS_KEY,

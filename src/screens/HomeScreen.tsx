@@ -9,6 +9,7 @@ import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useMonthlyGoals } from '../hooks/useMonthlyGoals';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { UnreportedRow } from '../components/UnreportedRow';
@@ -29,6 +30,7 @@ export function HomeScreen({ navigation, route }: any) {
   const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
   const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly } = useMonthlyGoals();
   const { count: unreportedCount } = useUnreported();
+  const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
 
   useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
   const [editVisible, setEditVisible] = useState(false);
@@ -116,6 +118,8 @@ export function HomeScreen({ navigation, route }: any) {
         onClose={() => setEditVisible(false)}
         definitions={definitions}
         onUpdateDefinitions={updateDefinitions}
+        eventTypeDefs={eventTypeDefinitions}
+        onUpdateEventTypeDefs={updateEventTypeDefinitions}
       />
 
       <MonthlyPlanningModal

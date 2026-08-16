@@ -6,6 +6,7 @@ import {
   CALENDAR_EVENTS_KEY,
   CONVERT_PROGRESS_KEY,
   EVENT_STATUSES_KEY,
+  EVENT_TYPE_DEFINITIONS_KEY,
   GOAL_DEFINITIONS_KEY,
   LAST_SYNCED_KEY,
   PEOPLE_KEY,
@@ -22,6 +23,7 @@ const ROW_TABLES = [
   { table: 'people', storageKey: PEOPLE_KEY },
   { table: 'calendar_events', storageKey: CALENDAR_EVENTS_KEY },
   { table: 'goal_definitions', storageKey: GOAL_DEFINITIONS_KEY },
+  { table: 'event_type_definitions', storageKey: EVENT_TYPE_DEFINITIONS_KEY },
   { table: 'convert_progress', storageKey: CONVERT_PROGRESS_KEY },
 ] as const;
 

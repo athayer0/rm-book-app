@@ -9,6 +9,7 @@ import {
 import { useStoredState } from './useStoredState';
 import { useCalendarEvents } from './useCalendarEvents';
 import { useEventStatuses } from './useEventStatuses';
+import { useEventTypeDefinitions } from './useEventTypeDefinitions';
 import { enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
@@ -45,6 +46,7 @@ export function useMonthlyGoals() {
 
   const { events } = useCalendarEvents();
   const { getStatus } = useEventStatuses();
+  const { customLinks } = useEventTypeDefinitions();
 
   const goals = targetsState.value;
 
@@ -54,8 +56,8 @@ export function useMonthlyGoals() {
   );
 
   const derived = useMemo(
-    () => deriveWeekGoalCounts(events, isCompleted, getMonthDates(monthKey)),
-    [events, isCompleted, monthKey],
+    () => deriveWeekGoalCounts(events, isCompleted, getMonthDates(monthKey), customLinks),
+    [events, isCompleted, monthKey, customLinks],
   );
 
   const counts = useMemo(
@@ -83,8 +85,8 @@ export function useMonthlyGoals() {
 
   const derivedFor = useCallback(
     (mk: string): MonthlyCounts =>
-      mk === monthKey ? derived : deriveWeekGoalCounts(events, isCompleted, getMonthDates(mk)),
-    [monthKey, derived, events, isCompleted],
+      mk === monthKey ? derived : deriveWeekGoalCounts(events, isCompleted, getMonthDates(mk), customLinks),
+    [monthKey, derived, events, isCompleted, customLinks],
   );
 
   const getMonthData = useCallback(async (mk: string): Promise<{ counts: MonthlyCounts; goals: MonthlyGoals }> => {

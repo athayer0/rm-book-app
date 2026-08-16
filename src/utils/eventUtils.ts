@@ -231,7 +231,12 @@ function durationHours(event: CalendarEvent): number {
   return Math.max(1, Math.round(mins / 60));
 }
 
-export function getGoalContribution(event: CalendarEvent): { goalId: string; delta: number } | null {
+export type CustomTypeLinks = Record<string, { goalId: string; mode: 'count' | 'hours' }>;
+
+export function getGoalContribution(
+  event: CalendarEvent,
+  customLinks: CustomTypeLinks = {},
+): { goalId: string; delta: number } | null {
   switch (event.type) {
     // Which of the two prayer goals a prayer counts toward is decided by when it
     // starts, not how long it ran: a prayer is one prayer whatever its duration,
@@ -253,8 +258,10 @@ export function getGoalContribution(event: CalendarEvent): { goalId: string; del
     case 'date':
       return { goalId: 'total_dates', delta: 1 };
     // contact is trackable but counts toward nothing — see TRACKABLE_TYPES.
-    default:
-      return null;
+    default: {
+      const link = customLinks[event.type];
+      return link ? { goalId: link.goalId, delta: link.mode === 'hours' ? durationHours(event) : 1 } : null;
+    }
   }
 }
 
@@ -267,8 +274,8 @@ export function getGoalContribution(event: CalendarEvent): { goalId: string; del
  * type out of the unreported count, which reads as a counting bug rather than as
  * a missing entry.
  */
-export function isReportableType(type: string): boolean {
-  return TRACKABLE_TYPES.has(type) || isCheckboxType(type);
+export function isReportableType(type: string, customTypeIds: Set<string> = new Set()): boolean {
+  return TRACKABLE_TYPES.has(type) || isCheckboxType(type) || customTypeIds.has(type);
 }
 
 /**
@@ -301,9 +308,10 @@ export const UNREPORTED_LOOKBACK_DAYS = 30;
 export function resolveEventStatus(
   event: CalendarEvent,
   stored: EventStatus | undefined,
+  customTypeIds: Set<string> = new Set(),
 ): EventStatus | undefined {
   if (event.backup) return undefined;
-  if (!isReportableType(event.type)) return undefined;
+  if (!isReportableType(event.type, customTypeIds)) return undefined;
   return stored ?? (hasEventStartPassed(event) ? 'pending' : undefined);
 }
 
@@ -322,6 +330,7 @@ export function findUnreportedOccurrences(
   events: CalendarEvent[],
   statusOf: (eventId: string, dateStr: string) => EventStatus | undefined,
   today: Date = new Date(),
+  customTypeIds: Set<string> = new Set(),
 ): CalendarEvent[] {
   const found: CalendarEvent[] = [];
 
@@ -331,7 +340,7 @@ export function findUnreportedOccurrences(
       // getEventsForDate stamps the occurrence's own date, so the clock check
       // inside resolveEventStatus reads this occurrence rather than the series'
       // first one.
-      if (resolveEventStatus(occurrence, statusOf(occurrence.id, dateStr)) === 'pending') {
+      if (resolveEventStatus(occurrence, statusOf(occurrence.id, dateStr), customTypeIds) === 'pending') {
         found.push(occurrence);
       }
     }
@@ -360,6 +369,7 @@ export function deriveWeekGoalCounts(
   events: CalendarEvent[],
   isCompleted: (eventId: string, dateStr: string) => boolean,
   weekDates: string[],
+  customLinks: CustomTypeLinks = {},
 ): Record<string, number> {
   const totals: Record<string, number> = {};
 
@@ -367,7 +377,7 @@ export function deriveWeekGoalCounts(
     for (const occurrence of getEventsForDate(events, dateStr)) {
       if (occurrence.backup) continue;
       if (!isCompleted(occurrence.id, dateStr)) continue;
-      const contrib = getGoalContribution(occurrence);
+      const contrib = getGoalContribution(occurrence, customLinks);
       if (!contrib) continue;
       totals[contrib.goalId] = (totals[contrib.goalId] ?? 0) + contrib.delta;
     }

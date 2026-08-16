@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { findUnreportedOccurrences } from '../utils/eventUtils';
 import { useCalendarEvents } from './useCalendarEvents';
 import { useEventReport } from './useEventReport';
+import { useEventTypeDefinitions } from './useEventTypeDefinitions';
 
 /**
  * The unreported backlog and the way to clear it.
@@ -13,10 +14,15 @@ import { useEventReport } from './useEventReport';
 export function useUnreported() {
   const { events } = useCalendarEvents();
   const { getStatus, report } = useEventReport();
+  const { definitions: eventTypeDefs } = useEventTypeDefinitions();
+  const customTypeIds = useMemo(
+    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
+    [eventTypeDefs],
+  );
 
   const unreported = useMemo(
-    () => findUnreportedOccurrences(events, getStatus),
-    [events, getStatus],
+    () => findUnreportedOccurrences(events, getStatus, new Date(), customTypeIds),
+    [events, getStatus, customTypeIds],
   );
 
   return { unreported, count: unreported.length, report, statusOf: getStatus };

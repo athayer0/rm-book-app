@@ -187,6 +187,51 @@ create trigger goal_definitions_set_updated_at
   for each row
   execute function set_updated_at();
 
+-- ── event_type_definitions ─────────────────
+-- Mirrors goal_definitions exactly, one table
+-- over: identity and presentation for event
+-- types, plus (custom types only) which goal
+-- their completions feed and how. Built-in
+-- types (church, prayer, ...) never carry
+-- goal_id/goal_mode -- their contribution is
+-- hardcoded in getGoalContribution() and can't
+-- be reassigned.
+--
+-- Built-in type ids are the same literal for
+-- every user, so the composite PK is
+-- load-bearing here for the same reason it is
+-- on goal_definitions.
+create table if not exists event_type_definitions (
+  user_id uuid not null references auth.users,
+  id text not null,
+  label text not null,
+  icon text,
+  icon_family text,
+  visible boolean default true,
+  built_in boolean default false,
+  goal_id text,
+  goal_mode text,
+  updated_at timestamptz default now(),
+  deleted_at timestamptz,
+  primary key (user_id, id)
+);
+alter table event_type_definitions
+  enable row level security;
+drop policy if exists "users own their event types"
+  on event_type_definitions;
+create policy "users own their event types"
+  on event_type_definitions
+  for all to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+drop trigger if exists
+  event_type_definitions_set_updated_at
+  on event_type_definitions;
+create trigger event_type_definitions_set_updated_at
+  before insert or update on event_type_definitions
+  for each row
+  execute function set_updated_at();
+
 -- ── goal_entries ───────────────────────────
 -- count (how many) and target (how many were
 -- aimed for) share a grain, so they share a
@@ -478,6 +523,7 @@ grant select, insert, update, delete
   on people,
      calendar_events,
      goal_definitions,
+     event_type_definitions,
      goal_entries,
      goal_monthly_entries,
      event_statuses,
@@ -500,6 +546,9 @@ create index if not exists
 create index if not exists
   goal_definitions_user_updated_idx
   on goal_definitions (user_id, updated_at);
+create index if not exists
+  event_type_definitions_user_updated_idx
+  on event_type_definitions (user_id, updated_at);
 create index if not exists
   goal_entries_user_updated_idx
   on goal_entries (user_id, updated_at);
