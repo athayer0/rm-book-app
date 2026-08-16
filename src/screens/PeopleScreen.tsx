@@ -13,7 +13,7 @@ import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { ImportContactsModal } from '../modals/ImportContactsModal';
 import { FAB, FAB_SIZE, FAB_BOTTOM } from '../components/FAB';
 import {
-  PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus,
+  PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus, statusDisplayName,
 } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
 import { DropdownMenu, DropdownItem, MenuDivider } from '../components/DropdownMenu';
@@ -80,6 +80,12 @@ export function PeopleScreen() {
   const [search, setSearch] = useState('');
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({ kind: 'all' });
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  // Bulk status editing: tap Select, tap rows to pick them, then Set Type
+  // applies one status to every row picked. Exclusive with the filter dropdown
+  // below — both hang a menu off the same header, so only one opens at a time.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false);
   // Both measured in the safe area's own space rather than the window's, so the
   // notch can't skew the ratio the dropdown's height is worked out from.
   const [pageHeight, setPageHeight] = useState(0);
@@ -125,6 +131,26 @@ export function PeopleScreen() {
     setShowModal(true);
   }
 
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setShowBulkStatusMenu(false);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function applyBulkStatus(status: string) {
+    const ids = Array.from(selectedIds);
+    for (const id of ids) await updatePerson(id, { status });
+    exitSelectMode();
+  }
+
   async function handleSave(personData: Omit<Person, 'id' | 'createdAt'>) {
     if (editingPerson) {
       await updatePerson(editingPerson.id, personData);
@@ -139,81 +165,137 @@ export function PeopleScreen() {
         style={styles.header}
         onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
       >
-        <Text style={styles.headerTitle}>People</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.filterChip}
-            onPress={() => setShowImportModal(true)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Import from Contacts"
-          >
-            <MaterialCommunityIcons name="account-arrow-down-outline" size={24} color={Colors.onPrimary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.filterChip}
-            onPress={() => setShowFilterDropdown(v => !v)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="options-outline" size={26} color={Colors.onPrimary} />
-          </TouchableOpacity>
+        {selectMode ? (
+          <>
+            <TouchableOpacity onPress={exitSelectMode}>
+              <Text style={styles.headerActionText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>
+              {selectedIds.size === 0 ? 'Select People' : `${selectedIds.size} Selected`}
+            </Text>
+            <View>
+              <TouchableOpacity
+                onPress={() => setShowBulkStatusMenu(v => !v)}
+                disabled={selectedIds.size === 0}
+              >
+                <Text style={[styles.headerActionText, selectedIds.size === 0 && styles.headerActionTextDisabled]}>
+                  Set Type
+                </Text>
+              </TouchableOpacity>
+              <DropdownMenu open={showBulkStatusMenu} align="right" style={styles.filterDropdown}>
+                <ScrollView
+                  style={{ maxHeight: filterListMaxHeight }}
+                  nestedScrollEnabled
+                  bounces={false}
+                  overScrollMode="never"
+                  {...filterScrollEdges.scrollViewProps}
+                >
+                  {STATUS_OPTIONS.map((s, i) => (
+                    <DropdownItem
+                      key={s}
+                      label={statusDisplayName(s)}
+                      showSeparator={i < STATUS_OPTIONS.length - 1}
+                      leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
+                      onPress={() => applyBulkStatus(s)}
+                    />
+                  ))}
+                </ScrollView>
+                <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
+                <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
+              </DropdownMenu>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.headerTitle}>People</Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.filterChip}
+                onPress={() => setShowImportModal(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Import from Contacts"
+              >
+                <MaterialCommunityIcons name="account-arrow-down-outline" size={24} color={Colors.onPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.filterChip}
+                onPress={() => setSelectMode(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Select People"
+              >
+                <Ionicons name="checkbox-outline" size={24} color={Colors.onPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.filterChip}
+                onPress={() => setShowFilterDropdown(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="options-outline" size={26} color={Colors.onPrimary} />
+              </TouchableOpacity>
 
-          {/* Right-aligned and content-width: it hangs off an icon button far
-              narrower than its own list, so stretching to the trigger would give
-              a menu the width of one glyph. `top` overrides the default '100%'
-              to keep the offset the header row has always used. */}
-          <DropdownMenu
-            open={showFilterDropdown}
-            align="right"
-            style={styles.filterDropdown}
-          >
-            <ScrollView
-              style={{ maxHeight: filterListMaxHeight }}
-              nestedScrollEnabled
-              bounces={false}
-              overScrollMode="never"
-              {...filterScrollEdges.scrollViewProps}
-            >
-              <DropdownItem
-                label="All"
-                selected={filterSelection.kind === 'all'}
-                onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
-              />
-              {STATUS_GROUPS.map((g) => (
-                <DropdownItem
-                  key={g.name}
-                  label={g.name}
-                  selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
-                  onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
-                />
-              ))}
-              <DropdownItem
-                label="Favorites"
-                selected={filterSelection.kind === 'favorites'}
-                showSeparator={false}
-                leading={<Ionicons name="star" size={16} color={Colors.favorite} style={styles.filterChipIcon} />}
-                onPress={() => { setFilterSelection({ kind: 'favorites' }); setShowFilterDropdown(false); }}
-              />
-              <MenuDivider />
-              {STATUS_OPTIONS.map((s, i) => (
-                <DropdownItem
-                  key={s}
-                  label={s}
-                  selected={filterSelection.kind === 'status' && filterSelection.name === s}
-                  showSeparator={i < STATUS_OPTIONS.length - 1}
-                  leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
-                  onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
-                />
-              ))}
-            </ScrollView>
-            <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
-            <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
-          </DropdownMenu>
-        </View>
+              {/* Right-aligned and content-width: it hangs off an icon button far
+                  narrower than its own list, so stretching to the trigger would give
+                  a menu the width of one glyph. `top` overrides the default '100%'
+                  to keep the offset the header row has always used. */}
+              <DropdownMenu
+                open={showFilterDropdown}
+                align="right"
+                style={styles.filterDropdown}
+              >
+                <ScrollView
+                  style={{ maxHeight: filterListMaxHeight }}
+                  nestedScrollEnabled
+                  bounces={false}
+                  overScrollMode="never"
+                  {...filterScrollEdges.scrollViewProps}
+                >
+                  <DropdownItem
+                    label="All"
+                    selected={filterSelection.kind === 'all'}
+                    onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
+                  />
+                  {STATUS_GROUPS.map((g) => (
+                    <DropdownItem
+                      key={g.name}
+                      label={g.name}
+                      selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
+                      onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
+                    />
+                  ))}
+                  <DropdownItem
+                    label="Favorites"
+                    selected={filterSelection.kind === 'favorites'}
+                    showSeparator={false}
+                    leading={<Ionicons name="star" size={16} color={Colors.favorite} style={styles.filterChipIcon} />}
+                    onPress={() => { setFilterSelection({ kind: 'favorites' }); setShowFilterDropdown(false); }}
+                  />
+                  <MenuDivider />
+                  {STATUS_OPTIONS.map((s, i) => (
+                    <DropdownItem
+                      key={s}
+                      label={s}
+                      selected={filterSelection.kind === 'status' && filterSelection.name === s}
+                      showSeparator={i < STATUS_OPTIONS.length - 1}
+                      leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
+                      onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
+                    />
+                  ))}
+                </ScrollView>
+                <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
+                <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
+              </DropdownMenu>
+            </View>
+          </>
+        )}
       </View>
 
-      {showFilterDropdown && (
-        <Pressable style={styles.filterBackdrop} onPress={() => setShowFilterDropdown(false)} />
+      {(showFilterDropdown || showBulkStatusMenu) && (
+        <Pressable
+          style={styles.filterBackdrop}
+          onPress={() => { setShowFilterDropdown(false); setShowBulkStatusMenu(false); }}
+        />
       )}
 
       <View style={styles.body}>
@@ -255,8 +337,9 @@ export function PeopleScreen() {
               <PersonCard
                 key={row.key}
                 person={row.person}
-                onPress={() => handleEdit(row.person)}
+                onPress={() => (selectMode ? toggleSelected(row.person.id) : handleEdit(row.person))}
                 isFirst={index === 0}
+                selected={selectMode ? selectedIds.has(row.person.id) : undefined}
               />
             )
           )
@@ -265,7 +348,7 @@ export function PeopleScreen() {
       </ScrollView>
 
       </View>
-      <FAB onPress={() => { setEditingPerson(null); setShowModal(true); }} />
+      {!selectMode && <FAB onPress={() => { setEditingPerson(null); setShowModal(true); }} />}
 
       <AddEditPersonModal
         visible={showModal}
@@ -298,6 +381,8 @@ function makeStyles(C: ColorPalette) {
       elevation: 20,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
+    headerActionText: { fontSize: 16, fontWeight: '600', color: C.onPrimary },
+    headerActionTextDisabled: { color: C.onPrimaryMuted },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     filterChip: {
       width: 36,
