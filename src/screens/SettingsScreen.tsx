@@ -30,7 +30,8 @@ import { GoalIcon } from '../components/GoalIcon';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { formatTime, parseTimeString } from '../utils/dateUtils';
 import { EVENT_REMINDER_MINUTE_OPTIONS, eventReminderLabel } from '../constants/eventReminders';
-import { requestNotificationPermissions, scheduleDailyReview, cancelDailyReview } from '../lib/notifications';
+import { scheduleDailyReview } from '../lib/notifications';
+import { useNotificationToggles } from '../hooks/useNotificationToggles';
 
 const START_HOUR_OPTIONS = [4, 5, 6, 7, 8, 9, 10];
 const END_HOUR_OPTIONS = [21, 22, 23, 24];
@@ -104,6 +105,7 @@ export function SettingsScreen() {
   const { resetAll, resetBuiltInDefinitions } = useWeeklyGoals();
   const { deleteAllEvents } = useCalendarEvents();
   const { signOut } = useAuth();
+  const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
   // Same resolution useColors() does internally — needed here too so the
   // theme-color list can show only the variant that's actually in effect.
   const systemScheme = useColorScheme();
@@ -199,51 +201,10 @@ export function SettingsScreen() {
     }
   }
 
-  // Requesting/scheduling here (rather than leaving it to App.tsx's settings-
-  // driven effect alone) is what lets a denied permission stay off instead of
-  // silently sitting "on" with nothing scheduled — the effect still runs too,
-  // but by then permission is already resolved, so it's a no-op.
-  async function handleToggleDailyReview(value: boolean) {
-    if (value) {
-      const granted = await requestNotificationPermissions();
-      if (!granted) {
-        Alert.alert(
-          'Notifications Disabled',
-          'Enable notifications for RM Book in your device settings to use the daily review reminder.',
-        );
-        return;
-      }
-      await scheduleDailyReview(settings.dailyReviewHour, settings.dailyReviewMinute);
-      updateSettings({ dailyReviewEnabled: true });
-    } else {
-      await cancelDailyReview();
-      updateSettings({ dailyReviewEnabled: false });
-    }
-  }
-
   async function handleSelectDailyReviewTime(t: string) {
     const { hour, minute } = parseTimeString(t);
     updateSettings({ dailyReviewHour: hour, dailyReviewMinute: minute });
     if (settings.dailyReviewEnabled) await scheduleDailyReview(hour, minute);
-  }
-
-  // Scheduling itself happens in App.tsx's settings-driven effect (it needs
-  // the full event list, which this screen has no reason to load) — this
-  // just gates the permission request the same way the daily review toggle
-  // does, so a denial leaves the switch off instead of on with nothing
-  // scheduled.
-  async function handleToggleEventReminders(value: boolean) {
-    if (value) {
-      const granted = await requestNotificationPermissions();
-      if (!granted) {
-        Alert.alert(
-          'Notifications Disabled',
-          'Enable notifications for RM Book in your device settings to use event reminders.',
-        );
-        return;
-      }
-    }
-    updateSettings({ eventReminderEnabled: value });
   }
 
   function handleResetWeek() {
@@ -486,7 +447,7 @@ export function SettingsScreen() {
               <Text style={styles.rowLabel}>Notifications</Text>
               <Switch
                 value={settings.dailyReviewEnabled}
-                onValueChange={handleToggleDailyReview}
+                onValueChange={toggleDailyReview}
                 trackColor={{ true: Colors.control }}
                 thumbColor={Colors.white}
               />
@@ -530,7 +491,7 @@ export function SettingsScreen() {
               <Text style={styles.rowLabel}>Notifications</Text>
               <Switch
                 value={settings.eventReminderEnabled}
-                onValueChange={handleToggleEventReminders}
+                onValueChange={toggleEventReminders}
                 trackColor={{ true: Colors.control }}
                 thumbColor={Colors.white}
               />
