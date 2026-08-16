@@ -177,6 +177,26 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
     ),
   });
 
+  if (usesContactMethod(event.type)) {
+    groups.push({
+      key: 'method',
+      node: (
+        <>
+          <Text style={styles.label}>{methodFieldLabel(event.type)}</Text>
+          <View style={styles.inlineValue}>
+            <GoalIcon
+              icon={CONTACT_METHODS[method].icon}
+              iconFamily={CONTACT_METHODS[method].iconFamily}
+              size={16}
+              color={Colors.textSecondary}
+            />
+            <Text style={styles.value}>{contactMethodLabel(method)}</Text>
+          </View>
+        </>
+      ),
+    });
+  }
+
   groups.push({
     key: 'when',
     node: (
@@ -199,26 +219,6 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
       </>
     ),
   });
-
-  if (usesContactMethod(event.type)) {
-    groups.push({
-      key: 'method',
-      node: (
-        <>
-          <Text style={styles.label}>{methodFieldLabel(event.type)}</Text>
-          <View style={styles.inlineValue}>
-            <GoalIcon
-              icon={CONTACT_METHODS[method].icon}
-              iconFamily={CONTACT_METHODS[method].iconFamily}
-              size={16}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.value}>{contactMethodLabel(method)}</Text>
-          </View>
-        </>
-      ),
-    });
-  }
 
   if (attendees.length > 0) {
     groups.push({
