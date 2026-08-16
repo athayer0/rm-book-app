@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, useColorScheme,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
+import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { GoalGrid } from '../components/GoalGrid';
@@ -18,6 +19,9 @@ import { useUnreported } from '../hooks/useUnreported';
 export function HomeScreen({ navigation, route }: any) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
+  const systemScheme = useColorScheme();
+  const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
 
   const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
   const { count: unreportedCount } = useUnreported();
@@ -65,20 +69,20 @@ export function HomeScreen({ navigation, route }: any) {
           />
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.actionBtn}
+              style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
               onPress={() => openPlanning('goals')}
               activeOpacity={0.75}
             >
-              <Ionicons name="list-outline" size={17} color={Colors.control} />
-              <Text style={styles.actionBtnText}>Goals</Text>
+              <Ionicons name="list-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
+              <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Goals</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.actionBtn}
+              style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
               onPress={() => openPlanning('graph')}
               activeOpacity={0.75}
             >
-              <Ionicons name="stats-chart-outline" size={17} color={Colors.control} />
-              <Text style={styles.actionBtnText}>Last 6 Weeks</Text>
+              <Ionicons name="stats-chart-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
+              <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Last 6 Weeks</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -169,6 +173,14 @@ function makeStyles(C: ColorPalette) {
       fontSize: 14,
       fontWeight: '700',
       color: C.control,
+    },
+    // Dark mode only: the button and its label swap which one carries `control`
+    // vs `contactActionBg`, turning the outline-style button into a filled one.
+    actionBtnSwapped: {
+      backgroundColor: C.control,
+    },
+    actionBtnTextSwapped: {
+      color: C.contactActionBg,
     },
   });
 }
