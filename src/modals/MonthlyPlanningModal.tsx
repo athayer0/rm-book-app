@@ -38,10 +38,12 @@ export function MonthlyPlanningModal({ visible, onClose, definitions, onUpdateDe
   }, [visible]);
 
   // Edits are committed when the sheet closes — including an iOS swipe-down dismiss,
-  // which fires onRequestClose for a pageSheet.
-  async function handleClose() {
-    await onUpdateDefinitions(localDefs);
+  // which fires onRequestClose for a pageSheet. onClose fires first so the sheet's
+  // slide-out animation starts immediately rather than waiting on the definitions
+  // write (an AsyncStorage save plus one sequential sync-queue enqueue per goal).
+  function handleClose() {
     onClose();
+    onUpdateDefinitions(localDefs);
   }
 
   const monthlyVisibleCount = localDefs.filter(d => d.monthlyVisible).length;

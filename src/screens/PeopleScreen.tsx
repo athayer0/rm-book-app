@@ -211,21 +211,21 @@ export function PeopleScreen() {
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.filterChip}
-                onPress={() => setShowImportModal(true)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Import from Contacts"
-              >
-                <MaterialCommunityIcons name="account-arrow-down-outline" size={24} color={Colors.onPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.filterChip}
                 onPress={() => setSelectMode(true)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Select People"
               >
                 <Ionicons name="checkbox-outline" size={24} color={Colors.onPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.filterChip}
+                onPress={() => setShowImportModal(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Import from Contacts"
+              >
+                <MaterialCommunityIcons name="account-arrow-down-outline" size={24} color={Colors.onPrimary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.filterChip}
