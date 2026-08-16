@@ -5,11 +5,19 @@ import { useStoredState } from './useStoredState';
 import { enqueueDelete, enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 import { detachPersonFromEvents } from './useCalendarEvents';
+import { deleteConvertProgress } from './useConvertProgress';
 
 export interface Person {
   id: string;
   name: string;
   status: string;
+  /**
+   * Only asked for where it matters — whether Aaronic/Melchizedek Priesthood
+   * ordination belong on a recent convert's covenant path. See
+   * PersonCovenantPathTab, which prompts for it the first time that tab opens
+   * on someone who doesn't have it set yet.
+   */
+  gender?: 'male' | 'female';
   phone?: string;
   // The optional contact methods the editor adds and removes. `undefined` means
   // the person has no such section at all; a string — including '' — means the
@@ -61,6 +69,7 @@ export function usePeople() {
     if (user) await enqueueDelete('people', id, { user_id: user.id, id });
     // The events they were on outlive them, so the id has to come off those too.
     await detachPersonFromEvents(id, user?.id);
+    await deleteConvertProgress(id, user?.id);
   }, [write, user]);
 
   const toggleStar = useCallback(async (id: string) => {

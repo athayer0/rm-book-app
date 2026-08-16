@@ -7,6 +7,7 @@ export const CALENDAR_EVENTS_KEY = 'calendar_events';
 export const GOAL_DEFINITIONS_KEY = 'goal_definitions';
 export const EVENT_STATUSES_KEY = 'event_statuses';
 export const SETTINGS_KEY = 'settings';
+export const CONVERT_PROGRESS_KEY = 'convert_progress';
 
 /** Device-local: which week the counts were last rolled over for. Never synced. */
 export const LAST_RESET_KEY = 'last_reset_date';
@@ -30,6 +31,7 @@ const APP_DATA_KEYS = [
   GOAL_DEFINITIONS_KEY,
   EVENT_STATUSES_KEY,
   SETTINGS_KEY,
+  CONVERT_PROGRESS_KEY,
 ];
 
 const APP_DATA_PREFIXES = ['goal_counts_', 'goal_targets_'];

@@ -23,6 +23,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
   },
   goal_entries: {},
   event_statuses: {},
+  convert_progress: {},
   settings: {
     weekStart: 'week_start',
     themeColor: 'theme_color',
@@ -49,7 +50,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
 /** Every column that actually exists on each table. Anything else is dropped. */
 const COLUMNS: Record<string, string[]> = {
   people: [
-    'user_id', 'id', 'name', 'status', 'phone', 'whatsapp', 'messenger', 'address',
+    'user_id', 'id', 'name', 'status', 'gender', 'phone', 'whatsapp', 'messenger', 'address',
     'notes', 'starred', 'created_at', 'updated_at', 'deleted_at',
   ],
   calendar_events: [
@@ -66,6 +67,9 @@ const COLUMNS: Record<string, string[]> = {
   ],
   event_statuses: [
     'user_id', 'event_id', 'occurrence_date', 'status', 'updated_at', 'deleted_at',
+  ],
+  convert_progress: [
+    'user_id', 'id', 'completed', 'updated_at', 'deleted_at',
   ],
   settings: [
     'user_id', 'week_start', 'theme', 'theme_color',
@@ -90,6 +94,7 @@ export const PK_COLUMNS: Record<string, string[]> = {
   goal_entries: ['user_id', 'goal_id', 'week_key'],
   event_statuses: ['user_id', 'event_id', 'occurrence_date'],
   settings: ['user_id'],
+  convert_progress: ['user_id', 'id'],
 };
 
 function invert(map: Record<string, string>): Record<string, string> {

@@ -30,6 +30,10 @@ create table if not exists people (
   id text not null,
   name text not null,
   status text,
+  -- 'male' / 'female', only ever asked for on
+  -- the covenant path tab -- see gender on
+  -- Person in src/hooks/usePeople.ts.
+  gender text,
   phone text,
   -- Optional contact methods. NULL means the
   -- person has no such section in the editor;
@@ -54,6 +58,8 @@ create table if not exists people (
 -- create-if-not-exists skips an existing table
 -- outright, so columns added after the first
 -- run need their own alter.
+alter table people
+  add column if not exists gender text;
 alter table people
   add column if not exists whatsapp text;
 alter table people
@@ -267,6 +273,45 @@ create trigger event_statuses_set_updated_at
   for each row
   execute function set_updated_at();
 
+-- ── convert_progress ───────────────────────
+-- One row per convert: id is the person's own
+-- id, since there's only ever one path per
+-- person. No FK to people -- same reasoning as
+-- calendar_events.people and goal_entries:
+-- queue ordering across devices can't
+-- guarantee the person row lands first.
+create table if not exists convert_progress (
+  user_id uuid not null references auth.users,
+  id text not null,
+  -- Milestone ids the convert has completed,
+  -- out of COVENANT_PATH_MILESTONES in
+  -- src/constants/covenantPath.ts. Whether
+  -- priesthood ordination belongs on the list
+  -- at all comes from people.gender instead.
+  completed jsonb default '[]'::jsonb,
+  updated_at timestamptz default now(),
+  deleted_at timestamptz,
+  primary key (user_id, id)
+);
+alter table convert_progress
+  enable row level security;
+drop policy if exists
+  "users own their convert progress"
+  on convert_progress;
+create policy
+  "users own their convert progress"
+  on convert_progress
+  for all to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+drop trigger if exists
+  convert_progress_set_updated_at
+  on convert_progress;
+create trigger convert_progress_set_updated_at
+  before insert or update on convert_progress
+  for each row
+  execute function set_updated_at();
+
 -- ── settings ───────────────────────────────
 -- Scalars get real columns. The two maps are
 -- keyed by arbitrary event-type strings, so a
@@ -389,6 +434,7 @@ grant select, insert, update, delete
      goal_definitions,
      goal_entries,
      event_statuses,
+     convert_progress,
      settings
   to authenticated;
 
@@ -413,3 +459,6 @@ create index if not exists
 create index if not exists
   event_statuses_user_updated_idx
   on event_statuses (user_id, updated_at);
+create index if not exists
+  convert_progress_user_updated_idx
+  on convert_progress (user_id, updated_at);

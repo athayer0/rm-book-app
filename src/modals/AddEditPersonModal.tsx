@@ -17,6 +17,7 @@ import { usePendingContact } from '../hooks/usePendingContact';
 import { CalendarEvent } from '../utils/eventUtils';
 import { AddEditEventModal } from './AddEditEventModal';
 import { PersonTimelineTab } from '../components/PersonTimelineTab';
+import { PersonCovenantPathTab } from '../components/PersonCovenantPathTab';
 import { PersonDetailView } from '../components/PersonDetailView';
 import { EdgeFade, TextWidthProbe } from '../components/ScrollableValue';
 import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
@@ -36,6 +37,16 @@ interface Props {
   onDelete?: (id: string) => void;
   onClose: () => void;
 }
+
+type TabKey = 'details' | 'timeline' | 'covenant';
+
+const TAB_LABELS: Record<TabKey, string> = {
+  details: 'Details',
+  timeline: 'Timeline',
+  covenant: 'Path',
+};
+
+const RECENT_CONVERT_STATUS = 'Recent Converts';
 
 export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
@@ -66,7 +77,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
     if (showStatusPicker) setElevated('status');
     else if (showMethodPicker) setElevated('method');
   }, [showStatusPicker, showMethodPicker]);
-  const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
+  const [activeTab, setActiveTab] = useState<TabKey>('details');
   /**
    * Someone who already exists opens as a page about themselves; only editing
    * them shows the form. Someone being added has nothing to display, so they
@@ -113,6 +124,15 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
     // wrapping it in a useCallback nothing else needs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [person, visible]);
+
+  // The path tab only exists for a recent convert. If an edit in progress
+  // changes the status away from that while it's the open tab, fall back
+  // rather than leave the sheet showing a tab its own bar no longer offers.
+  const isConvert = status === RECENT_CONVERT_STATUS;
+  useEffect(() => {
+    if (activeTab === 'covenant' && !isConvert) setActiveTab('details');
+  }, [isConvert, activeTab]);
+  const tabs: TabKey[] = isConvert ? ['details', 'timeline', 'covenant'] : ['details', 'timeline'];
 
   const { settings } = useSettings();
   const { addEvent } = useCalendarEvents();
@@ -262,10 +282,11 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
         </View>
 
         {/* Only for someone who already exists — a person being added has no id
-            for the timeline to look events up by, and no events to find. */}
+            for the timeline or path to look up anything by. Path only joins the
+            bar for a recent convert, since it has nothing to track otherwise. */}
         {person && (
           <View style={styles.tabBar}>
-            {(['details', 'timeline'] as const).map(tab => (
+            {tabs.map(tab => (
               <TouchableOpacity
                 key={tab}
                 style={styles.tabBtn}
@@ -273,7 +294,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 activeOpacity={0.75}
               >
                 <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
-                  {tab === 'details' ? 'Details' : 'Timeline'}
+                  {TAB_LABELS[tab]}
                 </Text>
                 {activeTab === tab && <View style={styles.tabUnderline} />}
               </TouchableOpacity>
@@ -282,6 +303,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
         )}
 
         {person && activeTab === 'timeline' && <PersonTimelineTab personId={person.id} />}
+        {person && activeTab === 'covenant' && <PersonCovenantPathTab personId={person.id} />}
 
         {viewing && activeTab === 'details' && (
           <PersonDetailView
