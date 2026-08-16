@@ -119,8 +119,18 @@ export function useWeeklyGoals() {
     });
   }, [user]);
 
+  const syncTarget = useCallback(async (goalId: string, wk: string, target: number) => {
+    if (!user) return;
+    // Target-only, for the same reason syncCount is count-only.
+    await enqueueUpsert('goal_entries', `${goalId}|${wk}|target`, {
+      user_id: user.id, goal_id: goalId, week_key: wk, target,
+    });
+  }, [user]);
+
   /**
-   * Force every goal to read zero for the current week.
+   * Force every goal to read zero for the current week, and clear the targets
+   * set for it — a full reset back to "week not planned yet" rather than just
+   * zeroing progress against whatever targets were left in place.
    *
    * Completed events cannot be un-completed from here, so zeroing means offsetting
    * their contribution: the offset is the negative of what the week derives. Goals
@@ -134,8 +144,12 @@ export function useWeeklyGoals() {
       if (contributed > 0) offsets[def.id] = -contributed;
     }
     await offsetsState.write(() => offsets);
-    for (const def of definitions) await syncCount(def.id, weekKey, offsets[def.id] ?? 0);
-  }, [offsetsState, definitions, derived, syncCount, weekKey]);
+    await targetsState.write(() => ({}));
+    for (const def of definitions) {
+      await syncCount(def.id, weekKey, offsets[def.id] ?? 0);
+      await syncTarget(def.id, weekKey, 0);
+    }
+  }, [offsetsState, targetsState, definitions, derived, syncCount, syncTarget, weekKey]);
 
   const updateDefinitions = useCallback(async (defs: GoalDefinition[]) => {
     await defsState.write(() => defs);
@@ -201,12 +215,8 @@ export function useWeeklyGoals() {
       const stored = (await getItem<WeeklyGoals>(key)) ?? {};
       await setItem(key, { ...stored, [id]: value });
     }
-    if (!user) return;
-    // Target-only, for the same reason syncCount is count-only.
-    await enqueueUpsert('goal_entries', `${id}|${wk}|target`, {
-      user_id: user.id, goal_id: id, week_key: wk, target: value,
-    });
-  }, [targetsState, user, weekKey]);
+    await syncTarget(id, wk, value);
+  }, [targetsState, syncTarget, weekKey]);
 
   return { definitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek };
 }
