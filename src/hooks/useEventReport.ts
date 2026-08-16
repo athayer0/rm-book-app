@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import * as Haptics from 'expo-haptics';
 import { CalendarEvent, EventStatus } from '../utils/eventUtils';
 import { statusAfterCompletedDate } from '../constants/personStatuses';
 import { useEventStatuses } from './useEventStatuses';
@@ -24,6 +25,9 @@ export function useEventReport() {
 
   const report = useCallback(
     async (occurrence: CalendarEvent, status: EventStatus | undefined) => {
+      // Every route to a report lands here, so one call covers the checkbox, the
+      // editor's picker, the unreported backlog, and the timeline alike.
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await setStatus(occurrence.id, occurrence.date, status);
 
       if (status !== 'completed' || occurrence.type !== 'date') return;
