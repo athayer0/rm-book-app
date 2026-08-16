@@ -77,6 +77,7 @@ export function WeeklyPlanningModal({ visible, onClose, definitions, onUpdateDef
         id: `custom_${Date.now()}`,
         ...draft,
         visible: true,
+        monthlyVisible: false,
         builtIn: false,
       }]);
     }

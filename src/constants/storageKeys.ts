@@ -34,7 +34,7 @@ const APP_DATA_KEYS = [
   CONVERT_PROGRESS_KEY,
 ];
 
-const APP_DATA_PREFIXES = ['goal_counts_', 'goal_targets_'];
+const APP_DATA_PREFIXES = ['goal_counts_', 'goal_targets_', 'goal_monthly_counts_', 'goal_monthly_targets_'];
 
 /**
  * Cleared on account switch, never exported: bookkeeping that describes this
@@ -64,6 +64,16 @@ export function goalCountsKey(wk: string): string {
 /** Per-week targets, same grain as the counts. */
 export function goalTargetsKey(wk: string): string {
   return `goal_targets_${wk}`;
+}
+
+/** Per-month counts. `mk` is a bare month key like "2025-08" from getMonthKey(). */
+export function goalMonthlyCountsKey(mk: string): string {
+  return `goal_monthly_counts_${mk}`;
+}
+
+/** Per-month targets, same grain as the counts. */
+export function goalMonthlyTargetsKey(mk: string): string {
+  return `goal_monthly_targets_${mk}`;
 }
 
 /** Composite key for a single occurrence of a (possibly recurring) event. */

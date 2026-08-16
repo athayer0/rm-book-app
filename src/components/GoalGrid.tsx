@@ -10,10 +10,12 @@ interface Props {
   goals: WeeklyGoals;
   onPressGoal?: () => void;
   compact?: boolean;
+  /** Which of a goal's two independent visibility flags this grid honours. Defaults to the weekly one. */
+  visibilityKey?: 'visible' | 'monthlyVisible';
 }
 
-export function GoalGrid({ definitions, counts, goals, onPressGoal, compact }: Props) {
-  const visible = definitions.filter(d => d.visible);
+export function GoalGrid({ definitions, counts, goals, onPressGoal, compact, visibilityKey = 'visible' }: Props) {
+  const visible = definitions.filter(d => d[visibilityKey]);
   const rows: GoalDefinition[][] = [];
   for (let i = 0; i < visible.length; i += 2) {
     rows.push(visible.slice(i, i + 2));

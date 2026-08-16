@@ -12,6 +12,8 @@ import {
   SETTINGS_KEY,
   goalCountsKey,
   goalTargetsKey,
+  goalMonthlyCountsKey,
+  goalMonthlyTargetsKey,
   statusKey,
 } from '../constants/storageKeys';
 
@@ -182,6 +184,7 @@ async function runPull(userId: string): Promise<void> {
   }
 
   await pullGoalEntries(lastSynced, pull);
+  await pullGoalMonthlyEntries(lastSynced, pull);
   await pullEventStatuses(lastSynced, pull);
   await pullSettings(userId);
 
@@ -227,6 +230,39 @@ async function pullGoalEntries(since: string | null, pull: Puller): Promise<void
 
   for (const [wk, value] of counts) await setItem(goalCountsKey(wk), value);
   for (const [wk, value] of targets) await setItem(goalTargetsKey(wk), value);
+}
+
+/** Same shape as pullGoalEntries, one grain up: month_key instead of week_key. */
+async function pullGoalMonthlyEntries(since: string | null, pull: Puller): Promise<void> {
+  const hasLocal = (await getAllKeys()).some(k => k.startsWith('goal_monthly_counts_'));
+  const rows = await pull('goal_monthly_entries', hasLocal ? since : null);
+  if (rows.length === 0) return;
+
+  const counts = new Map<string, Record<string, number>>();
+  const targets = new Map<string, Record<string, number>>();
+
+  async function bucket(map: Map<string, Record<string, number>>, key: string, mk: string) {
+    if (!map.has(mk)) map.set(mk, (await getItem<Record<string, number>>(key)) ?? {});
+    return map.get(mk)!;
+  }
+
+  for (const row of rows) {
+    const mk = String(row.month_key);
+    const goalId = String(row.goal_id);
+    const countBucket = await bucket(counts, goalMonthlyCountsKey(mk), mk);
+    const targetBucket = await bucket(targets, goalMonthlyTargetsKey(mk), mk);
+
+    if (row.deleted_at) {
+      delete countBucket[goalId];
+      delete targetBucket[goalId];
+      continue;
+    }
+    if (row.count !== null && row.count !== undefined) countBucket[goalId] = Number(row.count);
+    if (row.target !== null && row.target !== undefined) targetBucket[goalId] = Number(row.target);
+  }
+
+  for (const [mk, value] of counts) await setItem(goalMonthlyCountsKey(mk), value);
+  for (const [mk, value] of targets) await setItem(goalMonthlyTargetsKey(mk), value);
 }
 
 async function pullEventStatuses(since: string | null, pull: Puller): Promise<void> {

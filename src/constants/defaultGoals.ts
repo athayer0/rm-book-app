@@ -8,6 +8,8 @@ export interface GoalDefinition {
   iconFamily: string;
   color: string;
   visible: boolean;
+  /** Shown on the Home screen's monthly grid. Independent of `visible` — a goal can be weekly, monthly, neither, or both. */
+  monthlyVisible: boolean;
   builtIn: boolean;
 }
 
@@ -27,6 +29,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'Ionicons',
     color: '#E8980E',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -36,6 +39,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'Ionicons',
     color: '#5E35B1',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -45,6 +49,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'Ionicons',
     color: '#8B5A2B',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -54,6 +59,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'Ionicons',
     color: '#9B59B6',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -63,6 +69,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'Ionicons',
     color: '#E05C6B',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -72,6 +79,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'MaterialCommunityIcons',
     color: '#1A3A6B',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -81,6 +89,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'MaterialCommunityIcons',
     color: '#8B1A4A',
     visible: true,
+    monthlyVisible: false,
     builtIn: true,
   },
   {
@@ -90,6 +99,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'MaterialCommunityIcons',
     color: '#00B5C8',
     visible: true,
+    monthlyVisible: true,
     builtIn: true,
   },
 ];

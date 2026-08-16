@@ -1,4 +1,4 @@
-import { getISOWeek, getISOWeekYear, format, addWeeks, addDays, parseISO } from 'date-fns';
+import { getISOWeek, getISOWeekYear, format, addWeeks, addMonths, addDays, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 
 export function getWeekKey(date: Date = new Date()): string {
   const year = getISOWeekYear(date);
@@ -74,6 +74,31 @@ export function timeToMinutes(hour: number, minute: number): number {
 
 export function getWeekKeyByOffset(offset: number): string {
   return getWeekKey(addWeeks(new Date(), offset));
+}
+
+export function getMonthKey(date: Date = new Date()): string {
+  return format(date, 'yyyy-MM');
+}
+
+export function getMonthKeyByOffset(offset: number): string {
+  return getMonthKey(addMonths(new Date(), offset));
+}
+
+/**
+ * Every date inside a month key, the inverse of getMonthKey. Mirrors
+ * getWeekDates: goal counts are derived by summing the events inside these
+ * dates, so a disagreement here would land contributions in the wrong month.
+ */
+export function getMonthDates(monthKey: string): string[] {
+  const [year, month] = monthKey.split('-').map(Number);
+  const first = new Date(year, month - 1, 1);
+  return eachDayOfInterval({ start: startOfMonth(first), end: endOfMonth(first) })
+    .map(d => format(d, 'yyyy-MM-dd'));
+}
+
+export function formatMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  return format(new Date(year, month - 1, 1), 'MMMM yyyy');
 }
 
 export function addMinutesToTimeString(timeStr: string, minutes: number): string {

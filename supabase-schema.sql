@@ -140,9 +140,16 @@ create trigger calendar_events_set_updated_at
 -- Identity and presentation only: label, icon,
 -- colour, visibility, and the existence of a
 -- custom goal. Targets are NOT here -- they are
--- per-week and live on goal_entries.target.
--- There is deliberately no per-definition
--- default target; an unset week resolves to 0.
+-- per-week/per-month and live on goal_entries.target
+-- / goal_monthly_entries.target. There is
+-- deliberately no per-definition default target;
+-- an unset week or month resolves to 0.
+--
+-- `visible` and `monthly_visible` are independent:
+-- a goal can show on the weekly grid, the monthly
+-- grid, neither, or both. There is no separate
+-- monthly goal list -- just the one definition
+-- with a second visibility flag.
 --
 -- Built-in goal ids ('morning_prayer', ...)
 -- are the same literal for every user, so the
@@ -157,6 +164,7 @@ create table if not exists goal_definitions (
   icon_family text,
   color text,
   visible boolean default true,
+  monthly_visible boolean default false,
   built_in boolean default false,
   updated_at timestamptz default now(),
   deleted_at timestamptz,
@@ -225,6 +233,44 @@ drop trigger if exists
   on goal_entries;
 create trigger goal_entries_set_updated_at
   before insert or update on goal_entries
+  for each row
+  execute function set_updated_at();
+
+-- ── goal_monthly_entries ───────────────────
+-- Same shape and reasoning as goal_entries, one
+-- grain up: month_key ("2025-08") instead of
+-- week_key. A goal's count/target here are
+-- tracked independently of its weekly ones --
+-- completing an event contributes to whichever
+-- of this table and goal_entries the goal is
+-- currently visible in, derived client-side from
+-- events falling in the calendar month.
+create table if not exists goal_monthly_entries (
+  user_id uuid not null references auth.users,
+  goal_id text not null,
+  month_key text not null,
+  count int,
+  target int,
+  updated_at timestamptz default now(),
+  deleted_at timestamptz,
+  primary key (user_id, goal_id, month_key),
+  constraint goal_monthly_entries_month_key_format
+    check (month_key ~ '^[0-9]{4}-(0[1-9]|1[0-2])$')
+);
+alter table goal_monthly_entries
+  enable row level security;
+drop policy if exists "users own their monthly entries"
+  on goal_monthly_entries;
+create policy "users own their monthly entries"
+  on goal_monthly_entries
+  for all to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+drop trigger if exists
+  goal_monthly_entries_set_updated_at
+  on goal_monthly_entries;
+create trigger goal_monthly_entries_set_updated_at
+  before insert or update on goal_monthly_entries
   for each row
   execute function set_updated_at();
 
@@ -433,6 +479,7 @@ grant select, insert, update, delete
      calendar_events,
      goal_definitions,
      goal_entries,
+     goal_monthly_entries,
      event_statuses,
      convert_progress,
      settings
@@ -456,6 +503,9 @@ create index if not exists
 create index if not exists
   goal_entries_user_updated_idx
   on goal_entries (user_id, updated_at);
+create index if not exists
+  goal_monthly_entries_user_updated_idx
+  on goal_monthly_entries (user_id, updated_at);
 create index if not exists
   event_statuses_user_updated_idx
   on event_statuses (user_id, updated_at);

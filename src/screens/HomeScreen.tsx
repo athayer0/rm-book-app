@@ -8,11 +8,14 @@ import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
+import { useMonthlyGoals } from '../hooks/useMonthlyGoals';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { UnreportedRow } from '../components/UnreportedRow';
 import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
+import { MonthlyPlanningModal } from '../modals/MonthlyPlanningModal';
 import { GoalWeeklyModal } from '../modals/GoalWeeklyModal';
+import { GoalMonthlyModal } from '../modals/GoalMonthlyModal';
 import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
 import { useUnreported } from '../hooks/useUnreported';
 
@@ -24,12 +27,15 @@ export function HomeScreen({ navigation, route }: any) {
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
 
   const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
+  const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly } = useMonthlyGoals();
   const { count: unreportedCount } = useUnreported();
 
-  useFocusEffect(useCallback(() => { reload(); }, [reload]));
+  useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
   const [editVisible, setEditVisible] = useState(false);
+  const [monthlyEditVisible, setMonthlyEditVisible] = useState(false);
   const [planningVisible, setPlanningVisible] = useState(false);
   const [planningTab, setPlanningTab] = useState<'goals' | 'graph'>('goals');
+  const [monthlyPlanningVisible, setMonthlyPlanningVisible] = useState(false);
   const [unreportedVisible, setUnreportedVisible] = useState(false);
 
   function openPlanning(tab: 'goals' | 'graph') {
@@ -87,6 +93,21 @@ export function HomeScreen({ navigation, route }: any) {
           </View>
         </View>
 
+        <View style={styles.card}>
+          <SectionHeader
+            title="Monthly Goals"
+            actionLabel="EDIT"
+            onAction={() => setMonthlyEditVisible(true)}
+          />
+          <GoalGrid
+            definitions={definitions}
+            counts={monthlyCounts}
+            goals={monthlyGoals}
+            onPressGoal={() => setMonthlyPlanningVisible(true)}
+            visibilityKey="monthlyVisible"
+          />
+        </View>
+
         <UnreportedRow count={unreportedCount} onPress={() => setUnreportedVisible(true)} />
       </ScrollView>
 
@@ -97,11 +118,24 @@ export function HomeScreen({ navigation, route }: any) {
         onUpdateDefinitions={updateDefinitions}
       />
 
+      <MonthlyPlanningModal
+        visible={monthlyEditVisible}
+        onClose={() => setMonthlyEditVisible(false)}
+        definitions={definitions}
+        onUpdateDefinitions={updateDefinitions}
+      />
+
       <GoalWeeklyModal
         visible={planningVisible}
         onClose={() => { setPlanningVisible(false); reload(); }}
         definitions={definitions}
         initialTab={planningTab}
+      />
+
+      <GoalMonthlyModal
+        visible={monthlyPlanningVisible}
+        onClose={() => { setMonthlyPlanningVisible(false); reloadMonthly(); }}
+        definitions={definitions}
       />
 
       <UnreportedEventsModal
