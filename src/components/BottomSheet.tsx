@@ -27,6 +27,14 @@ interface Props {
   title?: string;
   /** Sheet height excluding the safe-area inset; clamped to the window. */
   height: number;
+  /**
+   * Whether the sheet rides up over the keyboard so a focused field near its
+   * bottom edge clears it. Default true. Set false for a sheet whose fields
+   * all sit near the top already — riding up then just wastes motion, and for
+   * one holding a floating DropdownMenu it also drags the menu's anchor out
+   * from under it mid-animation.
+   */
+  avoidKeyboard?: boolean;
   /** Discards the draft. Also what the backdrop and the Android back button do. */
   onCancel: () => void;
   /** Commits the draft. */
@@ -34,7 +42,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-export function BottomSheet({ visible, title, height, onCancel, onDone, children }: Props) {
+export function BottomSheet({ visible, title, height, avoidKeyboard = true, onCancel, onDone, children }: Props) {
   const Colors = useColors();
   const styles = makeStyles(Colors);
   const { height: windowHeight } = useWindowDimensions();
@@ -55,6 +63,7 @@ export function BottomSheet({ visible, title, height, onCancel, onDone, children
   // the keyboard rather than at its own fixed pace.
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   useEffect(() => {
+    if (!avoidKeyboard) return;
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const animateTo = (next: number, e?: KeyboardEvent) => {
@@ -68,7 +77,7 @@ export function BottomSheet({ visible, title, height, onCancel, onDone, children
     const showSub = Keyboard.addListener(showEvent, e => animateTo(e.endCoordinates.height, e));
     const hideSub = Keyboard.addListener(hideEvent, e => animateTo(0, e));
     return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
+  }, [avoidKeyboard]);
 
   // Kept mounted through the exit so the slide-down can play before unmount —
   // the same reason SheetModal and DropdownMenu track their own mounted flag.

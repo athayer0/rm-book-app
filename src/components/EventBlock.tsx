@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, isCheckboxType, hasEndTime, COMPACT_EVENT_HEIGHT, CALENDAR_CHECKBOX_SIZE } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, hasEndTime, COMPACT_EVENT_HEIGHT, CALENDAR_CHECKBOX_SIZE } from '../utils/eventUtils';
 import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../constants/contactMethods';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -91,11 +91,7 @@ export function EventBlock({
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
-  const { definitions: eventTypeDefs } = useEventTypeDefinitions();
-  const customTypeIds = useMemo(
-    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
-    [eventTypeDefs],
-  );
+  const { byId: eventTypeById } = useEventTypeDefinitions();
 
   const statusColor: Record<EventStatus, string> = {
     completed: Colors.statusCompleted,
@@ -109,15 +105,15 @@ export function EventBlock({
   const isBeingDragged = active && draggingEvent?.id === event.id;
 
   const isBackup = !!event.backup;
-  // Checkbox types (task) carry a binary checked/unchecked status instead of the
-  // three-state badge, and only when they aren't a backup.
-  const isCheckbox = !isBackup && isCheckboxType(event.type);
+  // A type set to Checkbox in Event Types carries a binary checked/unchecked
+  // status instead of the three-state badge, and only when it isn't a backup.
+  const isCheckbox = !isBackup && eventTypeById[event.type]?.reportStyle === 'checkbox';
   const isChecked = status === 'completed';
   // The state comes from resolveEventStatus; only the choice not to draw it as a
   // badge belongs here. Synthesising pending locally is what let this drift from
   // the unreported sweep's idea of the same word.
   const effectiveStatus: EventStatus | undefined =
-    isBackup || isCheckbox ? undefined : resolveEventStatus(event, status, customTypeIds);
+    isBackup || isCheckbox ? undefined : resolveEventStatus(event, status, eventTypeById);
   const showBadge = isCheckbox || !!effectiveStatus;
 
   const isDraggingRef = useRef(false);

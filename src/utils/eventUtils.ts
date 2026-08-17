@@ -1,6 +1,7 @@
 import { format, parseISO, addDays, addWeeks, addMonths } from 'date-fns';
 import { DEFAULT_SLOT_HEIGHT, EventSizes } from '../constants/eventSizes';
 import { EventColors, EventTypeConfig } from '../constants/colors';
+import { EventTypeDefinition } from '../constants/eventTypeDefaults';
 
 export type RecurringRule = 'daily' | 'weekly' | 'monthly';
 
@@ -17,13 +18,6 @@ export function defaultRecurrenceEnd(startDate: string, rule: RecurringRule): st
 }
 
 export type EventStatus = 'completed' | 'failed' | 'pending';
-
-// Types that carry a reported status. Most of them feed a goal, but `contact`
-// deliberately does not: a contact is worth reporting on without being worth
-// counting, and getGoalContribution is free to return null for it.
-export const TRACKABLE_TYPES = new Set([
-  'prayer', 'temple', 'church', 'scripture', 'exercise', 'service', 'date', 'contact',
-]);
 
 export interface CalendarEvent {
   id: string;
@@ -53,6 +47,14 @@ export interface CalendarEvent {
    *  date's weekday when unset. */
   recurringDays?: number[];
   backup?: boolean;
+  /**
+   * How many times this occurred in one event — e.g. 5 for a "Miles Run" event
+   * covering 5 miles. Editable regardless of status; only feeds its linked
+   * goal once the occurrence is marked completed, same as `hours` mode already
+   * reads `startTime`/`endTime` regardless of when they were set. Only
+   * meaningful for a type whose `goalMode` is 'quantity'.
+   */
+  quantity?: number;
 }
 
 export function generateId(): string {
@@ -231,51 +233,44 @@ function durationHours(event: CalendarEvent): number {
   return Math.max(1, Math.round(mins / 60));
 }
 
-export type CustomTypeLinks = Record<string, { goalId: string; mode: 'count' | 'hours' }>;
+export type CustomTypeLinks = Record<string, { goalId: string; mode: 'count' | 'hours' | 'quantity' }>;
 
+/**
+ * `linkedGoals` now covers every type with a link, built-in or custom — see
+ * BUILTIN_GOAL_LINKS, which seeds it as each built-in type's default goalId.
+ * `prayer` is the one type that never carries a seeded link (it splits across
+ * two goals by time of day, which doesn't fit a single goalId): it falls back
+ * to that split only while it has no explicit link of its own, same as any
+ * other "stored wins, default fills the gap" field. Relinking (or explicitly
+ * unlinking) prayer overrides the fallback like it would for any other type.
+ */
 export function getGoalContribution(
   event: CalendarEvent,
-  customLinks: CustomTypeLinks = {},
+  linkedGoals: CustomTypeLinks = {},
 ): { goalId: string; delta: number } | null {
-  switch (event.type) {
-    // Which of the two prayer goals a prayer counts toward is decided by when it
-    // starts, not how long it ran: a prayer is one prayer whatever its duration,
-    // and 2pm is the line between the morning one and the nightly one.
-    case 'prayer': {
-      const { hour } = parseTime(event.startTime);
-      return { goalId: hour < 14 ? 'morning_prayer' : 'nightly_prayer', delta: 1 };
-    }
-    case 'temple':
-      return { goalId: 'temple_attendance', delta: 1 };
-    case 'church':
-      return { goalId: 'church_hours', delta: durationHours(event) };
-    case 'service':
-      return { goalId: 'service_hours', delta: durationHours(event) };
-    case 'scripture':
-      return { goalId: 'personal_study', delta: 1 };
-    case 'exercise':
-      return { goalId: 'times_exercised', delta: 1 };
-    case 'date':
-      return { goalId: 'total_dates', delta: 1 };
-    // contact is trackable but counts toward nothing — see TRACKABLE_TYPES.
-    default: {
-      const link = customLinks[event.type];
-      return link ? { goalId: link.goalId, delta: link.mode === 'hours' ? durationHours(event) : 1 } : null;
-    }
+  const link = linkedGoals[event.type];
+  if (link) {
+    if (link.mode === 'hours') return { goalId: link.goalId, delta: durationHours(event) };
+    if (link.mode === 'quantity') return { goalId: link.goalId, delta: event.quantity ?? 0 };
+    return { goalId: link.goalId, delta: 1 };
   }
+
+  if (event.type === 'prayer') {
+    const { hour } = parseTime(event.startTime);
+    return { goalId: hour < 14 ? 'morning_prayer' : 'nightly_prayer', delta: 1 };
+  }
+  // contact is reportable but counts toward nothing — see reportStyle.
+  return null;
 }
 
 /**
- * Whether the reporting shortcut should account for this type.
- *
- * Derived from the two things that make an event reportable at all — feeding a
- * goal, or carrying a checkbox — rather than listed out, so adding either trait
- * to a type enrols it automatically. A hardcoded list would silently leave a new
- * type out of the unreported count, which reads as a counting bug rather than as
- * a missing entry.
+ * Whether the reporting shortcut should account for this type — driven
+ * entirely by the type's own `reportStyle` (Checkbox/Status/None, set in the
+ * Event Types screen), independent of whether it's linked to a goal. A type
+ * with no live definition (e.g. one that's been deleted) resolves to 'none'.
  */
-export function isReportableType(type: string, customTypeIds: Set<string> = new Set()): boolean {
-  return TRACKABLE_TYPES.has(type) || isCheckboxType(type) || customTypeIds.has(type);
+export function isReportableType(type: string, byId: Record<string, EventTypeDefinition> = {}): boolean {
+  return (byId[type]?.reportStyle ?? 'none') !== 'none';
 }
 
 /**
@@ -308,10 +303,10 @@ export const UNREPORTED_LOOKBACK_DAYS = 30;
 export function resolveEventStatus(
   event: CalendarEvent,
   stored: EventStatus | undefined,
-  customTypeIds: Set<string> = new Set(),
+  byId: Record<string, EventTypeDefinition> = {},
 ): EventStatus | undefined {
   if (event.backup) return undefined;
-  if (!isReportableType(event.type, customTypeIds)) return undefined;
+  if (!isReportableType(event.type, byId)) return undefined;
   return stored ?? (hasEventStartPassed(event) ? 'pending' : undefined);
 }
 
@@ -330,7 +325,7 @@ export function findUnreportedOccurrences(
   events: CalendarEvent[],
   statusOf: (eventId: string, dateStr: string) => EventStatus | undefined,
   today: Date = new Date(),
-  customTypeIds: Set<string> = new Set(),
+  byId: Record<string, EventTypeDefinition> = {},
 ): CalendarEvent[] {
   const found: CalendarEvent[] = [];
 
@@ -340,7 +335,7 @@ export function findUnreportedOccurrences(
       // getEventsForDate stamps the occurrence's own date, so the clock check
       // inside resolveEventStatus reads this occurrence rather than the series'
       // first one.
-      if (resolveEventStatus(occurrence, statusOf(occurrence.id, dateStr), customTypeIds) === 'pending') {
+      if (resolveEventStatus(occurrence, statusOf(occurrence.id, dateStr), byId) === 'pending') {
         found.push(occurrence);
       }
     }

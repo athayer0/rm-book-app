@@ -14,6 +14,17 @@ import { useStoredState } from './useStoredState';
 import { enqueueUpsert } from '../lib/syncQueue';
 import { useAuth } from '../lib/AuthContext';
 
+/**
+ * One of the calendar's quick-add bubbles: a type plus the icon that
+ * distinguishes it there. A type has no icon of its own — the bubble is the
+ * only place an icon is ever shown, so this is the only place one is set.
+ */
+export interface QuickAddType {
+  id: string;
+  icon: string;
+  iconFamily?: string;
+}
+
 export interface AppSettings {
   weekStart: 'sunday' | 'monday';
   theme: 'light' | 'dark' | 'system';
@@ -27,6 +38,8 @@ export interface AppSettings {
   tertiaryColorDark: string;
   eventTypeColors: Record<string, string>;
   eventTypeDefaultMinutes: Record<string, number>;
+  /** Up to 8, in bubble order — see QuickAddTypesModal. */
+  quickAddTypes: QuickAddType[];
   gridStartHour: number;
   gridEndHour: number;
   eventSize: EventSize;
@@ -58,6 +71,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
   eventTypeColors: {},
   eventTypeDefaultMinutes: {},
+  // Matches the app's shipped quick-add bubbles and their icons (from
+  // EventTypeIcons in colors.ts) exactly, so existing users see no change
+  // until they open Settings > Quick Add and customize it themselves.
+  quickAddTypes: [
+    { id: 'travel', icon: 'car' },
+    { id: 'activity', icon: 'people' },
+    { id: 'date', icon: 'heart' },
+    { id: 'temple', icon: 'church', iconFamily: 'MaterialCommunityIcons' },
+    { id: 'contact', icon: 'chatbubble-ellipses' },
+    { id: 'task', icon: 'checkbox' },
+  ],
   gridStartHour: 6,
   gridEndHour: 24,
   eventSize: DEFAULT_EVENT_SIZE,

@@ -25,15 +25,6 @@ import { addMinutesToTimeString, formatTime, nextHalfHour, parseTimeString } fro
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
 
-/**
- * The types that earn a bubble off the +, in stack order — first entry nearest
- * the thumb, climbing from there. A hand-picked list rather than a usage count
- * on purpose: the value is that the same type is always in the same place under
- * your thumb, which an order that recomputes itself can't promise. Add or drop
- * entries here — anything left off is still one long press on the + away.
- */
-const QUICK_ADD_TYPES = ['travel', 'activity', 'date', 'temple', 'contact', 'task'];
-
 function CalendarContent({ route, navigation }: { route?: any; navigation?: any }) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -67,16 +58,20 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   const DRAG_SLOT_HEIGHT = SLOT_HEIGHT / 2;
 
   // The bubbles take their colour from the button, not from the type, so only
-  // label/icon vary — and only with which types are currently visible.
+  // label/icon vary. settings.quickAddTypes is the user's own picked-and-ordered
+  // list (Settings > Quick Add) — a type dropped from it there, or deleted
+  // since, just falls out of the filter rather than needing cleanup here.
   const quickActions = useMemo<FABAction[]>(
     () =>
-      QUICK_ADD_TYPES.filter(type => eventTypeById[type]?.visible !== false).map(type => ({
-        key: type,
-        label: eventTypeById[type]?.label ?? type,
-        icon: eventTypeById[type]?.icon ?? 'ellipse',
-        iconFamily: eventTypeById[type]?.iconFamily,
-      })),
-    [eventTypeById],
+      settings.quickAddTypes
+        .filter(q => !!eventTypeById[q.id])
+        .map(q => ({
+          key: q.id,
+          label: eventTypeById[q.id]?.label ?? q.id,
+          icon: q.icon,
+          iconFamily: q.iconFamily,
+        })),
+    [settings.quickAddTypes, eventTypeById],
   );
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');

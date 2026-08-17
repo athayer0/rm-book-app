@@ -42,7 +42,7 @@ export function EventTypeSheet({ visible, onSelect, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
-  const { visibleDefinitions } = useEventTypeDefinitions();
+  const { definitions } = useEventTypeDefinitions();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const typeScrollEdges = useScrollEdges();
@@ -96,11 +96,11 @@ export function EventTypeSheet({ visible, onSelect, onClose }: Props) {
                 showsVerticalScrollIndicator={false}
                 {...typeScrollEdges.scrollViewProps}
               >
-                {visibleDefinitions.map((def, i) => (
+                {definitions.map((def, i) => (
                   <DropdownItem
                     key={def.id}
                     label={def.label}
-                    showSeparator={i < visibleDefinitions.length - 1}
+                    showSeparator={i < definitions.length - 1}
                     leading={<View style={[styles.dot, { backgroundColor: eventTypeColor(def.id, settings.eventTypeColors) }]} />}
                     onPress={() => onSelect(def.id)}
                   />

@@ -8,7 +8,7 @@ import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { GoalDefinition } from '../constants/defaultGoals';
+import { GoalDefinition, MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import { useMonthlyGoals } from '../hooks/useMonthlyGoals';
 import { resolveGoal } from '../hooks/useWeeklyGoals';
 import { getMonthKeyByOffset, formatMonthLabel } from '../utils/dateUtils';
@@ -144,13 +144,13 @@ export function GoalMonthlyModal({ visible, onClose, definitions }: Props) {
     if (!editingRow) return;
     const { id, actualValue, goalValue, showActual } = editingRow;
     const parsedGoal = parseInt(goalValue, 10);
-    const goal = isNaN(parsedGoal) || parsedGoal < 0 ? 0 : parsedGoal;
+    const goal = isNaN(parsedGoal) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, parsedGoal));
 
     // A future month's actual isn't part of this dialog, so its stored value
     // (always 0, nothing has happened yet) passes through untouched.
     const parsedActual = parseInt(actualValue, 10);
     const actual = showActual
-      ? (isNaN(parsedActual) || parsedActual < 0 ? 0 : parsedActual)
+      ? (isNaN(parsedActual) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, parsedActual)))
       : rowData[id]?.actual ?? 0;
 
     setRowData(prev => ({ ...prev, [id]: { actual, goal } }));
@@ -168,7 +168,7 @@ export function GoalMonthlyModal({ visible, onClose, definitions }: Props) {
       const key = field === 'actual' ? 'actualValue' : 'goalValue';
       const parsed = parseInt(prev[key], 10);
       const base = isNaN(parsed) ? 0 : parsed;
-      return { ...prev, [key]: String(Math.max(0, base + delta)) };
+      return { ...prev, [key]: String(Math.min(MAX_GOAL_VALUE, Math.max(0, base + delta))) };
     });
   }
 
@@ -299,7 +299,7 @@ export function GoalMonthlyModal({ visible, onClose, definitions }: Props) {
                           onChangeText={v => setEditingRow(prev => prev ? { ...prev, actualValue: v } : null)}
                           keyboardType="number-pad"
                           selectTextOnFocus
-                          maxLength={4}
+                          maxLength={3}
                         />
                         <View style={styles.stepperCol}>
                           <TouchableOpacity
@@ -330,7 +330,7 @@ export function GoalMonthlyModal({ visible, onClose, definitions }: Props) {
                         onChangeText={v => setEditingRow(prev => prev ? { ...prev, goalValue: v } : null)}
                         keyboardType="number-pad"
                         selectTextOnFocus
-                        maxLength={4}
+                        maxLength={3}
                       />
                       <View style={styles.stepperCol}>
                         <TouchableOpacity

@@ -13,6 +13,7 @@ import { EventTypeDefinition } from '../constants/eventTypeDefaults';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { EditGoalSheet, GoalDraft } from './EditGoalSheet';
+import { useSettings } from '../hooks/useSettings';
 
 /**
  * Which goal the edit sheet is open on: an existing one by id, or the
@@ -37,6 +38,7 @@ export function WeeklyPlanningModal({
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
 
   const [localDefs, setLocalDefs] = useState<GoalDefinition[]>(definitions);
   // Mirrors localDefs, on the event-type side — only ever touched here to keep
@@ -65,13 +67,16 @@ export function WeeklyPlanningModal({
   const visibleCount = localDefs.filter(d => d.visible).length;
   const atVisibleLimit = visibleCount >= MAX_VISIBLE_GOALS;
 
-  function removeGoal(id: string) {
-    setLocalDefs(prev => prev.filter(d => d.id !== id));
-    // Frees up the type that pointed at this goal, so it reappears as
-    // available in future pickers instead of staying claimed forever.
-    setLocalEventTypeDefs(prev => prev.map(d => (
-      d.goalId === id ? { ...d, goalId: undefined, goalMode: undefined } : d
-    )));
+  /** Whether a goal can be deleted right now — false while an event type still links to it. */
+  function goalInUse(id: string): boolean {
+    return localEventTypeDefs.some(d => d.goalId === id);
+  }
+
+  /** Tombstones rather than removes the array entry — see GoalDefinition.removed. */
+  function deleteGoal(id: string): boolean {
+    if (goalInUse(id)) return false;
+    setLocalDefs(prev => prev.map(d => (d.id === id ? { ...d, removed: true } : d)));
+    return true;
   }
 
   function patchGoal(id: string, patch: Partial<GoalDefinition>) {
@@ -118,9 +123,9 @@ export function WeeklyPlanningModal({
     }));
   }
 
-  /** Custom types with no linked goal, plus whichever one currently links to this goal. */
+  /** Types with no linked goal, plus whichever one currently links to this goal. */
   function availableEventTypesFor(goalId: string | undefined): EventTypeDefinition[] {
-    return localEventTypeDefs.filter(t => !t.builtIn && (!t.goalId || t.goalId === goalId));
+    return localEventTypeDefs.filter(t => !t.goalId || t.goalId === goalId);
   }
 
   // The sheet stays mounted through its own exit, so closing it (Cancel, Save,
@@ -156,8 +161,8 @@ export function WeeklyPlanningModal({
         <Text style={styles.sectionLabel}>GOALS</Text>
         <View style={styles.goalList}>
         <View style={styles.goalListClip}>
-          {localDefs.map((def, index) => {
-            const isLast = index === localDefs.length - 1;
+          {localDefs.filter(d => !d.removed).map((def, index, arr) => {
+            const isLast = index === arr.length - 1;
             return (
               <TouchableOpacity
                 key={def.id}
@@ -172,30 +177,19 @@ export function WeeklyPlanningModal({
                   {def.label}
                 </Text>
 
-                {/* Built-ins hide rather than delete, keeping their counts and calendar
-                    wiring intact. Custom goals have nothing to preserve, so they delete. */}
-                {def.builtIn ? (
-                  <TouchableOpacity
-                    onPress={() => toggleVisible(def)}
-                    disabled={!def.visible && atVisibleLimit}
-                    style={styles.rowAction}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons
-                      name={def.visible ? 'eye-outline' : 'eye-off-outline'}
-                      size={18}
-                      color={def.visible ? Colors.textSecondary : Colors.textLight}
-                    />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => removeGoal(def.id)}
-                    style={styles.rowAction}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                  </TouchableOpacity>
-                )}
+                {/* Delete now lives inside the edit sheet — every row's action is hide/show. */}
+                <TouchableOpacity
+                  onPress={() => toggleVisible(def)}
+                  disabled={!def.visible && atVisibleLimit}
+                  style={styles.rowAction}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name={def.visible ? 'eye-outline' : 'eye-off-outline'}
+                    size={18}
+                    color={def.visible ? Colors.textSecondary : Colors.textLight}
+                  />
+                </TouchableOpacity>
 
                 <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
               </TouchableOpacity>
@@ -225,8 +219,14 @@ export function WeeklyPlanningModal({
         goal={editingGoal}
         defaultColor={editingGoal?.builtIn ? DEFAULT_GOALS.find(g => g.id === editingGoal.id)?.color : undefined}
         availableEventTypes={availableEventTypesFor(editingGoal?.id)}
+        eventTypeColors={settings.eventTypeColors}
+        canDelete={editingGoal ? !goalInUse(editingGoal.id) : false}
         onCancel={() => setEditTarget(null)}
         onSave={saveEdit}
+        onDelete={() => {
+          if (!editingGoal) return;
+          if (deleteGoal(editingGoal.id)) setEditTarget(null);
+        }}
       />
     </SheetModal>
   );

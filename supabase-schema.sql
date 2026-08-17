@@ -119,6 +119,12 @@ alter table calendar_events
   add column if not exists people jsonb;
 alter table calendar_events
   add column if not exists contact_method text;
+-- How many times this occurred in one event -- e.g. 5 for a "Miles Run"
+-- event covering 5 miles. Only meaningful for a type whose goal_mode is
+-- 'quantity'; feeds getGoalContribution() the same way start_time/end_time
+-- already do for 'hours' mode.
+alter table calendar_events
+  add column if not exists quantity integer;
 alter table calendar_events
   enable row level security;
 drop policy if exists "users own their events"
@@ -166,6 +172,10 @@ create table if not exists goal_definitions (
   visible boolean default true,
   monthly_visible boolean default false,
   built_in boolean default false,
+  -- Tombstone: a built-in goal is always regenerated from the app's shipped
+  -- defaults unless this is set, so deleting one has to be remembered rather
+  -- than expressed by the row's absence.
+  removed boolean not null default false,
   updated_at timestamptz default now(),
   deleted_at timestamptz,
   primary key (user_id, id)
@@ -188,14 +198,20 @@ create trigger goal_definitions_set_updated_at
   execute function set_updated_at();
 
 -- ── event_type_definitions ─────────────────
--- Mirrors goal_definitions exactly, one table
--- over: identity and presentation for event
--- types, plus (custom types only) which goal
--- their completions feed and how. Built-in
--- types (church, prayer, ...) never carry
--- goal_id/goal_mode -- their contribution is
--- hardcoded in getGoalContribution() and can't
--- be reassigned.
+-- No icon here, unlike goal_definitions -- a type
+-- has no icon of its own; the only place one is
+-- ever shown is a quick-add bubble, and that icon
+-- is set per selection in settings.quick_add_types
+-- instead. Otherwise mirrors goal_definitions:
+-- identity/visibility for event types, plus which
+-- goal their completions feed and how. Built-in
+-- types carry goal_id/goal_mode
+-- too (seeded from BUILTIN_GOAL_LINKS) -- the old
+-- hardcoded-per-type contribution in
+-- getGoalContribution() is gone except for a
+-- narrow fallback for `prayer`, which splits
+-- across two goals by time of day and so can't be
+-- expressed as a single goal_id.
 --
 -- Built-in type ids are the same literal for
 -- every user, so the composite PK is
@@ -205,16 +221,21 @@ create table if not exists event_type_definitions (
   user_id uuid not null references auth.users,
   id text not null,
   label text not null,
-  icon text,
-  icon_family text,
   visible boolean default true,
   built_in boolean default false,
   goal_id text,
   goal_mode text,
+  removed boolean not null default false,
   updated_at timestamptz default now(),
   deleted_at timestamptz,
   primary key (user_id, id)
 );
+-- Whether/how completing an event of this type shows a status control:
+-- 'checkbox', 'status' (failed/pending/completed), or 'none'. Independent of
+-- goal_id/goal_mode -- linking separately decides whether that status also
+-- feeds a goal.
+alter table event_type_definitions
+  add column if not exists report_style text;
 alter table event_type_definitions
   enable row level security;
 drop policy if exists "users own their event types"
@@ -439,6 +460,10 @@ create table if not exists settings (
     default '{}'::jsonb,
   event_type_default_minutes jsonb
     default '{}'::jsonb,
+  -- Up to 8 {id, icon, iconFamily} objects, in
+  -- bubble order -- see QuickAddTypesModal.
+  quick_add_types jsonb
+    default '[]'::jsonb,
   default_country_code text default '+1',
   default_contact_method text
     default 'phone',
@@ -452,6 +477,9 @@ create table if not exists settings (
   event_reminder_minutes int default 5,
   updated_at timestamptz default now()
 );
+alter table settings
+  add column if not exists
+  quick_add_types jsonb default '[]'::jsonb;
 alter table settings
   add column if not exists
   default_country_code text default '+1';

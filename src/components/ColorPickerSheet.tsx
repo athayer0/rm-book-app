@@ -162,8 +162,7 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
  * deep, counting the list sheet underneath. iOS won't reliably present a third
  * nested modal at once, which is what read as "tapping Color does nothing and
  * the app is stuck." Embedding the picker as a step inside the caller's own
- * BottomSheet (see ColorPickerBody) keeps the whole flow to one Modal, the way
- * EventColorsModal's flat list → picker already does.
+ * BottomSheet (see ColorPickerBody) keeps the whole flow to one Modal.
  *
  * `active` plays the role `visible` plays for ColorPickerSheet above: state
  * resets whenever it flips to true, since this stays mounted the whole time

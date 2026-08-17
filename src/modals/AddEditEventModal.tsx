@@ -107,21 +107,16 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people: allPeople } = usePeople();
-  const { definitions: eventTypeDefs, visibleDefinitions, byId: eventTypeById } = useEventTypeDefinitions();
+  const { definitions, byId: eventTypeById } = useEventTypeDefinitions();
 
   // The type dropdown's list must include the event's current type even if it
-  // has since been hidden — otherwise editing an existing event strands it off
+  // has since been deleted — otherwise editing an existing event strands it off
   // its own picker.
   const EVENT_TYPES = useMemo(() => {
-    const ids = visibleDefinitions.map(d => d.id);
+    const ids = definitions.map(d => d.id);
     const current = event?.type;
     return current && !ids.includes(current) ? [...ids, current] : ids;
-  }, [visibleDefinitions, event?.type]);
-
-  const customTypeIds = useMemo(
-    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
-    [eventTypeDefs],
-  );
+  }, [definitions, event?.type]);
 
   function typeLabel(t: string): string {
     return eventTypeById[t]?.label ?? t;
@@ -140,10 +135,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
    * CalendarEvent has no status field for onSave to carry, so opening this and
    * closing it writes nothing. Pending stays derived.
    */
-  const resolvedStatus = event ? resolveEventStatus(event, currentStatus, customTypeIds) : undefined;
+  const resolvedStatus = event ? resolveEventStatus(event, currentStatus, eventTypeById) : undefined;
 
   const [title, setTitle] = useState('');
-  const [type, setType] = useState('scripture');
+  // 'scripture' as a last-resort fallback only matters if every type has been
+  // deleted — definitions is always non-empty otherwise.
+  const [type, setType] = useState(() => definitions[0]?.id ?? 'scripture');
   const [localStatus, setLocalStatus] = useState<EventStatus | undefined>(resolvedStatus);
   const [date, setDate] = useState(defaultDate ?? format(new Date(), 'yyyy-MM-dd'));
   const [startTime, setStartTime] = useState('9:00 AM');
@@ -156,6 +153,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [isBackup, setIsBackup] = useState(false);
   const [attendees, setAttendees] = useState<string[]>([]);
   const [contactMethod, setContactMethod] = useState(settings.defaultContactMethod);
+  const [quantity, setQuantity] = useState(0);
   // One picker open at a time — a single value makes that structural instead of
   // something six separate booleans have to agree on.
   const [openPicker, setOpenPicker] = useState<PickerId | null>(null);
@@ -204,8 +202,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setIsBackup(event.backup ?? false);
       setAttendees(event.people ?? []);
       setContactMethod(resolveContactMethod(event.contactMethod, event.type));
+      setQuantity(event.quantity ?? 0);
     } else {
-      const initialType = prefill?.type ?? 'scripture';
+      const initialType = prefill?.type ?? definitions[0]?.id ?? 'scripture';
       const initialStart = prefill?.startTime ?? defaultStartTime ?? '9:00 AM';
       const initialDate = prefill?.date ?? defaultDate ?? format(new Date(), 'yyyy-MM-dd');
       setTitle(prefill?.title ?? '');
@@ -223,6 +222,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       // New event, so the user's default seeds it — unlike the branch above,
       // where an existing event's stored method is the whole answer.
       setContactMethod(resolveContactMethod(prefill?.contactMethod, initialType, settings.defaultContactMethod));
+      setQuantity(prefill?.quantity ?? 0);
     }
     setOpenPicker(null);
     setShowPersonPicker(false);
@@ -266,6 +266,22 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   function handleStatusTap(next: EventStatus | undefined) {
     setLocalStatus(next);
     onStatusChange?.(next);
+  }
+
+  // Quantity is set from the display view too, and — unlike status — it's a
+  // field on the event itself rather than a separate tracked value, so
+  // committing a tap here means writing straight through onSave instead of
+  // waiting on the form's own Save button. buildEventData() reads `quantity`
+  // out of state, which setQuantity above hasn't applied yet by the time this
+  // runs, so the new value is spliced in after rather than trusted to state.
+  async function handleQuantityChange(newQuantity: number) {
+    setQuantity(newQuantity);
+    try {
+      await onSave({ ...buildEventData(), quantity: newQuantity });
+    } catch (e) {
+      console.error('[AddEditEventModal] quantity save failed:', e);
+      setError('Failed to save quantity. Please try again.');
+    }
   }
 
   function handleTypeChange(newType: string) {
@@ -412,6 +428,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       // null column, so clearing the last person off an event syncs as a clear.
       people: attendees.length ? attendees : undefined,
       contactMethod: usesContactMethod(type) ? contactMethod : undefined,
+      quantity: eventTypeById[type]?.goalMode === 'quantity' ? quantity : undefined,
     };
   }
 
@@ -544,6 +561,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             settings={settings}
             status={localStatus}
             onStatusChange={onStatusChange ? handleStatusTap : undefined}
+            onQuantityChange={handleQuantityChange}
             onDelete={onDelete ? handleDelete : undefined}
           />
         ) : (

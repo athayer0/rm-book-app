@@ -1,6 +1,15 @@
 /** The grid only has room for so many before it turns into a wall of cards. */
 export const MAX_VISIBLE_GOALS = 10;
 
+/**
+ * Ceiling for any goal-related number a person types in by hand: a weekly/
+ * monthly target, its actual/current count, or a per-event quantity. Three
+ * digits is already an implausibly large single value for any of these: the
+ * cap exists to stop a stray extra digit or a stuck stepper from producing a
+ * number nothing downstream (grid layout, sync payloads) was sized for.
+ */
+export const MAX_GOAL_VALUE = 999;
+
 export interface GoalDefinition {
   id: string;
   label: string;
@@ -11,6 +20,14 @@ export interface GoalDefinition {
   /** Shown on the Home screen's monthly grid. Independent of `visible` — a goal can be weekly, monthly, neither, or both. */
   monthlyVisible: boolean;
   builtIn: boolean;
+  /**
+   * Tombstone, not a removal from the array. Built-ins are always regenerated
+   * from DEFAULT_GOALS by mergeWithDefaults(), so a deleted built-in has to be
+   * remembered as deleted rather than dropped, or it would reappear on the next
+   * read. Customs use the same flag for consistency and so a delete actually
+   * syncs (a dropped array entry never told Supabase anything).
+   */
+  removed?: boolean;
 }
 
 /**

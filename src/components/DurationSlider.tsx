@@ -78,11 +78,11 @@ function makeStyles(C: ColorPalette) {
   const RAIL = 6;
   return StyleSheet.create({
     value: {
-      fontSize: 20,
+      fontSize: 14,
       fontWeight: '700',
       color: C.control,
       textAlign: 'center',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     track: {
       height: THUMB + 12,

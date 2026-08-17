@@ -154,5 +154,17 @@ export function useCalendarEvents() {
     }
   }, [current, write, user]);
 
-  return { events, addEvent, updateEvent, deleteEvent, deleteOccurrence, deleteFromDate, getForDate, deleteAllEvents, reload };
+  /** Every event of a given type — used when deleting an event type that's still in use. */
+  const deleteEventsOfType = useCallback(async (type: string) => {
+    const toDelete = current.current.filter(e => e.type === type);
+    if (toDelete.length === 0) return;
+    await write(prev => prev.filter(e => e.type !== type));
+    if (user) {
+      for (const e of toDelete) {
+        await enqueueDelete('calendar_events', e.id, { user_id: user.id, id: e.id });
+      }
+    }
+  }, [current, write, user]);
+
+  return { events, addEvent, updateEvent, deleteEvent, deleteOccurrence, deleteFromDate, getForDate, deleteAllEvents, deleteEventsOfType, reload };
 }

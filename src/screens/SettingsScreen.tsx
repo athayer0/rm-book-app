@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import {
-  EventColors, EventTypeConfig, DEFAULT_THEME_COLOR,
+  EventColors, EventTypeConfig, EventTypeLabels, DEFAULT_THEME_COLOR,
   DEFAULT_SECONDARY_COLOR_LIGHT, DEFAULT_SECONDARY_COLOR_DARK,
   DEFAULT_TERTIARY_COLOR_LIGHT, DEFAULT_TERTIARY_COLOR_DARK,
 } from '../constants/colors';
@@ -16,9 +16,11 @@ import { EventSizes, EVENT_SIZE_OPTIONS, resolveEventSize, eventSizePercent } fr
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
 import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
 import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
-import { EventColorsModal } from '../modals/EventColorsModal';
-import { EventDurationsModal } from '../modals/EventDurationsModal';
+import { QuickAddTypesModal } from '../modals/QuickAddTypesModal';
 import { EventTypesModal } from '../modals/EventTypesModal';
+import {
+  DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition,
+} from '../constants/eventTypeDefaults';
 import { normalizeHex } from '../utils/colorUtils';
 import { useSettings, DEFAULT_SETTINGS, type AppSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
@@ -51,7 +53,20 @@ function hourLabel(h: number): string {
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
-const EVENT_TYPES = Object.keys(EventColors);
+// Whether a built-in type's editable fields still match what it ships with —
+// used to grey out "Reset Event Types to Default" when there is nothing to
+// restore. Mirrors the seeding useEventTypeDefinitions.mergeWithDefaults does
+// for goalId/goalMode/reportStyle.
+function isStockBuiltInType(d: EventTypeDefinition): boolean {
+  const seededLink = BUILTIN_GOAL_LINKS[d.id];
+  const expectedReportStyle = BUILTIN_REPORT_STYLES[d.id] ?? 'none';
+  return (
+    d.label === EventTypeLabels[d.id] &&
+    (d.goalId ?? undefined) === seededLink?.goalId &&
+    (seededLink ? (d.goalMode ?? 'count') === seededLink.goalMode : true) &&
+    (d.reportStyle ?? 'none') === expectedReportStyle
+  );
+}
 
 // Every top-level dropdown/picker on this screen, so at most one can be open
 // at a time — opening one closes whichever else was open, rather than each
@@ -106,8 +121,18 @@ export function SettingsScreen() {
 
   const { settings, updateSettings } = useSettings();
   const { resetAll, resetBuiltInDefinitions, definitions: goalDefinitions } = useWeeklyGoals();
-  const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
-  const { deleteAllEvents } = useCalendarEvents();
+  const {
+    definitions: eventTypeDefinitions,
+    updateDefinitions: updateEventTypeDefinitions,
+    resetBuiltInDefinitions: resetBuiltInEventTypeDefinitions,
+  } = useEventTypeDefinitions();
+  // A deleted built-in no longer has a live definition, so it drops out of the
+  // "N customized" counts below along with any type that was only ever hidden.
+  const EVENT_TYPES = useMemo(
+    () => Object.keys(EventColors).filter(id => eventTypeDefinitions.some(d => d.id === id)),
+    [eventTypeDefinitions],
+  );
+  const { events, deleteAllEvents, deleteEventsOfType } = useCalendarEvents();
   const { signOut } = useAuth();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
   const replayOnboarding = useOnboardingReplay();
@@ -122,7 +147,7 @@ export function SettingsScreen() {
   // Which theme colour the picker sheet is editing, if any.
   const [colorSheet, setColorSheet] = useState<ThemeColorRowKey | null>(null);
   // Which of the event-type screens is open.
-  const [eventSheet, setEventSheet] = useState<'colors' | 'durations' | 'types' | null>(null);
+  const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
@@ -219,10 +244,9 @@ export function SettingsScreen() {
     ]);
   }
 
-  // Per-type editing lives in EventColorsModal / EventDurationsModal. The bulk
-  // resets stay here rather than travelling with it: those lists are sized to
-  // fill their sheet exactly with no scroll, so there is nowhere to put a reset
-  // panel inside one, and a reset is a thing you do to the whole set anyway.
+  // Per-type editing lives in EventTypesModal's edit sheet, one type at a
+  // time. The bulk resets stay here instead: a reset is a thing you do to the
+  // whole set at once, not a field on any single type's edit sheet.
   const effectiveColor = (type: string) => eventTypeColor(type, settings.eventTypeColors);
   const effectiveMinutes = (type: string) =>
     eventTypeDefaultMinutes(type, settings.eventTypeDefaultMinutes);
@@ -238,6 +262,19 @@ export function SettingsScreen() {
     const mins = effectiveMinutes(t);
     return mins !== null && mins !== stockMinutes(t);
   });
+
+  // Order matters here (it's bubble order), so this is a full-array compare
+  // rather than a per-type diff like the two above.
+  const quickAddIsDefault = JSON.stringify(settings.quickAddTypes) === JSON.stringify(DEFAULT_SETTINGS.quickAddTypes);
+
+  // "Reset Event Types to Default" covers the type list itself — restoring any
+  // deleted built-in and dropping every custom type — not colors or durations,
+  // which are separate settings with their own resets above.
+  const customEventTypes = eventTypeDefinitions.filter(d => !d.builtIn);
+  const removedBuiltInTypes = DEFAULT_EVENT_TYPES.filter(def => !eventTypeDefinitions.some(d => d.id === def.id));
+  const modifiedBuiltInTypes = eventTypeDefinitions.filter(d => d.builtIn && !isStockBuiltInType(d));
+  const eventTypesAreDefault =
+    customEventTypes.length === 0 && removedBuiltInTypes.length === 0 && modifiedBuiltInTypes.length === 0;
 
   // Both resets are all-or-nothing and confirmed by an alert rather than a panel
   // of checkboxes. The alert names the count, since the row itself no longer
@@ -286,6 +323,65 @@ export function SettingsScreen() {
             customizedDurationTypes.forEach(t => { delete next[t]; });
             updateSettings({ eventTypeDefaultMinutes: next });
           },
+        },
+      ],
+      { cancelable: true },
+    );
+  }
+
+  // Bulk reset of the type list itself — restores every built-in (including
+  // any that were deleted) and drops every custom type. Mirrors
+  // EditEventTypeSheet's single-delete flow: a type still in use gets the
+  // "in use, delete its events too?" alert instead of the plain confirm.
+  function confirmResetEventTypes() {
+    const inUseCustoms = customEventTypes.filter(t => events.some(e => e.type === t.id));
+
+    if (inUseCustoms.length > 0) {
+      const eventCount = inUseCustoms.reduce((sum, t) => sum + events.filter(e => e.type === t.id).length, 0);
+      Alert.alert(
+        'Reset Event Types',
+        `There ${eventCount === 1 ? 'is' : 'are'} still ${eventCount} event${eventCount === 1 ? '' : 's'} using ${
+          inUseCustoms.length === 1 ? `"${inUseCustoms[0].label}"` : `${inUseCustoms.length} custom event types`
+        } that would be removed. Would you like to delete ${eventCount === 1 ? 'it' : 'them'} and reset event types anyway?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete All & Reset', style: 'destructive', onPress: () => performResetEventTypes(customEventTypes) },
+        ],
+        { cancelable: true },
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Reset Event Types to Default',
+      customEventTypes.length > 0
+        ? `Built-in event types will be restored to their original values, and ${customEventTypes.length} custom event type${customEventTypes.length === 1 ? '' : 's'} will be removed. This cannot be undone.`
+        : 'Built-in event types will be restored to their original values. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset', style: 'destructive', onPress: () => performResetEventTypes(customEventTypes) },
+      ],
+      { cancelable: true },
+    );
+  }
+
+  async function performResetEventTypes(customTypes: EventTypeDefinition[]) {
+    for (const t of customTypes) {
+      await deleteEventsOfType(t.id);
+    }
+    await updateEventTypeDefinitions(DEFAULT_EVENT_TYPES.map(d => ({ ...d })));
+  }
+
+  function confirmResetQuickAdd() {
+    Alert.alert(
+      'Reset Quick Add',
+      'This will restore the default quick-add types and icons. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => updateSettings({ quickAddTypes: DEFAULT_SETTINGS.quickAddTypes }),
         },
       ],
       { cancelable: true },
@@ -621,64 +717,43 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Event Colors and Default Durations — one setting each, on a screen of
-            their own. They used to share a "Customize Types" panel per type,
-            which meant scrolling past every colour to reach a duration and
-            expanding a picker that pushed fourteen rows down the list. */}
+        {/* Event Types — name/status/goal-link editing plus color and duration
+            both live inside the "Customize" sheet now, per type. Colors and
+            durations used to have their own screens listing every type flat;
+            those are gone, but their bulk "Reset to Default" actions stay
+            here alongside a reset for the type list itself. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT COLORS</Text>
+          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('colors')}>
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
               <Text style={styles.rowLabel}>Customize</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
+              style={styles.row}
               disabled={customizedColorTypes.length === 0}
               onPress={confirmResetEventColors}
             >
-              <Text
-                style={[
-                  styles.rowLabel,
-                  // Reads as a row like every other one on this screen when it
-                  // is live, and greys out when there is nothing to undo.
-                  { color: customizedColorTypes.length ? Colors.text : Colors.textLight },
-                ]}
-              >
-                Reset to Default
-              </Text>
               {/* The greyed label and icon are the whole disabled state now —
                   nothing to reset reads clearly enough without saying so. */}
+              <Text style={[styles.rowLabel, { color: customizedColorTypes.length ? Colors.text : Colors.textLight }]}>
+                Reset Colors to Default
+              </Text>
               <Ionicons
                 name="refresh"
                 size={16}
                 color={customizedColorTypes.length ? Colors.textLight : Colors.border}
               />
             </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT DEFAULT DURATIONS</Text>
-          <View style={styles.card}>
-            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('durations')}>
-              <Text style={styles.rowLabel}>Customize</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-            </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
+              style={styles.row}
               disabled={customizedDurationTypes.length === 0}
               onPress={confirmResetEventDurations}
             >
-              <Text
-                style={[
-                  styles.rowLabel,
-                  { color: customizedDurationTypes.length ? Colors.text : Colors.textLight },
-                ]}
-              >
-                Reset to Default
+              <Text style={[styles.rowLabel, { color: customizedDurationTypes.length ? Colors.text : Colors.textLight }]}>
+                Reset Default Durations to Default
               </Text>
               <Ionicons
                 name="refresh"
@@ -686,17 +761,47 @@ export function SettingsScreen() {
                 color={customizedDurationTypes.length ? Colors.textLight : Colors.border}
               />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={eventTypesAreDefault}
+              onPress={confirmResetEventTypes}
+            >
+              <Text style={[styles.rowLabel, { color: eventTypesAreDefault ? Colors.textLight : Colors.text }]}>
+                Reset Event Types to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={eventTypesAreDefault ? Colors.border : Colors.textLight}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Event Types — which types show on the calendar's pickers, plus any
-            custom ones the user has added and optionally linked to a goal. */}
+        {/* Which types earn a bubble off the calendar's +, and their icon —
+            the only place an event type's icon is ever shown. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
+          <Text style={styles.sectionTitle}>QUICK ADD</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => setEventSheet('types')}>
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('quickAdd')}>
               <Text style={styles.rowLabel}>Customize</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={quickAddIsDefault}
+              onPress={confirmResetQuickAdd}
+            >
+              <Text style={[styles.rowLabel, { color: quickAddIsDefault ? Colors.textLight : Colors.text }]}>
+                Reset to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={quickAddIsDefault ? Colors.border : Colors.textLight}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -816,7 +921,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset every setting on this screen — theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, country code, maps app, and notification reminders — along with the built-in Goals (labels, icons, colors, targets) to their original values. Your custom Goals, counts, and events will not be affected.',
+                  'This will reset every setting on this screen — theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, country code, maps app, and notification reminders — along with the built-in Goals and Event Types (labels, icons, colors, links, targets), including restoring any that were deleted, to their original values. Your custom Goals, Event Types, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
@@ -825,6 +930,7 @@ export function SettingsScreen() {
                       onPress: () => {
                         updateSettings(DEFAULT_SETTINGS);
                         resetBuiltInDefinitions();
+                        resetBuiltInEventTypeDefinitions();
                       },
                     },
                   ],
@@ -927,8 +1033,7 @@ export function SettingsScreen() {
         }}
       />
 
-      <EventColorsModal visible={eventSheet === 'colors'} onClose={() => setEventSheet(null)} />
-      <EventDurationsModal visible={eventSheet === 'durations'} onClose={() => setEventSheet(null)} />
+      <QuickAddTypesModal visible={eventSheet === 'quickAdd'} onClose={() => setEventSheet(null)} />
       <EventTypesModal
         visible={eventSheet === 'types'}
         onClose={() => setEventSheet(null)}

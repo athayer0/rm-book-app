@@ -11,6 +11,7 @@ import { GoalDefinition } from '../constants/defaultGoals';
 import { SheetModal } from '../components/SheetModal';
 import { EditEventTypeSheet, EventTypeDraft } from './EditEventTypeSheet';
 import { useSettings } from '../hooks/useSettings';
+import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { eventTypeColor, eventTypeDefaultMinutes } from '../utils/eventUtils';
 
 /**
@@ -33,6 +34,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings, updateSettings } = useSettings();
+  const { events, deleteEventsOfType } = useCalendarEvents();
 
   const [localDefs, setLocalDefs] = useState<EventTypeDefinition[]>(definitions);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -52,28 +54,41 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
     onUpdateDefinitions(localDefs);
   }
 
-  function removeType(id: string) {
-    setLocalDefs(prev => prev.filter(d => d.id !== id));
+  /** Whether a type can be deleted right now — false while any calendar event still uses it. */
+  function typeInUse(id: string): boolean {
+    return events.some(e => e.type === id);
+  }
+
+  /** Number of calendar events currently using this type, for the blocked-delete message. */
+  function typeUsageCount(id: string): number {
+    return events.filter(e => e.type === id).length;
+  }
+
+  /** Tombstones rather than removes the array entry — see EventTypeDefinition.removed. */
+  function deleteType(id: string): boolean {
+    if (typeInUse(id)) return false;
+    setLocalDefs(prev => prev.map(d => (d.id === id ? { ...d, removed: true } : d)));
+    return true;
+  }
+
+  /** Removes every calendar event of this type first, then tombstones the type itself. */
+  async function deleteTypeAndEvents(id: string) {
+    await deleteEventsOfType(id);
+    setLocalDefs(prev => prev.map(d => (d.id === id ? { ...d, removed: true } : d)));
   }
 
   function patchType(id: string, patch: Partial<EventTypeDefinition>) {
     setLocalDefs(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)));
   }
 
-  // Built-ins hide/unhide freely — these render in scrollable lists and menus,
-  // not a fixed grid, so there's no MAX_VISIBLE_GOALS-style cap to enforce.
-  function toggleVisible(def: EventTypeDefinition) {
-    patchType(def.id, { visible: !def.visible });
-  }
-
-  // A custom goal/type can have at most one link. The picker only offers goals
-  // with no existing link, plus whichever one is currently linked to the type
+  // A goal/type can have at most one link. The picker only offers goals with
+  // no existing link, plus whichever one is currently linked to the type
   // being edited.
   function availableGoalsFor(typeId: string | undefined): GoalDefinition[] {
     const linkedGoalIds = new Set(
-      localDefs.filter(d => !d.builtIn && d.goalId && d.id !== typeId).map(d => d.goalId!),
+      localDefs.filter(d => d.goalId && d.id !== typeId).map(d => d.goalId!),
     );
-    return goalDefinitions.filter(g => !g.builtIn && !linkedGoalIds.has(g.id));
+    return goalDefinitions.filter(g => !linkedGoalIds.has(g.id));
   }
 
   function saveEdit(draft: EventTypeDraft) {
@@ -81,26 +96,25 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
       const id = editTarget.id;
       const existing = localDefs.find(d => d.id === id);
       if (!existing) { setEditTarget(null); return; }
-      if (!existing.builtIn) {
-        patchType(id, {
-          label: draft.label, icon: draft.icon, iconFamily: draft.iconFamily,
-          goalId: draft.goalId, goalMode: draft.goalMode,
-        });
-      }
+      patchType(id, {
+        label: draft.label, goalId: draft.goalId, goalMode: draft.goalMode, reportStyle: draft.reportStyle,
+      });
       applyOverrides(id, draft);
     } else if (editTarget?.kind === 'new') {
       const id = `custom_evt_${Date.now()}`;
       setLocalDefs(prev => [...prev, {
-        id, label: draft.label, icon: draft.icon, iconFamily: draft.iconFamily,
+        id, label: draft.label,
         visible: true, builtIn: false, goalId: draft.goalId, goalMode: draft.goalMode,
+        reportStyle: draft.reportStyle,
       }]);
       applyOverrides(id, draft);
     }
     setEditTarget(null);
   }
 
-  // Color and default duration live in settings, not on the definition — same
-  // maps EventColorsModal/EventDurationsModal read/write.
+  // Color and default duration live in settings, not on the definition —
+  // eventTypeColors/eventTypeDefaultMinutes, same maps SettingsScreen's bulk
+  // resets read/write.
   function applyOverrides(id: string, draft: EventTypeDraft) {
     // A checkbox or optional-end built-in (task, contact) has no duration to
     // set — the sheet hides that field for them, so don't write a stray
@@ -140,10 +154,15 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
         bounces={false}
         overScrollMode="never"
       >
+        <TouchableOpacity onPress={() => setEditTarget({ kind: 'new' })} style={styles.addLink}>
+          <Ionicons name="add" size={18} color={Colors.goalTextAction} />
+          <Text style={styles.addLinkText}>Add an Event Type</Text>
+        </TouchableOpacity>
+
         <View style={styles.list}>
         <View style={styles.listClip}>
-          {localDefs.map((def, index) => {
-            const isLast = index === localDefs.length - 1;
+          {localDefs.filter(d => !d.removed).map((def, index, arr) => {
+            const isLast = index === arr.length - 1;
             const color = eventTypeColor(def.id, settings.eventTypeColors);
             return (
               <TouchableOpacity
@@ -152,34 +171,10 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                 onPress={() => setEditTarget({ kind: 'type', id: def.id })}
                 activeOpacity={0.7}
               >
-                <View style={[styles.dot, { backgroundColor: color }, !def.visible && styles.hiddenDim]} />
-                <Text style={[styles.label, !def.visible && styles.hiddenDim]} numberOfLines={1}>
+                <View style={[styles.dot, { backgroundColor: color }]} />
+                <Text style={styles.label} numberOfLines={1}>
                   {def.label}
                 </Text>
-
-                {/* Built-ins hide rather than delete, keeping their calendar
-                    wiring intact. Custom types have nothing to preserve. */}
-                {def.builtIn ? (
-                  <TouchableOpacity
-                    onPress={() => toggleVisible(def)}
-                    style={styles.rowAction}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons
-                      name={def.visible ? 'eye-outline' : 'eye-off-outline'}
-                      size={18}
-                      color={def.visible ? Colors.textSecondary : Colors.textLight}
-                    />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => removeType(def.id)}
-                    style={styles.rowAction}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                  </TouchableOpacity>
-                )}
 
                 <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
               </TouchableOpacity>
@@ -187,11 +182,6 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
           })}
         </View>
         </View>
-
-        <TouchableOpacity onPress={() => setEditTarget({ kind: 'new' })} style={styles.addLink}>
-          <Ionicons name="add" size={18} color={Colors.goalTextAction} />
-          <Text style={styles.addLinkText}>Add an Event Type</Text>
-        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -203,8 +193,19 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
         defaultMinutes={editingType ? eventTypeDefaultMinutes(editingType.id, settings.eventTypeDefaultMinutes) ?? undefined : undefined}
         defaultColor={editingType?.builtIn ? EventColors[editingType.id] : undefined}
         availableGoals={availableGoalsFor(editingType?.id)}
+        canDelete={editingType ? !typeInUse(editingType.id) : false}
+        usageCount={editingType ? typeUsageCount(editingType.id) : 0}
         onCancel={() => setEditTarget(null)}
         onSave={saveEdit}
+        onDelete={() => {
+          if (!editingType) return;
+          if (deleteType(editingType.id)) setEditTarget(null);
+        }}
+        onDeleteAll={async () => {
+          if (!editingType) return;
+          await deleteTypeAndEvents(editingType.id);
+          setEditTarget(null);
+        }}
       />
     </SheetModal>
   );
@@ -260,25 +261,18 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '500',
       color: C.text,
     },
-    rowAction: {
-      width: 28,
-      alignItems: 'center',
-    },
     addLink: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      marginTop: 20,
+      marginBottom: 12,
       paddingVertical: 10,
     },
     addLinkText: {
       fontSize: 14,
       fontWeight: '700',
       color: C.goalTextAction,
-    },
-    hiddenDim: {
-      opacity: 0.4,
     },
   });
 }

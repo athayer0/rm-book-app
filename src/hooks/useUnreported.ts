@@ -14,15 +14,11 @@ import { useEventTypeDefinitions } from './useEventTypeDefinitions';
 export function useUnreported() {
   const { events } = useCalendarEvents();
   const { getStatus, report } = useEventReport();
-  const { definitions: eventTypeDefs } = useEventTypeDefinitions();
-  const customTypeIds = useMemo(
-    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
-    [eventTypeDefs],
-  );
+  const { byId: eventTypeById } = useEventTypeDefinitions();
 
   const unreported = useMemo(
-    () => findUnreportedOccurrences(events, getStatus, new Date(), customTypeIds),
-    [events, getStatus, customTypeIds],
+    () => findUnreportedOccurrences(events, getStatus, new Date(), eventTypeById),
+    [events, getStatus, eventTypeById],
   );
 
   return { unreported, count: unreported.length, report, statusOf: getStatus };

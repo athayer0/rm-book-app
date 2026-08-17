@@ -1,47 +1,50 @@
 import React, { useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { Svg, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { GoalIcon } from './GoalIcon';
 
 export interface IconOption { name: string; family: string; }
 
+// Alphabetical by icon name, family included or not — a fixed, arbitrary set
+// like this has no natural grouping (by theme it's a judgment call every time
+// someone adds one), so alphabetical is the one ordering that stays stable
+// and predictable as the list grows.
 export const ICON_OPTIONS: IconOption[] = [
-  { name: 'sunny',               family: 'Ionicons' },
-  { name: 'moon',                family: 'Ionicons' },
-  { name: 'book-outline',        family: 'Ionicons' },
-  { name: 'heart',               family: 'Ionicons' },
-  { name: 'star',                family: 'Ionicons' },
-  { name: 'time-outline',        family: 'Ionicons' },
-  { name: 'people',              family: 'Ionicons' },
-  { name: 'person-outline',      family: 'Ionicons' },
-  { name: 'home',                family: 'Ionicons' },
+  { name: 'airplane',            family: 'Ionicons' },
   { name: 'barbell-outline',     family: 'Ionicons' },
   { name: 'bicycle',             family: 'Ionicons' },
-  { name: 'water',               family: 'Ionicons' },
-  { name: 'leaf',                family: 'Ionicons' },
+  { name: 'book-outline',        family: 'Ionicons' },
+  { name: 'briefcase-outline',   family: 'Ionicons' },
   { name: 'bulb-outline',        family: 'Ionicons' },
-  { name: 'school',              family: 'Ionicons' },
-  { name: 'trophy',              family: 'Ionicons' },
-  { name: 'restaurant-outline',  family: 'Ionicons' },
-  { name: 'musical-notes',       family: 'Ionicons' },
-  { name: 'compass',             family: 'Ionicons' },
-  { name: 'ribbon',              family: 'Ionicons' },
-  { name: 'color-palette-outline', family: 'Ionicons' },
-  { name: 'synagogue',           family: 'MaterialCommunityIcons' },
+  { name: 'call-outline',        family: 'Ionicons' },
   { name: 'church',              family: 'MaterialCommunityIcons' },
-  { name: 'hands-pray',         family: 'MaterialCommunityIcons' },
+  { name: 'color-palette-outline', family: 'Ionicons' },
+  { name: 'compass',             family: 'Ionicons' },
   { name: 'cross',               family: 'MaterialCommunityIcons' },
+  { name: 'gift-outline',        family: 'Ionicons' },
+  { name: 'hands-pray',          family: 'MaterialCommunityIcons' },
+  { name: 'heart',               family: 'Ionicons' },
+  { name: 'home',                family: 'Ionicons' },
+  { name: 'leaf',                family: 'Ionicons' },
+  { name: 'moon',                family: 'Ionicons' },
+  { name: 'musical-notes',       family: 'Ionicons' },
+  { name: 'people',              family: 'Ionicons' },
+  { name: 'person-outline',      family: 'Ionicons' },
+  { name: 'restaurant-outline',  family: 'Ionicons' },
+  { name: 'ribbon',              family: 'Ionicons' },
+  { name: 'run',                 family: 'MaterialCommunityIcons' },
+  { name: 'school',              family: 'Ionicons' },
+  { name: 'star',                family: 'Ionicons' },
+  { name: 'sunny',               family: 'Ionicons' },
+  { name: 'synagogue',           family: 'MaterialCommunityIcons' },
+  { name: 'time-outline',        family: 'Ionicons' },
+  { name: 'trophy',              family: 'Ionicons' },
+  { name: 'water',               family: 'Ionicons' },
 ];
 
-const OPTION_SIZE = 44;
-const FADE_WIDTH = 32;
-// Clearance below the icons for the scroll indicator to sit in.
-const INDICATOR_GAP = 10;
-
-// SVG gradient ids are document-global; two pickers can be on screen at once.
-let gradientSeq = 0;
+const CELL_SIZE = 52;
+const GRID_GAP = 10;
 
 interface Props {
   icon: string;
@@ -51,82 +54,67 @@ interface Props {
   onSelect: (opt: IconOption) => void;
 }
 
+/**
+ * Every icon on offer, laid out as a plain wrapping grid. A tap updates the
+ * selection in place rather than immediately closing whatever this is a step
+ * inside of — the caller's own Cancel/Done is what leaves the grid, same as
+ * the colour picker. Used as a full-page step inside a caller's own
+ * BottomSheet (see EditGoalSheet's `iconPickerOpen`) and as
+ * QuickAddTypesModal's own small icon sheet — both hand it the same
+ * icon/iconFamily/color/onSelect contract, so it has no opinion on what
+ * wraps it.
+ *
+ * Replaces the old horizontal scroll strip: a row of icons a few at a time
+ * hid most of the set behind a scroll a first-time user had no reason to
+ * try, where a grid shows the whole set at a glance.
+ */
 export function IconPicker({ icon, iconFamily, color, onSelect }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
-  const gradientId = useMemo(() => `iconFade${gradientSeq++}`, []);
 
   return (
-    <View style={styles.wrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator
-        contentContainerStyle={styles.content}
-      >
-        {ICON_OPTIONS.map(opt => {
-          const isSelected = icon === opt.name && iconFamily === opt.family;
-          return (
-            <TouchableOpacity
-              key={`${opt.family}:${opt.name}`}
-              onPress={() => onSelect(opt)}
-              style={[
-                styles.option,
-                isSelected && { backgroundColor: color + '25', borderColor: color },
-              ]}
-            >
-              <GoalIcon
-                icon={opt.name}
-                iconFamily={opt.family}
-                size={22}
-                color={isSelected ? color : Colors.textSecondary}
-              />
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Fades the right edge into the panel so the row reads as "continues offscreen". */}
-      <Svg width={FADE_WIDTH} height={OPTION_SIZE} style={styles.fade} pointerEvents="none">
-        <Defs>
-          <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={Colors.card} stopOpacity="0" />
-            <Stop offset="1" stopColor={Colors.card} stopOpacity="1" />
-          </LinearGradient>
-        </Defs>
-        <Rect width={FADE_WIDTH} height={OPTION_SIZE} fill={`url(#${gradientId})`} />
-      </Svg>
+    <View style={styles.grid}>
+      {ICON_OPTIONS.map(opt => {
+        const isSelected = icon === opt.name && iconFamily === opt.family;
+        return (
+          <TouchableOpacity
+            key={`${opt.family}:${opt.name}`}
+            onPress={() => onSelect(opt)}
+            style={[
+              styles.cell,
+              isSelected && { backgroundColor: color + '25', borderColor: color },
+            ]}
+            activeOpacity={0.7}
+          >
+            <GoalIcon
+              icon={opt.name}
+              iconFamily={opt.family}
+              size={24}
+              color={isSelected ? color : Colors.textSecondary}
+            />
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
-    wrap: {
-      position: 'relative',
-      marginBottom: 8,
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: GRID_GAP,
     },
-    content: {
-      gap: 6,
-      // Leaves the last icon peeking out from under the fade rather than flush to it.
-      paddingRight: FADE_WIDTH,
-      // Extends the scroll frame below the icons so the indicator lands under them
-      // instead of overlapping the bottom row of glyphs.
-      paddingBottom: INDICATOR_GAP,
-    },
-    option: {
-      width: OPTION_SIZE,
-      height: OPTION_SIZE,
-      borderRadius: 10,
+    cell: {
+      width: CELL_SIZE,
+      height: CELL_SIZE,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: C.background,
       borderWidth: 1.5,
       borderColor: 'transparent',
-    },
-    fade: {
-      position: 'absolute',
-      right: 0,
-      top: 0,
     },
   });
 }

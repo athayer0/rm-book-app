@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
@@ -19,6 +19,7 @@ import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { usePeople, Person } from '../hooks/usePeople';
 import { AppSettings } from '../hooks/useSettings';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
+import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 
 interface Props {
   /**
@@ -31,6 +32,8 @@ interface Props {
   status: EventStatus | undefined;
   /** Absent when the caller doesn't track status, which makes the row read-only. */
   onStatusChange?: (status: EventStatus | undefined) => void;
+  /** Absent when the caller doesn't persist quantity, which makes the stepper read-only. */
+  onQuantityChange?: (quantity: number) => void;
   /** Absent hides the trash icon — the caller owns confirmation and the actual delete. */
   onDelete?: () => void;
 }
@@ -70,26 +73,41 @@ const CHECKBOX_SIZE = 38;
  * one card and is separated by rules, reading as a page about the event rather
  * than a stack of things to fill in.
  *
- * The one thing that stays live is the reported status, which is an action taken
- * on the event rather than one of its fields.
+ * Two things stay live here rather than moving to the editor: the reported
+ * status, and a quantity-type event's count — both are actions taken on the
+ * event (report it, log another rep) rather than fields you go fill in.
  *
  * Empty fields are dropped rather than shown blank, so what's here is what the
  * event actually has.
  */
-export function EventDetailView({ event, settings, status, onStatusChange, onDelete }: Props) {
+export function EventDetailView({ event, settings, status, onStatusChange, onQuantityChange, onDelete }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people: allPeople } = usePeople();
-  const { definitions: eventTypeDefs, byId: eventTypeById } = useEventTypeDefinitions();
-  const customTypeIds = useMemo(
-    () => new Set(eventTypeDefs.filter(d => !d.builtIn).map(d => d.id)),
-    [eventTypeDefs],
-  );
+  const { byId: eventTypeById } = useEventTypeDefinitions();
 
   const peopleById = useMemo(
     () => new Map(allPeople.map(p => [p.id, p])),
     [allPeople],
   );
+
+  // Local text for the quantity box, so a partially-typed value ("1" on the way
+  // to "12") isn't clobbered by the prop re-deriving from event.quantity on
+  // every keystroke's re-render. Only resynced while the box isn't focused —
+  // committing happens on blur, via onQuantityChange.
+  const [quantityText, setQuantityText] = useState(String(event.quantity ?? 0));
+  const [quantityFocused, setQuantityFocused] = useState(false);
+  useEffect(() => {
+    if (!quantityFocused) setQuantityText(String(event.quantity ?? 0));
+  }, [event.id, event.quantity, quantityFocused]);
+
+  function commitQuantity() {
+    setQuantityFocused(false);
+    const n = parseInt(quantityText, 10);
+    const clamped = Number.isNaN(n) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, n));
+    setQuantityText(String(clamped));
+    if (clamped !== (event.quantity ?? 0)) onQuantityChange?.(clamped);
+  }
 
   // Same fallback as the editor's: PERSON_STATUSES is a Record, so indexing it
   // is typed as always finding something, but a status this build no longer
@@ -139,7 +157,8 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
     ),
   });
 
-  if (!isBackup && isReportableType(event.type, customTypeIds)) {
+  const isStatusCheckbox = eventTypeById[event.type]?.reportStyle === 'checkbox';
+  if (!isBackup && isReportableType(event.type, eventTypeById)) {
     groups.push({
       key: 'status',
       node: (
@@ -147,11 +166,11 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
           <Text style={styles.label}>Status</Text>
           <View style={styles.statusRow}>
             <Text style={styles.value}>
-              {isCheckboxType(event.type)
+              {isStatusCheckbox
                 ? (status === 'completed' ? 'Completed' : 'Not completed')
                 : (status ? STATUS_LABELS[status] : 'None')}
             </Text>
-            {isCheckboxType(event.type) ? (
+            {isStatusCheckbox ? (
               <TouchableOpacity
                 onPress={() => onStatusChange?.(status === 'completed' ? undefined : 'completed')}
                 disabled={!onStatusChange}
@@ -165,6 +184,29 @@ export function EventDetailView({ event, settings, status, onStatusChange, onDel
               <StatusPicker value={status} onChange={s => onStatusChange?.(s)} />
             )}
           </View>
+        </>
+      ),
+    });
+  }
+
+  if (!isBackup && eventTypeById[event.type]?.goalMode === 'quantity') {
+    groups.push({
+      key: 'quantity',
+      node: (
+        <>
+          <Text style={styles.label}>Quantity</Text>
+          <TextInput
+            style={styles.quantityBox}
+            value={quantityText}
+            onChangeText={setQuantityText}
+            onFocus={() => setQuantityFocused(true)}
+            onBlur={commitQuantity}
+            editable={!!onQuantityChange}
+            keyboardType="number-pad"
+            selectTextOnFocus
+            maxLength={3}
+            accessibilityLabel="Quantity"
+          />
         </>
       ),
     });
@@ -349,6 +391,21 @@ function makeStyles(C: ColorPalette) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+    },
+    // Matches GoalWeeklyModal's numPill: a filled rounded box holding a large
+    // number, right-aligned in its row rather than centred in one — this row
+    // has nothing to its left the way that pill's icon-and-label do.
+    quantityBox: {
+      alignSelf: 'flex-end',
+      minWidth: 60,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: C.background,
+      fontSize: 22,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
     },
   });
 }

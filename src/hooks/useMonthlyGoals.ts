@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { getItem, setItem } from '../utils/storage';
 import { getMonthKey, getMonthDates } from '../utils/dateUtils';
 import { deriveWeekGoalCounts } from '../utils/eventUtils';
+import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import {
   goalMonthlyCountsKey,
   goalMonthlyTargetsKey,
@@ -98,7 +99,7 @@ export function useMonthlyGoals() {
   }, [derivedFor]);
 
   const saveCountForMonth = useCallback(async (id: string, mk: string, total: number) => {
-    const offset = total - (derivedFor(mk)[id] ?? 0);
+    const offset = Math.min(MAX_GOAL_VALUE, Math.max(0, total)) - (derivedFor(mk)[id] ?? 0);
     if (mk === monthKey) {
       await offsetsState.write(current => ({ ...current, [id]: offset }));
     } else {
@@ -109,7 +110,8 @@ export function useMonthlyGoals() {
     await syncCount(id, mk, offset);
   }, [derivedFor, monthKey, offsetsState, syncCount]);
 
-  const saveGoalForMonth = useCallback(async (id: string, mk: string, value: number) => {
+  const saveGoalForMonth = useCallback(async (id: string, mk: string, rawValue: number) => {
+    const value = Math.min(MAX_GOAL_VALUE, Math.max(0, rawValue));
     if (mk === monthKey) {
       await targetsState.write(current => ({ ...current, [id]: value }));
     } else {

@@ -23,10 +23,10 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     monthlyVisible: 'monthly_visible',
   },
   event_type_definitions: {
-    iconFamily: 'icon_family',
     builtIn: 'built_in',
     goalId: 'goal_id',
     goalMode: 'goal_mode',
+    reportStyle: 'report_style',
   },
   goal_entries: {},
   goal_monthly_entries: {},
@@ -44,6 +44,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     eventSize: 'event_size',
     eventTypeColors: 'event_type_colors',
     eventTypeDefaultMinutes: 'event_type_default_minutes',
+    quickAddTypes: 'quick_add_types',
     defaultCountryCode: 'default_country_code',
     defaultContactMethod: 'default_contact_method',
     mapsApp: 'maps_app',
@@ -64,15 +65,15 @@ const COLUMNS: Record<string, string[]> = {
   calendar_events: [
     'user_id', 'id', 'title', 'type', 'color', 'date', 'start_time', 'end_time',
     'notes', 'recurring', 'recurring_rule', 'recurring_until', 'excluded_dates',
-    'recurring_days', 'backup', 'people', 'contact_method', 'updated_at', 'deleted_at',
+    'recurring_days', 'backup', 'people', 'contact_method', 'quantity', 'updated_at', 'deleted_at',
   ],
   goal_definitions: [
     'user_id', 'id', 'label', 'icon', 'icon_family', 'color',
-    'visible', 'monthly_visible', 'built_in', 'updated_at', 'deleted_at',
+    'visible', 'monthly_visible', 'built_in', 'removed', 'updated_at', 'deleted_at',
   ],
   event_type_definitions: [
-    'user_id', 'id', 'label', 'icon', 'icon_family',
-    'visible', 'built_in', 'goal_id', 'goal_mode', 'updated_at', 'deleted_at',
+    'user_id', 'id', 'label',
+    'visible', 'built_in', 'goal_id', 'goal_mode', 'report_style', 'removed', 'updated_at', 'deleted_at',
   ],
   goal_entries: [
     'user_id', 'goal_id', 'week_key', 'count', 'target', 'updated_at', 'deleted_at',
@@ -91,7 +92,7 @@ const COLUMNS: Record<string, string[]> = {
     'secondary_color_light', 'secondary_color_dark',
     'tertiary_color_light', 'tertiary_color_dark',
     'grid_start_hour', 'grid_end_hour',
-    'event_size', 'event_type_colors', 'event_type_default_minutes',
+    'event_size', 'event_type_colors', 'event_type_default_minutes', 'quick_add_types',
     'default_country_code', 'default_contact_method', 'maps_app',
     'daily_review_enabled', 'daily_review_hour', 'daily_review_minute',
     'event_reminder_enabled', 'event_reminder_minutes', 'updated_at',

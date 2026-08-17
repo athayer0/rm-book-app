@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getItem, setItem } from '../utils/storage';
 import { isNewWeek, getWeekKey, getWeekDates } from '../utils/dateUtils';
 import { deriveWeekGoalCounts } from '../utils/eventUtils';
-import { DEFAULT_GOALS, GoalDefinition } from '../constants/defaultGoals';
+import { DEFAULT_GOALS, GoalDefinition, MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import {
   GOAL_DEFINITIONS_KEY,
   LAST_RESET_KEY,
@@ -56,7 +56,11 @@ function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {
   });
   // Keep custom (non-builtIn) goals from stored
   const customs = storedDefs.filter(d => !d.builtIn);
-  return [...builtIns, ...customs];
+  // A removed goal (built-in or custom) is a tombstone, not an absent row —
+  // dropping it here rather than never storing it is what stops a built-in
+  // from reappearing on the next read, since `builtIns` above is always
+  // regenerated from the full DEFAULT_GOALS list.
+  return [...builtIns, ...customs].filter(d => !d.removed);
 }
 
 export function useWeeklyGoals() {
@@ -198,7 +202,7 @@ export function useWeeklyGoals() {
    * only the total is floored.
    */
   const saveCountForWeek = useCallback(async (id: string, wk: string, total: number) => {
-    const offset = total - (derivedFor(wk)[id] ?? 0);
+    const offset = Math.min(MAX_GOAL_VALUE, Math.max(0, total)) - (derivedFor(wk)[id] ?? 0);
     if (wk === weekKey) {
       await offsetsState.write(current => ({ ...current, [id]: offset }));
     } else {
@@ -209,7 +213,8 @@ export function useWeeklyGoals() {
     await syncCount(id, wk, offset);
   }, [derivedFor, weekKey, offsetsState, syncCount]);
 
-  const saveGoalForWeek = useCallback(async (id: string, wk: string, value: number) => {
+  const saveGoalForWeek = useCallback(async (id: string, wk: string, rawValue: number) => {
+    const value = Math.min(MAX_GOAL_VALUE, Math.max(0, rawValue));
     if (wk === weekKey) {
       await targetsState.write(current => ({ ...current, [id]: value }));
     } else {
