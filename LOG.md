@@ -32,9 +32,9 @@ FEATURES
 [x] add the ability to add and hide events and when adding an event you have the option to add a corresponding ki that gets incremented by reporting it
 [x] quantity reported events (1 event, report like 30 pushups, weekly goal of 100)
 
-[ ] fix select shadows
-[ ] fix menu animations
-[ ] clean up monthly goals stuff and goal and event menus
+[ ] fix select (show all calendar shadows, turn off select mode when switching pages, fix select headers)
+[ ] fix menu animations (color menu sizing, icon and color menu animations) might be fixed be redesigning the event and goal type menus to be dropdowns to select the type, better button for adding, and all the individual settings on the first menus instead of having to open a second. making color and icon the second menus, not third.
+[ ] figure out monthly goals "monthly planning" (future/past goals, graph) and home page ui
 [ ] ui overhaul
 [ ] add spanish portuguese french etc
 
