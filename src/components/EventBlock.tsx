@@ -81,13 +81,19 @@ interface Props {
    * is the point of reusing this instead of imitating it.
    */
   inline?: boolean;
+  /**
+   * `undefined` outside multi-select (normal tap-to-edit behaviour). `true`/`false`
+   * once a selection is active — mirrors PersonCard, where the same three-state
+   * prop both signals "selection mode is on" and carries this row's state.
+   */
+  selected?: boolean;
 }
 
 export function EventBlock({
   event, status, onPress, onToggleStatus, onDragStart, onDragMove, onDragEnd, onDragCancel,
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
   slotHeight = DEFAULT_SLOT_HEIGHT, fontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize,
-  inline = false,
+  inline = false, selected,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -99,10 +105,13 @@ export function EventBlock({
     pending: Colors.statusPending,
   };
 
-  const { active, event: draggingEvent } = useDrag();
+  const { active, event: draggingEvent, groupIds } = useDrag();
   const top = eventTopOffset(event.startTime, gridStartHour, slotHeight) + 1;
   const height = renderedEventHeight(event, slotHeight);
-  const isBeingDragged = active && draggingEvent?.id === event.id;
+  // A group drag carries the whole multi-selection, not just the block that was
+  // grabbed — every member has to lift off the grid, or the ones left behind
+  // would show both their original block and their floating ghost at once.
+  const isBeingDragged = active && (draggingEvent?.id === event.id || (groupIds?.has(event.id) ?? false));
 
   const isBackup = !!event.backup;
   // A type set to Checkbox in Event Types carries a binary checked/unchecked
@@ -114,7 +123,11 @@ export function EventBlock({
   // the unreported sweep's idea of the same word.
   const effectiveStatus: EventStatus | undefined =
     isBackup || isCheckbox ? undefined : resolveEventStatus(event, status, eventTypeById);
-  const showBadge = isCheckbox || !!effectiveStatus;
+  // Multi-select takes over the right-hand gutter entirely: repeat marker and
+  // status badge both stand down so the selection checkbox is the only thing
+  // there, rather than competing with whatever the event would normally show.
+  const inSelectMode = selected !== undefined;
+  const showBadge = inSelectMode || isCheckbox || !!effectiveStatus;
 
   const isDraggingRef = useRef(false);
 
@@ -140,7 +153,11 @@ export function EventBlock({
     .runOnJS(true)
     .onEnd((_e, success) => { if (success) onPress(); });
 
-  const composed = inline ? tapGesture : Gesture.Race(dragPanGesture, tapGesture);
+  // No onDragStart means this block isn't draggable right now — an unselected
+  // row during multi-select, or a read-only prev/next pane. Racing the pan
+  // gesture anyway would still let a long-press "activate" it and swallow the
+  // tap for nothing, so drop it from the race entirely rather than let it win.
+  const composed = inline || !onDragStart ? tapGesture : Gesture.Race(dragPanGesture, tapGesture);
 
   const stripeCount = Math.ceil(height / 7) + 4;
 
@@ -155,6 +172,7 @@ export function EventBlock({
   // Scales with the block's font so it stays proportionate at every density.
   const repeatSize = Math.round(fontSize * 1.75);
   const isRecurring = !!event.recurring;
+  const showRepeatIcon = isRecurring && !inSelectMode;
 
   // The right-hand gutter: the status badge sits nearest the edge, the repeat
   // marker to its left. With no badge the marker takes the badge's place, at the
@@ -162,8 +180,8 @@ export function EventBlock({
   // paddingRight or the title would run underneath them.
   const repeatRight = showBadge ? 6 + badge + REPEAT_GAP : 6;
   const gutter = showBadge
-    ? 6 + badge + (isRecurring ? REPEAT_GAP + repeatSize : 0)
-    : isRecurring ? 6 + repeatSize : BLOCK.paddingRight;
+    ? 6 + badge + (showRepeatIcon ? REPEAT_GAP + repeatSize : 0)
+    : showRepeatIcon ? 6 + repeatSize : BLOCK.paddingRight;
 
   // Contacts and dates lead with how they happened — a phone glyph on a phone
   // call, a screen on a video date. It rides the title row, so it sits on the
@@ -269,13 +287,13 @@ export function EventBlock({
           )}
         </View>
 
-        {isRecurring && (
+        {showRepeatIcon && (
           <View style={[styles.statusWrap, { width: repeatSize, right: repeatRight }]}>
             <Ionicons name="sync-outline" size={repeatSize} color={Colors.textSecondary} />
           </View>
         )}
 
-        {isCheckbox && (
+        {!inSelectMode && isCheckbox && (
           <GestureDetector gesture={Gesture.Tap().runOnJS(true).onEnd(() => onToggleStatus?.())}>
             <View style={[styles.statusWrap, { width: badge }]} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
               <StatusCheckbox checked={isChecked} size={CALENDAR_CHECKBOX_SIZE} color={event.color} />
@@ -283,7 +301,7 @@ export function EventBlock({
           </GestureDetector>
         )}
 
-        {effectiveStatus && (
+        {!inSelectMode && effectiveStatus && (
           <View style={[styles.statusWrap, { width: badge }]}>
             {effectiveStatus === 'failed' ? (
               <View style={{ width: badgeInner + badgeInset, height: badgeInner + badgeInset, borderRadius: (badgeInner + badgeInset) / 2, backgroundColor: statusColor.failed, alignItems: 'center', justifyContent: 'center' }}>
@@ -300,6 +318,17 @@ export function EventBlock({
               </View>
             )}
           </View>
+        )}
+
+        {inSelectMode && (
+          // The checkbox itself is what marks selection — a bigger tap target
+          // than the glyph alone, but no border/tint on the block: selected
+          // state lives here, not in the block's own decoration.
+          <GestureDetector gesture={Gesture.Tap().runOnJS(true).onEnd(() => onPress())}>
+            <View style={[styles.statusWrap, { width: badge }]} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <StatusCheckbox checked={!!selected} size={CALENDAR_CHECKBOX_SIZE} color={Colors.control} />
+            </View>
+          </GestureDetector>
         )}
       </View>
     </GestureDetector>

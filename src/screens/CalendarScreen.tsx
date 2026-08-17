@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { format, addDays, subDays } from 'date-fns';
+import { format, addDays, subDays, parseISO, differenceInCalendarDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import { type ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
@@ -16,7 +16,7 @@ import { WeekStrip } from '../components/WeekStrip';
 import { FAB, type FABAction } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
 import { EventTypeSheet } from '../modals/EventTypeSheet';
-import { CalendarEvent, renderedEventHeight, hasEndTime } from '../utils/eventUtils';
+import { CalendarEvent, renderedEventHeight, hasEndTime, eventTopOffset } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventReport } from '../hooks/useEventReport';
@@ -48,6 +48,23 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   const { active: dragActive, event: dragEvent, ghostX, ghostY, ghostWidth, ghostHeight, grabOffsetY, endDrag, startDrag, moveDrag } = useDrag();
   const frozenEventsRef = useRef<CalendarEvent[] | null>(null);
   const frozenDateRef = useRef<string | null>(null);
+  // Multi-select: entered from the header's checkbox icon, which fills in
+  // while active; a trash icon appears beside it once something's selected.
+  // Confined to the day on screen — navigating to another day drops it (see
+  // the effect below), so there's never a selection spanning two days.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  // Snapshot of every selected event's own date/time/pixel-position, taken when a
+  // drag starts on one of them. The anchor (the block actually grabbed) resolves
+  // the drop as usual; every other selected event then replays the same
+  // day/minute delta off this snapshot, which is why it has to be captured up
+  // front rather than reread off `events` at drop time — by then, the day on
+  // screen may have changed. The same snapshot also drives the extra ghost
+  // blocks during the drag, so the whole group visibly moves together.
+  const groupDragOriginalRef = useRef<Map<string, {
+    date: string; startTime: string; endTime: string; hasEnd: boolean;
+    title: string; color: string; topOffset: number; height: number;
+  }> | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [headerBottom, setHeaderBottom] = useState(60);
@@ -90,6 +107,17 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   useEffect(() => {
     if (!showMonthPicker) setPickerMonth(selectedDate);
   }, [selectedDate]);
+
+  // The day chevrons, WeekStrip, and month picker all still work during
+  // selection. A selection scoped to a day that's no longer on screen doesn't
+  // mean anything, so drop it — except mid-drag, where the day can change
+  // from edge-scrolling and the gesture still needs to land.
+  const prevDateStrRef = useRef(dateStr);
+  useEffect(() => {
+    if (prevDateStrRef.current === dateStr) return;
+    prevDateStrRef.current = dateStr;
+    if (selectMode && !dragActive) exitSelectMode();
+  }, [dateStr, dragActive]);
 
   // An event-reminder notification tap lands here (see App.tsx) with the
   // occurrence's date — jump to that day. Consumed once and cleared, same as
@@ -142,6 +170,42 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     setShowEventModal(true);
   }
 
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedEventIds(new Set());
+  }
+
+  function toggleEventSelected(event: CalendarEvent) {
+    setSelectedEventIds(prev => {
+      const next = new Set(prev);
+      if (next.has(event.id)) next.delete(event.id); else next.add(event.id);
+      return next;
+    });
+  }
+
+  function handleDeleteSelected() {
+    const ids = Array.from(selectedEventIds);
+    if (ids.length === 0) return;
+    Alert.alert(
+      'Delete Events',
+      `Delete ${ids.length} selected event${ids.length === 1 ? '' : 's'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            for (const id of ids) {
+              const ev = events.find(e => e.id === id);
+              if (ev) await deleteOccurrence(ev.id, ev.date);
+            }
+            exitSelectMode();
+          },
+        },
+      ],
+    );
+  }
+
   function handleAddEvent() {
     setEditingEvent(null);
     setDefaultStartTime(undefined);
@@ -184,18 +248,51 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   function handleDragStart(event: CalendarEvent, x: number, y: number, width: number, height: number, grabOffset: number) {
     frozenEventsRef.current = events;
     frozenDateRef.current = dateStr;
-    startDrag(event, x, y, width, height, grabOffset);
+    // Dragging a block that's part of the current selection moves the whole
+    // group; dragging any other block (selection off, or this block not in it)
+    // is an ordinary single-event drag, so no snapshot is needed.
+    if (selectMode && selectedEventIds.has(event.id)) {
+      const map: NonNullable<typeof groupDragOriginalRef.current> = new Map();
+      for (const id of selectedEventIds) {
+        const ev = events.find(e => e.id === id);
+        if (ev) map.set(id, {
+          date: ev.date, startTime: ev.startTime, endTime: ev.endTime, hasEnd: hasEndTime(ev),
+          title: ev.title, color: ev.color,
+          topOffset: eventTopOffset(ev.startTime, settings.gridStartHour, SLOT_HEIGHT),
+          height: renderedEventHeight(ev, SLOT_HEIGHT),
+        });
+      }
+      groupDragOriginalRef.current = map;
+    } else {
+      groupDragOriginalRef.current = null;
+    }
+    startDrag(event, x, y, width, height, grabOffset, groupDragOriginalRef.current ? Array.from(groupDragOriginalRef.current.keys()) : undefined);
   }
 
   function handleDragCancel() {
     frozenEventsRef.current = null;
     frozenDateRef.current = null;
+    groupDragOriginalRef.current = null;
     endDrag();
+  }
+
+  function timeToMinutes(t: string): number {
+    const { hour, minute } = parseTimeString(t);
+    return hour * 60 + minute;
+  }
+
+  // Matches the single-drag clamp above (`Math.min(hour, 23)`): a drop never
+  // wraps a time across midnight, it just pins to the last minute of the day.
+  function minutesToClampedTime(mins: number): string {
+    const clamped = Math.max(0, Math.min(23 * 60 + 59, mins));
+    return formatTime(Math.floor(clamped / 60), clamped % 60);
   }
 
   function handleDragDrop(absoluteY: number, gridTopY: number, scrollOffset: number) {
     frozenEventsRef.current = null;
     frozenDateRef.current = null;
+    const group = groupDragOriginalRef.current;
+    groupDragOriginalRef.current = null;
     if (!dragEvent) { endDrag(); return; }
     const relativeY = absoluteY - grabOffsetY - gridTopY + scrollOffset;
     const fifteenMinSlot = Math.max(0, Math.floor(relativeY / DRAG_SLOT_HEIGHT));
@@ -214,7 +311,43 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
       newEnd = addMinutesToTimeString(newStart, durationMins);
     }
     updateEvent(dragEvent.id, { startTime: newStart, endTime: newEnd, date: dateStr });
+
+    // The rest of the group replays the anchor's own move — same day offset,
+    // same minute offset — off each event's pre-drag date/time, preserving its
+    // own duration rather than taking on the anchor's.
+    const anchorOriginal = group?.get(dragEvent.id);
+    if (group && anchorOriginal) {
+      const deltaMinutes = timeToMinutes(newStart) - timeToMinutes(anchorOriginal.startTime);
+      const deltaDays = differenceInCalendarDays(parseISO(dateStr), parseISO(anchorOriginal.date));
+      for (const [id, orig] of group) {
+        if (id === dragEvent.id) continue;
+        const origStartMins = timeToMinutes(orig.startTime);
+        const origEndMins = timeToMinutes(orig.endTime);
+        const durationMins = orig.hasEnd
+          ? Math.max(origEndMins > origStartMins ? origEndMins - origStartMins : origEndMins + 1440 - origStartMins, 15)
+          : 0;
+        const siblingStart = minutesToClampedTime(origStartMins + deltaMinutes);
+        const siblingEnd = orig.hasEnd ? minutesToClampedTime(timeToMinutes(siblingStart) + durationMins) : siblingStart;
+        const siblingDate = format(addDays(parseISO(orig.date), deltaDays), 'yyyy-MM-dd');
+        updateEvent(id, { date: siblingDate, startTime: siblingStart, endTime: siblingEnd });
+      }
+    }
     endDrag();
+  }
+
+  function renderGhostBlock(key: string, color: string, title: string, height: number, topPx: number) {
+    return (
+      <View
+        key={key}
+        style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: topPx, width: ghostWidth }]}
+        pointerEvents="none"
+      >
+        <View style={[styles.ghostBlock, { backgroundColor: Colors.card, borderLeftColor: color, height }]}>
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: color + '55' }]} />
+          <Text style={[styles.ghostTitle, { color: Colors.text, fontSize: eventFontSize }]} numberOfLines={1}>{title}</Text>
+        </View>
+      </View>
+    );
   }
 
   function handleSwipeWeek(dir: 1 | -1) {
@@ -260,6 +393,26 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
           </TouchableOpacity>
         </View>
         <View style={styles.headerActions}>
+          {/* Only shows once there's something to act on — tapping it is the
+              only way to delete a selection, so it has no disabled state. */}
+          {selectMode && selectedEventIds.size > 0 && (
+            <TouchableOpacity
+              onPress={handleDeleteSelected}
+              style={styles.navBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Delete selected events"
+            >
+              <Ionicons name="trash-outline" size={22} color={Colors.onPrimary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+            style={styles.navBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Select Events"
+          >
+            <Ionicons name={selectMode ? 'checkbox' : 'checkbox-outline'} size={22} color={Colors.onPrimary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setSelectedDate(d => subDays(d, 1))} style={styles.navBtn}>
             <Ionicons name="chevron-back" size={22} color={Colors.onPrimary} />
           </TouchableOpacity>
@@ -289,7 +442,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
                   getStatus={getStatus}
                   onEventPress={handleEventPress}
                   onToggleStatus={(ev) => report(ev, getStatus(ev.id, ev.date) === 'completed' ? undefined : 'completed')}
-                  onTapEmpty={handleTapEmpty}
+                  onTapEmpty={selectMode ? () => {} : handleTapEmpty}
                   onDragStart={handleDragStart}
                   onDragMove={moveDrag}
                   onDragEnd={handleDragDrop}
@@ -304,6 +457,9 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
                   isToday={isToday}
                   initialScrollY={syncScrollY}
                   onScrollSettle={setSyncScrollY}
+                  selectMode={selectMode}
+                  selectedEventIds={selectedEventIds}
+                  onToggleEventSelect={toggleEventSelected}
                 />
               );
             }
@@ -325,17 +481,21 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
         />
       </View>
 
-      {dragActive && dragEvent && (
-        <View
-          style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: ghostY - grabOffsetY, width: ghostWidth }]}
-          pointerEvents="none"
-        >
-          <View style={[styles.ghostBlock, { backgroundColor: Colors.card, borderLeftColor: dragEvent.color, height: ghostHeight }]}>
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: dragEvent.color + '55' }]} />
-            <Text style={[styles.ghostTitle, { color: Colors.text, fontSize: eventFontSize }]} numberOfLines={1}>{dragEvent.title}</Text>
-          </View>
-        </View>
-      )}
+      {dragActive && dragEvent && renderGhostBlock('anchor', dragEvent.color, dragEvent.title, ghostHeight, ghostY - grabOffsetY)}
+      {/* Every other selected event gets its own ghost, offset from the anchor's
+          live position by the same pixel gap it started with — so a group drag
+          visibly carries the whole selection, not just the block that was grabbed. */}
+      {dragActive && dragEvent && groupDragOriginalRef.current && (() => {
+        const group = groupDragOriginalRef.current;
+        const anchorEntry = group.get(dragEvent.id);
+        if (!anchorEntry) return null;
+        return Array.from(group.entries())
+          .filter(([id]) => id !== dragEvent.id)
+          .map(([id, sib]) => renderGhostBlock(
+            id, sib.color, sib.title, sib.height,
+            ghostY - grabOffsetY + (sib.topOffset - anchorEntry.topOffset),
+          ));
+      })()}
 
       {showMonthPicker && (
         <>
@@ -389,7 +549,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
         </>
       )}
 
-      <FAB onPress={handleAddEvent} actions={quickActions} onSelectAction={handleQuickAdd} />
+      {!selectMode && <FAB onPress={handleAddEvent} actions={quickActions} onSelectAction={handleQuickAdd} />}
 
       <EventTypeSheet
         visible={pendingTapTime !== null}

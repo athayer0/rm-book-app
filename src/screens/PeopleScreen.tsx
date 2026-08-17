@@ -167,13 +167,13 @@ export function PeopleScreen() {
       >
         {selectMode ? (
           <>
-            <TouchableOpacity onPress={exitSelectMode}>
+            <TouchableOpacity onPress={exitSelectMode} style={styles.headerSideZone}>
               <Text style={styles.headerActionText}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>
+            <Text style={[styles.headerTitle, styles.headerSelectTitle]}>
               {selectedIds.size === 0 ? 'Select People' : `${selectedIds.size} Selected`}
             </Text>
-            <View>
+            <View style={[styles.headerSideZone, styles.headerSideZoneRight]}>
               <TouchableOpacity
                 onPress={() => setShowBulkStatusMenu(v => !v)}
                 disabled={selectedIds.size === 0}
@@ -381,6 +381,14 @@ function makeStyles(C: ColorPalette) {
       elevation: 20,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
+    // In select mode, "Cancel" and "Set Type" aren't the same width, so
+    // centering the title between them (space-between's default) leaves it
+    // visibly off the header's true center. Forcing both side zones to the
+    // same floor — wider than either one's own content — makes them equal,
+    // and flex:1 + centered text then centers against the header itself.
+    headerSelectTitle: { flex: 1, textAlign: 'center' },
+    headerSideZone: { minWidth: 80 },
+    headerSideZoneRight: { alignItems: 'flex-end' },
     headerActionText: { fontSize: 16, fontWeight: '600', color: C.onPrimary },
     headerActionTextDisabled: { color: C.onPrimaryMuted },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -426,7 +434,7 @@ function makeStyles(C: ColorPalette) {
     searchIcon: {},
     searchInput: {
       flex: 1,
-      fontSize: 15,
+      fontSize: 16,
       color: C.text,
     },
     body: { flex: 1, backgroundColor: C.card, paddingTop: 10 },

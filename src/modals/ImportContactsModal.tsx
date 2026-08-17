@@ -132,7 +132,7 @@ export function ImportContactsModal({ visible, onClose }: Props) {
     for (const contact of toAdd) {
       await addPerson({
         name: contact.name,
-        status: 'Mission Friends',
+        status: 'Other',
         phone: contact.phone ?? '',
         address: contact.address,
         starred: false,

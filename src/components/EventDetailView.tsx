@@ -393,10 +393,9 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
     },
     // Matches GoalWeeklyModal's numPill: a filled rounded box holding a large
-    // number, right-aligned in its row rather than centred in one — this row
-    // has nothing to its left the way that pill's icon-and-label do.
+    // number, left-aligned under its label rather than centred in the row.
     quantityBox: {
-      alignSelf: 'flex-end',
+      alignSelf: 'flex-start',
       minWidth: 60,
       paddingHorizontal: 14,
       paddingVertical: 8,

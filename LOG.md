@@ -29,9 +29,13 @@ FEATURES
 [x] save recent convert info on where they are on the covenant path
 [x] simple onboarding
 [x] monthly goals
+[x] add the ability to add and hide events and when adding an event you have the option to add a corresponding ki that gets incremented by reporting it
+[x] quantity reported events (1 event, report like 30 pushups, weekly goal of 100)
 
-[ ] add the ability to add and hide events and when adding an event you have the option to add a corresponding ki that gets incremented by reporting it
-[ ] quantity reported events (1 event, report like 30 pushups, weekly goal of 100)
+[ ] fix select shadows
+[ ] fix menu animations
+[ ] clean up monthly goals stuff and goal and event menus
+[ ] ui overhaul
 [ ] add spanish portuguese french etc
 
 BUGS

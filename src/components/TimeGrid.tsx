@@ -39,6 +39,12 @@ interface Props {
   initialScrollY?: number;
   onScrollSettle?: (y: number) => void;
   syncScrollY?: number;
+  // Multi-select: when active, tapping a block toggles it instead of opening the
+  // editor, and only an already-selected block stays draggable (so a group of
+  // selected blocks can be dragged as one, same as a single event).
+  selectMode?: boolean;
+  selectedEventIds?: Set<string>;
+  onToggleEventSelect?: (event: CalendarEvent) => void;
 }
 
 function gridHourLabel(hour: number): string {
@@ -47,7 +53,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors, slotHeight), [Colors, slotHeight]);
 
@@ -190,6 +196,10 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
   function handleSlotTap(locationY: number) {
+    // Tapping empty space already does nothing in select mode (onTapEmpty is a
+    // no-op there) — the highlight and haptic would otherwise still fire for a
+    // tap that visibly does nothing.
+    if (selectMode) return;
     const maxSlot = (gridEndHour - gridStartHour) * 2 - 1;
     const slot = Math.min(maxSlot, Math.max(0, Math.floor((locationY - 16) / SLOT_HEIGHT)));
     setPressedSlot(slot);
@@ -269,6 +279,10 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
 
             {events.map(event => {
               const { col, numCols } = eventLayout.get(event.id) ?? { col: 0, numCols: 1 };
+              const isSelected = selectMode ? (selectedEventIds?.has(event.id) ?? false) : undefined;
+              // Only a block already in the selection stays draggable, so a hold on
+              // an unselected block just selects it instead of starting a move.
+              const dragEnabled = onDragStart && (!selectMode || isSelected);
               return (
                 <EventBlock
                   key={event.id + event.date}
@@ -279,9 +293,10 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
                   fontSize={eventFontSize}
                   columnWidth={1 / numCols}
                   columnOffset={col / numCols}
-                  onPress={() => onEventPress?.(event)}
+                  selected={isSelected}
+                  onPress={() => selectMode ? onToggleEventSelect?.(event) : onEventPress?.(event)}
                   onToggleStatus={onToggleStatus ? () => onToggleStatus(event) : undefined}
-                  onDragStart={onDragStart ? handleDragStart : undefined}
+                  onDragStart={dragEnabled ? handleDragStart : undefined}
                   onDragMove={handleDragMove}
                   onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
                   onDragCancel={onDragCancel}

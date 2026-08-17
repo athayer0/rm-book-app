@@ -374,7 +374,7 @@ export function SettingsScreen() {
 
   function confirmResetQuickAdd() {
     Alert.alert(
-      'Reset Quick Add',
+      'Reset Event Bubble +',
       'This will restore the default quick-add types and icons. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -782,7 +782,7 @@ export function SettingsScreen() {
         {/* Which types earn a bubble off the calendar's +, and their icon —
             the only place an event type's icon is ever shown. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>QUICK ADD</Text>
+          <Text style={styles.sectionTitle}>EVENT BUBBLE +</Text>
           <View style={styles.card}>
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('quickAdd')}>
               <Text style={styles.rowLabel}>Customize</Text>
@@ -1132,6 +1132,8 @@ function makeStyles(C: ColorPalette) {
       paddingHorizontal: 16,
       paddingBottom: 12,
       backgroundColor: C.card,
+      borderBottomLeftRadius: 20,
+      borderBottomRightRadius: 20,
     },
     dropdownListLast: {
       borderBottomWidth: 0,

@@ -53,7 +53,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const [name, setName] = useState('');
-  const [status, setStatus] = useState('Mission Friends');
+  const [status, setStatus] = useState('Other');
   const [phone, setPhone] = useState('');
   // null means the section is not on this person. '' means it is, but empty.
   const [whatsapp, setWhatsapp] = useState<string | null>(null);
