@@ -103,7 +103,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setStarred(person.starred);
     } else {
       setName('');
-      setStatus('Mission Friends');
+      setStatus('Other');
       setPhone('');
       setWhatsapp(null);
       setMessenger(null);
