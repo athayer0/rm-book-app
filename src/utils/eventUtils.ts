@@ -248,34 +248,47 @@ function durationHours(event: CalendarEvent): number {
   return Math.max(1, Math.round(mins / 60));
 }
 
-export type CustomTypeLinks = Record<string, { goalId: string; mode: 'count' | 'hours' | 'quantity' }>;
+export type CustomTypeLinks = Record<string, {
+  goalId: string;
+  mode: 'count' | 'hours' | 'quantity';
+  /** Set only on a type that splits by time of day — see EventTypeDefinition. */
+  lateGoalId?: string;
+  splitTime?: string;
+}>;
 
 /**
- * `linkedGoals` now covers every type with a link, built-in or custom — see
- * BUILTIN_GOAL_LINKS, which seeds it as each built-in type's default goalId.
- * `prayer` is the one type that never carries a seeded link (it splits across
- * two goals by time of day, which doesn't fit a single goalId): it falls back
- * to that split only while it has no explicit link of its own, same as any
- * other "stored wins, default fills the gap" field. Relinking (or explicitly
- * unlinking) prayer overrides the fallback like it would for any other type.
+ * `linkedGoals` covers every type with a link, built-in or custom — see
+ * BUILTIN_GOAL_LINKS, which seeds each built-in type's default. There is no
+ * per-type branch left in here at all: prayer's morning/nightly split was the
+ * last one, and it is now the seeded `lateGoalId`/`splitTime` on prayer's own
+ * link rather than two goal ids written into this function. A type with no link
+ * contributes nothing, whoever it is — `contact` is reportable and counts toward
+ * nothing by exactly that route.
+ *
+ * The cutoff belongs to the later half: a completion *at* it counts late, which
+ * is what the `hour < 14` test it replaces did with a 2 PM boundary.
+ *
+ * A cutoff with no late goal falls through to `goalId` rather than counting
+ * toward nothing. This is a state the UI produces routinely — Day/Night is
+ * chosen on the Goal Count Type control, so a type is a pair from that moment
+ * and the evening goal is picked after — so everything keeps counting toward the
+ * morning goal until the second half exists.
  */
 export function getGoalContribution(
   event: CalendarEvent,
   linkedGoals: CustomTypeLinks = {},
 ): { goalId: string; delta: number } | null {
   const link = linkedGoals[event.type];
-  if (link) {
-    if (link.mode === 'hours') return { goalId: link.goalId, delta: durationHours(event) };
-    if (link.mode === 'quantity') return { goalId: link.goalId, delta: event.quantity ?? 0 };
-    return { goalId: link.goalId, delta: 1 };
-  }
+  if (!link) return null;
 
-  if (event.type === 'prayer') {
-    const { hour } = parseTime(event.startTime);
-    return { goalId: hour < 14 ? 'morning_prayer' : 'nightly_prayer', delta: 1 };
-  }
-  // contact is reportable but counts toward nothing — see reportStyle.
-  return null;
+  const isLate = !!link.lateGoalId
+    && !!link.splitTime
+    && timeToMinutes(event.startTime) >= timeToMinutes(link.splitTime);
+  const goalId = isLate ? link.lateGoalId! : link.goalId;
+
+  if (link.mode === 'hours') return { goalId, delta: durationHours(event) };
+  if (link.mode === 'quantity') return { goalId, delta: event.quantity ?? 0 };
+  return { goalId, delta: 1 };
 }
 
 /**
@@ -365,7 +378,8 @@ export function findUnreportedOccurrences(
  * This is the derived half of a week's total; the other half is a stored manual
  * offset. Recomputed rather than maintained as a running count because far more
  * than the status toggle invalidates such a count — moving an event to another
- * week, deleting it, changing its type, shifting a prayer across 2pm, or editing
+ * week, deleting it, changing its type, shifting an event across its type's
+ * morning/evening cutoff, or editing
  * a church event's duration all change what the total should be, and none of
  * those operations can be expected to know a cached number exists.
  *

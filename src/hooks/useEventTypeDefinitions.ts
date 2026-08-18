@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import {
   BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, DEFAULT_EVENT_TYPES, EventTypeDefinition,
 } from '../constants/eventTypeDefaults';
+import type { CustomTypeLinks } from '../utils/eventUtils';
 import { EVENT_TYPE_DEFINITIONS_KEY } from '../constants/storageKeys';
 import { useStoredState } from './useStoredState';
 import { enqueueUpsert } from '../lib/syncQueue';
@@ -19,16 +20,32 @@ const EMPTY_DEFS: EventTypeDefinition[] = [];
  * A removed type (built-in or custom) is a tombstone, not an absent row —
  * dropping it here is what stops a built-in from reappearing on the next
  * read, since `builtIns` below is always regenerated from DEFAULT_EVENT_TYPES.
+ *
+ * The same "absent key falls back to the default" rule is why unlinking stores
+ * `null` rather than `undefined`: a spread only overrides keys that are present,
+ * and `undefined` doesn't survive the JSON round-trip to be present. See
+ * EventTypeDefinition.goalId.
  */
 function mergeWithDefaults(storedDefs: EventTypeDefinition[]): EventTypeDefinition[] {
   const builtIns = DEFAULT_EVENT_TYPES.map(def => {
-    const seededLink = BUILTIN_GOAL_LINKS[def.id];
+    const stored = storedDefs.find(d => d.id === def.id);
+    /**
+     * The link is three fields but one decision, so it seeds or doesn't as a
+     * unit. Field by field, a stored definition that had been relinked to a
+     * single goal — written before a split was expressible, so carrying `goalId`
+     * and nothing else — would keep its own goal for the early half and pick up
+     * the shipped default's late half, turning a link the user chose into a pair
+     * they never asked for. Prayer is the one type that can happen to, and the
+     * one type anybody has relinked.
+     */
+    const seededLink = stored && 'goalId' in stored ? undefined : BUILTIN_GOAL_LINKS[def.id];
     const base = {
       ...def,
       reportStyle: BUILTIN_REPORT_STYLES[def.id] ?? 'none',
-      ...(seededLink ? { goalId: seededLink.goalId, goalMode: seededLink.goalMode } : {}),
+      // Spread whole: the table's keys are the definition's own field names, so
+      // a seeded split pair (prayer) arrives with its cutoff attached.
+      ...(seededLink ?? {}),
     };
-    const stored = storedDefs.find(d => d.id === def.id);
     return stored ? { ...base, ...stored, builtIn: true } : base;
   });
   // Predates reportStyle: every custom type was implicitly status-reportable
@@ -51,12 +68,23 @@ export function useEventTypeDefinitions() {
     [definitions],
   );
 
-  // Covers every type with a link now, built-in or custom — the built-in-only
-  // hardcoded switch in getGoalContribution() is gone (except prayer's fallback).
+  // Covers every type with a link now, built-in or custom — getGoalContribution
+  // has no per-type branch left at all, prayer's split included.
+  //
+  // Neither split field is defaulted here. `splitTime` is what marks a link as a
+  // day/night pair, so supplying one a definition doesn't carry would invent a
+  // split; and a pair whose evening goal isn't chosen yet passes a cutoff with no
+  // `lateGoalId`, which getGoalContribution reads as "all of it counts early".
   const customLinks = useMemo(() => {
-    const links: Record<string, { goalId: string; mode: 'count' | 'hours' | 'quantity' }> = {};
+    const links: CustomTypeLinks = {};
     for (const def of definitions) {
-      if (def.goalId) links[def.id] = { goalId: def.goalId, mode: def.goalMode ?? 'count' };
+      if (!def.goalId) continue;
+      links[def.id] = {
+        goalId: def.goalId,
+        mode: def.goalMode ?? 'count',
+        ...(def.goalSplitTime ? { splitTime: def.goalSplitTime } : {}),
+        ...(def.lateGoalId ? { lateGoalId: def.lateGoalId } : {}),
+      };
     }
     return links;
   }, [definitions]);

@@ -26,6 +26,8 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     builtIn: 'built_in',
     goalId: 'goal_id',
     goalMode: 'goal_mode',
+    lateGoalId: 'late_goal_id',
+    goalSplitTime: 'goal_split_time',
     reportStyle: 'report_style',
   },
   goal_entries: {},
@@ -74,7 +76,8 @@ const COLUMNS: Record<string, string[]> = {
   ],
   event_type_definitions: [
     'user_id', 'id', 'label',
-    'visible', 'built_in', 'goal_id', 'goal_mode', 'report_style', 'removed', 'updated_at', 'deleted_at',
+    'visible', 'built_in', 'goal_id', 'goal_mode', 'late_goal_id', 'goal_split_time',
+    'report_style', 'removed', 'updated_at', 'deleted_at',
   ],
   goal_entries: [
     'user_id', 'goal_id', 'week_key', 'count', 'target', 'updated_at', 'deleted_at',
@@ -116,6 +119,20 @@ export const PK_COLUMNS: Record<string, string[]> = {
   convert_progress: ['user_id', 'id'],
 };
 
+/**
+ * Columns whose `null` is a value rather than an absence, so fromRow keeps it
+ * instead of skipping it.
+ *
+ * An event type's goal link is the one case. A stored definition is merged *over*
+ * the type's shipped default (mergeWithDefaults), so a missing goal_id re-seeds
+ * the built-in's link while an explicit null is what says the user unlinked it.
+ * Skipping the null — the right default everywhere else, where it only ever means
+ * "the server has nothing to add" — would hand the link back on the next pull.
+ */
+const NULLABLE_COLUMNS: Record<string, string[]> = {
+  event_type_definitions: ['goal_id', 'late_goal_id', 'goal_split_time'],
+};
+
 function invert(map: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
 }
@@ -146,19 +163,21 @@ export function toRow(
 
 /**
  * db row -> local shape. Drops sync bookkeeping the UI has no use for, and skips
- * nulls so a null server column can't clobber a value the client already holds.
+ * nulls so a null server column can't clobber a value the client already holds —
+ * except for the columns where a null is itself the answer, see NULLABLE_COLUMNS.
  */
 export function fromRow(
   table: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
   const reverse = invert(FIELD_MAPS[table] ?? {});
+  const keepNull = NULLABLE_COLUMNS[table] ?? [];
   const local: Record<string, unknown> = {};
 
   for (const [column, value] of Object.entries(row)) {
     if (column === 'user_id' || column === 'updated_at' || column === 'deleted_at') continue;
     const key = reverse[column] ?? column;
-    if (value !== null) local[key] = value;
+    if (value !== null || keepNull.includes(column)) local[key] = value;
   }
   return local;
 }

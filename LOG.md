@@ -35,7 +35,9 @@ FEATURES
 [x] fix menu animations (color menu sizing, icon and color menu animations) might be fixed be redesigning the event and goal type menus to be dropdowns to select the type, better button for adding, and all the individual settings on the first menus instead of having to open a second. making color and icon the second menus, not third.
 [x] figure out monthly goals "monthly planning" (future/past goals, graph)
 
-[ ] ui overhaul (cleaner dropdowns that don't blend into the backround, home page and people page ui, different icon library?)
+[ ] ui overhaul (cleaner dropdowns that don't blend into the backround, import contacts ui, different icon library?)
+[ ] update onboarding with new event and goal system changes
+[ ] increase range of red line and time text wherein the hour markers disappear
 [ ] add spanish portuguese french etc
 
 BUGS

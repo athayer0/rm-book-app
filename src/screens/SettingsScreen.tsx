@@ -56,7 +56,9 @@ function hourLabel(h: number): string {
 // Whether a built-in type's editable fields still match what it ships with —
 // used to grey out "Reset Event Types to Default" when there is nothing to
 // restore. Mirrors the seeding useEventTypeDefinitions.mergeWithDefaults does
-// for goalId/goalMode/reportStyle.
+// for the goal link (both halves of a split pair, and its cutoff), goalMode and
+// reportStyle. `?? undefined` on each id so an explicit unlink, which stores
+// null, reads as different from the seeded default rather than equal to it.
 function isStockBuiltInType(d: EventTypeDefinition): boolean {
   const seededLink = BUILTIN_GOAL_LINKS[d.id];
   const expectedReportStyle = BUILTIN_REPORT_STYLES[d.id] ?? 'none';
@@ -64,6 +66,8 @@ function isStockBuiltInType(d: EventTypeDefinition): boolean {
     d.label === EventTypeLabels[d.id] &&
     (d.goalId ?? undefined) === seededLink?.goalId &&
     (seededLink ? (d.goalMode ?? 'count') === seededLink.goalMode : true) &&
+    (d.lateGoalId ?? undefined) === seededLink?.lateGoalId &&
+    (d.goalSplitTime ?? undefined) === seededLink?.goalSplitTime &&
     (d.reportStyle ?? 'none') === expectedReportStyle
   );
 }

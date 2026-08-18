@@ -1,16 +1,59 @@
 import { EventColors, EventTypeLabels } from './colors';
 
+/**
+ * Where a split pair divides, unless the user moves it. 2 PM reproduces the
+ * boundary prayer's hardcoded morning/nightly split used, so seeding that pair
+ * as ordinary data changes nothing about what an existing prayer event counts
+ * toward.
+ */
+export const DEFAULT_GOAL_SPLIT_TIME = '2:00 PM';
+
 export interface EventTypeDefinition {
   id: string;
   label: string;
   builtIn: boolean;
-  /** The goal this type's completions contribute to, count or hours. */
-  goalId?: string;
+  /**
+   * The goal this type's completions contribute to, count or hours — or, when
+   * the type splits by time of day, the goal the earlier half counts toward.
+   *
+   * `null` is a deliberate "no goal", and is not interchangeable with an unset
+   * `undefined`. A built-in's stored fields are merged *over* its shipped
+   * defaults (mergeWithDefaults), so an absent key re-seeds the link from
+   * BUILTIN_GOAL_LINKS — which means unlinking has to persist as a value, and
+   * `undefined` isn't one: JSON.stringify drops the key, and the next read
+   * would hand the link straight back.
+   */
+  goalId?: string | null;
   /**
    * +1 per completion, the event's duration in hours, or the event's own
-   * `quantity` field. Defaults to 'count'.
+   * `quantity` field. Defaults to 'count'. Shared by both halves of a split
+   * pair: a goal divided by time of day is the same measurement on either side
+   * of the cutoff, so there is nothing for a second mode to describe.
    */
   goalMode?: 'count' | 'hours' | 'quantity';
+  /**
+   * The goal completions at or after `goalSplitTime` count toward instead, so
+   * one type can feed a morning/evening pair — what prayer's morning/nightly
+   * goals were a hardcoded exception in getGoalContribution() for, until these
+   * two fields made the split ordinary data any type can carry.
+   *
+   * Can be unset while `goalSplitTime` is set: that's a Day/Night type whose
+   * evening goal hasn't been picked yet, and every completion counts toward
+   * `goalId` until it is. Same `null`-means-none rule as `goalId`.
+   */
+  lateGoalId?: string | null;
+  /**
+   * Where the two halves divide, in the "2:00 PM" form every other time field in
+   * the app speaks.
+   *
+   * **Set is what makes a link a day/night pair** — it is the flag as well as
+   * the time, which is why the Goal Count Type control's Day/Night option can be
+   * chosen before there's an evening goal to divide anything with. The
+   * alternative was a fourth `goalMode`, but Day/Night isn't a fourth way of
+   * measuring: it counts completions exactly as 'count' does, and would have had
+   * to be translated back into one at every reader.
+   */
+  goalSplitTime?: string | null;
   /**
    * Whether — and how — completing an event of this type shows a status
    * control at all: a checkbox, the failed/pending/completed picker, or none.
@@ -49,12 +92,28 @@ export const DEFAULT_EVENT_TYPES: EventTypeDefinition[] = Object.keys(EventColor
  * behave exactly like a custom link — editable, deletable, unlinkable — while
  * starting out wired the way the app has always shipped.
  *
- * `prayer` is deliberately absent: it splits across two goals (morning/nightly)
- * by time of day, which doesn't fit a single goalId. It keeps a small hardcoded
- * fallback in getGoalContribution() that only applies while it carries no
- * explicit link. `contact` never contributed to a goal and stays that way.
+ * `prayer` is now one of them. It splits across two goals by time of day, which
+ * is why it used to be the one type with no entry here and a hardcoded fallback
+ * in getGoalContribution() instead — but a split is expressible as data now
+ * (lateGoalId + goalSplitTime), so its wiring is a default like every other
+ * type's. Nothing hardcodes 'morning_prayer'/'nightly_prayer' anymore: delete
+ * either goal, or the prayer type itself, and the pair can be rebuilt from the
+ * Event Types sheet — as can any other morning/evening pair someone invents.
+ *
+ * `contact` never contributed to a goal and stays that way.
  */
-export const BUILTIN_GOAL_LINKS: Record<string, { goalId: string; goalMode: 'count' | 'hours' | 'quantity' }> = {
+export const BUILTIN_GOAL_LINKS: Record<string, {
+  goalId: string;
+  goalMode: 'count' | 'hours' | 'quantity';
+  lateGoalId?: string;
+  goalSplitTime?: string;
+}> = {
+  prayer: {
+    goalId: 'morning_prayer',
+    goalMode: 'count',
+    lateGoalId: 'nightly_prayer',
+    goalSplitTime: DEFAULT_GOAL_SPLIT_TIME,
+  },
   temple: { goalId: 'temple_attendance', goalMode: 'count' },
   church: { goalId: 'church_hours', goalMode: 'hours' },
   service: { goalId: 'service_hours', goalMode: 'hours' },

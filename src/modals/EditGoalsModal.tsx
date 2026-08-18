@@ -198,9 +198,17 @@ export function EditGoalsModal({
     return isDark ? lightenColor(color) : color;
   }
 
-  /** Whether a goal can be deleted right now — false while an event type still links to it. */
+  /**
+   * Whether a goal can be deleted right now — false while an event type still
+   * links to it, in *either* slot. A type that splits by time of day holds two
+   * goals, and the evening one is no less linked for being the second.
+   */
   function goalInUse(id: string): boolean {
-    return localEventTypeDefs.some(d => d.goalId === id);
+    return localEventTypeDefs.some(d => linksTo(d, id));
+  }
+
+  function linksTo(d: EventTypeDefinition, goalId: string): boolean {
+    return d.goalId === goalId || d.lateGoalId === goalId;
   }
 
   function patchGoal(id: string, patch: Partial<GoalDefinition>) {
@@ -239,7 +247,7 @@ export function EditGoalsModal({
   function handleDeletePress() {
     if (!selected) return;
     if (goalInUse(selected.id)) {
-      const linkedTypeLabel = localEventTypeDefs.find(t => t.goalId === selected.id)?.label ?? 'an event type';
+      const linkedTypeLabel = localEventTypeDefs.find(t => linksTo(t, selected.id))?.label ?? 'an event type';
       Alert.alert(
         'Linked to an Event Type',
         `"${label(selected)}" is linked to ${linkedTypeLabel}. Set its Linked Event Type to None, then delete this goal.`,
@@ -272,11 +280,31 @@ export function EditGoalsModal({
    * Keeps a goal's link in step with the event-type side, where it's actually
    * stored. If the goal previously had a different type linked, that type is
    * freed; if a new type is picked, it's claimed.
+   *
+   * A type can hold this goal in either of two slots — the halves of a
+   * time-of-day split — so freeing means clearing whichever slot held it.
+   * Clearing the morning slot takes the evening one, and the cutoff, with it: an
+   * evening goal with no morning goal is a link getGoalContribution reads as no
+   * link at all, so leaving it would be silently dead configuration.
+   *
+   * Claiming always claims the morning slot, since that's the one a type needs
+   * before it can split. A type that already holds this goal as its *evening*
+   * half is therefore left exactly as it is — moving it to the morning slot
+   * would quietly unlink whatever goal was there.
    */
   function applyEventTypeLink(goalId: string, newTypeId: string | undefined) {
     setLocalEventTypeDefs(prev => prev.map(d => {
-      if (d.goalId === goalId && d.id !== newTypeId) return { ...d, goalId: undefined, goalMode: undefined };
-      if (d.id === newTypeId) return { ...d, goalId, goalMode: d.goalMode ?? 'count' };
+      if (d.id === newTypeId) {
+        if (d.lateGoalId === goalId) return d;
+        return { ...d, goalId, goalMode: d.goalMode ?? 'count' };
+      }
+      // null, not undefined — an unlinked built-in has to out-argue its own
+      // seeded default. See EventTypeDefinition.goalId.
+      if (d.goalId === goalId) return { ...d, goalId: null, lateGoalId: null, goalSplitTime: null };
+      // The cutoff stays, so the type is still Day/Night with its evening slot
+      // empty — clearing it from here would reach across and change the type's
+      // Goal Count Type, which is not what freeing one goal asked for.
+      if (d.lateGoalId === goalId) return { ...d, lateGoalId: null };
       return d;
     }));
   }
@@ -284,11 +312,17 @@ export function EditGoalsModal({
   // Derived rather than held in state: the link lives on the event type, so
   // reading it back from localEventTypeDefs is the same as reading it live.
   const linkedType = selected
-    ? localEventTypeDefs.find(t => t.goalId === selected.id)
+    ? localEventTypeDefs.find(t => linksTo(t, selected.id))
     : undefined;
-  /** Types with no linked goal, plus whichever one currently links to this goal. */
+  /** Whether this goal is the later half of that type's pair, not its only goal. */
+  const linkedAsEvening = !!selected && !!linkedType && linkedType.lateGoalId === selected.id;
+  /**
+   * Types with no linked goal, plus whichever one currently links to this goal —
+   * in either slot, so a goal that is some type's evening half still shows which
+   * type that is instead of reading as unlinked.
+   */
   const availableEventTypes = selected
-    ? localEventTypeDefs.filter(t => !t.goalId || t.goalId === selected.id)
+    ? localEventTypeDefs.filter(t => !t.goalId || linksTo(t, selected.id))
     : [];
 
   return (
@@ -377,16 +411,32 @@ export function EditGoalsModal({
               <View style={[styles.card, { marginTop: 18 }]}>
                 <View style={styles.section}>
                   <Text style={styles.fieldLabel}>Name</Text>
-                  <View style={styles.nameField}>
-                    <TextInput
-                      style={styles.nameInput}
-                      value={selected.label}
-                      onChangeText={text => patchGoal(selected.id, { label: text })}
-                      onFocus={() => setOpenMenu(null)}
-                      placeholder="Goal name..."
-                      placeholderTextColor={Colors.textLight}
-                      returnKeyType="done"
-                    />
+                  <View style={styles.nameRow}>
+                    <View style={styles.nameField}>
+                      <TextInput
+                        style={styles.nameInput}
+                        value={selected.label}
+                        onChangeText={text => patchGoal(selected.id, { label: text })}
+                        onFocus={() => setOpenMenu(null)}
+                        placeholder="Goal name..."
+                        placeholderTextColor={Colors.textLight}
+                        returnKeyType="done"
+                      />
+                    </View>
+                    {/* Beside the name rather than at the foot of the sheet,
+                        matching the event-type sheet and the person editor:
+                        deleting is about the whole goal, so it belongs against
+                        the thing that names it. The Alert — which is also where a
+                        goal still linked to an event type is refused — carries
+                        the destructive weight, so the glyph doesn't need to. */}
+                    <TouchableOpacity
+                      onPress={handleDeletePress}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete goal"
+                    >
+                      <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -462,7 +512,13 @@ export function EditGoalsModal({
                     {linkedType && (
                       <View style={[styles.rowDot, { backgroundColor: eventTypeColor(linkedType.id, settings.eventTypeColors) }]} />
                     )}
-                    <Text style={styles.rowValue}>{linkedType?.label ?? 'None'}</Text>
+                    {/* Says which half it is when it's the second one — the type's
+                        name alone would suggest this goal takes all of its
+                        completions, when it only takes the ones after the
+                        cutoff. */}
+                    <Text style={styles.rowValue}>
+                      {linkedType ? `${linkedType.label}${linkedAsEvening ? ' (evening)' : ''}` : 'None'}
+                    </Text>
                     <Ionicons
                       name={openMenu === 'link' ? 'chevron-up' : 'chevron-down'}
                       size={16}
@@ -506,9 +562,9 @@ export function EditGoalsModal({
           <Text style={styles.emptyHint}>Add a goal to start tracking one.</Text>
         )}
 
-        {/* Above the delete row, not below it: adding is the ordinary thing to
-            do here and deleting is the exception, so the destructive action is
-            the last thing on the page rather than something to scroll past. */}
+        {/* The only thing under the card now that deleting has moved up beside
+            the name — adding a goal is the one action here that isn't editing
+            what's already selected. */}
         <TouchableOpacity
           onPress={addGoal}
           disabled={!canAddGoal}
@@ -520,13 +576,6 @@ export function EditGoalsModal({
             {canAddGoal ? 'Add a Goal' : `Maximum of ${MAX_VISIBLE_GOALS} goals per grid`}
           </Text>
         </TouchableOpacity>
-
-        {!!selected && (
-          <TouchableOpacity style={styles.deleteRow} onPress={handleDeletePress} activeOpacity={0.7}>
-            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-            <Text style={styles.deleteRowText}>Delete Goal</Text>
-          </TouchableOpacity>
-        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -652,10 +701,18 @@ function makeStyles(C: ColorPalette) {
       color: C.textSecondary,
       marginBottom: 10,
     },
+    // The name field and the delete button, which shares its row rather than
+    // sitting at the foot of the sheet.
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
     // A recessed fill, same device the segmented control's track uses below, so
     // the field reads as something to tap into rather than a static label — a
     // bare line of text at this size gave no hint.
     nameField: {
+      flex: 1,
       backgroundColor: C.background,
       borderRadius: 10,
       paddingHorizontal: 12,
@@ -788,21 +845,5 @@ function makeStyles(C: ColorPalette) {
     // cap — just one that no longer offers to be pressed.
     addBtnDisabled: { backgroundColor: C.border },
     addBtnTextDisabled: { color: C.textSecondary },
-    deleteRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      // 22 when this sat under the card, where it needed to stand clear of a
-      // whole block of fields. It now follows the add button, which is one
-      // control, so it only needs to not look attached to it.
-      marginTop: 16,
-      paddingVertical: 10,
-    },
-    deleteRowText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: C.danger,
-    },
   });
 }

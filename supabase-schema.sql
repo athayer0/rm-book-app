@@ -217,12 +217,12 @@ create trigger goal_definitions_set_updated_at
 -- identity/visibility for event types, plus which
 -- goal their completions feed and how. Built-in
 -- types carry goal_id/goal_mode
--- too (seeded from BUILTIN_GOAL_LINKS) -- the old
+-- too (seeded from BUILTIN_GOAL_LINKS) -- the
 -- hardcoded-per-type contribution in
--- getGoalContribution() is gone except for a
--- narrow fallback for `prayer`, which splits
--- across two goals by time of day and so can't be
--- expressed as a single goal_id.
+-- getGoalContribution() is gone entirely, prayer's
+-- morning/nightly split included: that pair is now
+-- late_goal_id + goal_split_time below, so no goal
+-- id is written into app code anywhere.
 --
 -- Built-in type ids are the same literal for
 -- every user, so the composite PK is
@@ -241,6 +241,19 @@ create table if not exists event_type_definitions (
   deleted_at timestamptz,
   primary key (user_id, id)
 );
+-- A type can split its completions across two goals by time of day:
+-- goal_id takes the earlier half, late_goal_id everything from
+-- goal_split_time ('2:00 PM' form, same as calendar_events.start_time)
+-- onward. Both null means no split and goal_id takes the lot.
+--
+-- A null here is meaningful, not merely absent: a stored definition is
+-- merged over the type's shipped default, so a null goal_id is what
+-- records that the user unlinked a built-in, where a missing one would
+-- re-seed it. See NULLABLE_COLUMNS in rowMappers.ts.
+alter table event_type_definitions
+  add column if not exists late_goal_id text;
+alter table event_type_definitions
+  add column if not exists goal_split_time text;
 -- Whether/how completing an event of this type shows a status control:
 -- 'checkbox', 'status' (failed/pending/completed), or 'none'. Independent of
 -- goal_id/goal_mode -- linking separately decides whether that status also

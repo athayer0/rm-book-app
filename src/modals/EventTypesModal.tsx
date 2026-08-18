@@ -8,13 +8,14 @@ import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, DEFAULT_GOAL_COLOR } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { EventTypeDefinition } from '../constants/eventTypeDefaults';
+import { DEFAULT_GOAL_SPLIT_TIME, EventTypeDefinition } from '../constants/eventTypeDefaults';
 import { GoalDefinition } from '../constants/defaultGoals';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
 import { DurationSlider } from '../components/DurationSlider';
-import { DropdownMenu, DropdownItem, MenuScrollView } from '../components/DropdownMenu';
+import { TimeWheelPicker } from '../components/TimeWheelPicker';
+import { DropdownMenu, DropdownItem, MenuScrollView, Collapsible } from '../components/DropdownMenu';
 import { useSettings } from '../hooks/useSettings';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { eventTypeColor, eventTypeDefaultMinutes } from '../utils/eventUtils';
@@ -29,8 +30,31 @@ const DEFAULT_TYPE_MINUTES = 30;
 const TYPE_MENU_ROWS = 6.5;
 const GOAL_MENU_ROWS = 5.5;
 
-/** Which floating menu is open. Both are on this one screen, so they share a slot. */
-type MenuId = 'type' | 'goal';
+/**
+ * Which floating menu is open. All three are on this one screen, so they share a
+ * slot. The cutoff's time wheel isn't one of them: it opens in the flow rather
+ * than floating, and keeping it out of here is what lets `elevatedMenu` keep
+ * lagging — opening the wheel closes the goal menu, and the group has to stay
+ * lifted through that menu's exit.
+ */
+type MenuId = 'type' | 'goal' | 'lateGoal';
+
+/**
+ * The Goal Count Type control's four choices. Three of them are the stored
+ * `goalMode`; Day/Night is not a fourth way of measuring but a completion goal
+ * that divides at a time of day, so it maps onto mode 'count' plus a
+ * `goalSplitTime` — see EventTypeDefinition.goalSplitTime.
+ */
+type CountChoice = 'count' | 'hours' | 'quantity' | 'dayNight';
+
+const COUNT_CHOICES: CountChoice[] = ['count', 'hours', 'quantity', 'dayNight'];
+
+const COUNT_CHOICE_LABEL: Record<CountChoice, string> = {
+  count: 'Completion',
+  hours: 'Hours',
+  quantity: 'Quantity',
+  dayNight: 'Day/Night',
+};
 
 interface Props {
   visible: boolean;
@@ -67,6 +91,8 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   const [localMinutes, setLocalMinutes] = useState<Record<string, number>>(settings.eventTypeDefaultMinutes);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
+  /** The split cutoff's time wheel — in the flow, so not a MenuId. */
+  const [cutoffOpen, setCutoffOpen] = useState(false);
   const [colorSheetOpen, setColorSheetOpen] = useState(false);
 
   /**
@@ -86,6 +112,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
       setLocalMinutes(settings.eventTypeDefaultMinutes);
       setSelectedId(definitions.find(d => !d.removed)?.id ?? null);
       setOpenMenu(null);
+      setCutoffOpen(false);
       setColorSheetOpen(false);
     }
   }, [visible]);
@@ -116,8 +143,17 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
     }
   }
 
+  // One control open at a time across both kinds: a floating menu and the
+  // in-flow time wheel would otherwise overlap, since the wheel sits directly
+  // under the row the goal menus hang off.
   function toggleMenu(id: MenuId) {
+    setCutoffOpen(false);
     setOpenMenu(prev => (prev === id ? null : id));
+  }
+
+  function toggleCutoff() {
+    setOpenMenu(null);
+    setCutoffOpen(prev => !prev);
   }
 
   function label(def: EventTypeDefinition): string {
@@ -213,22 +249,57 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
     );
   }
 
-  // A goal/type can have at most one link. The picker only offers goals with no
-  // existing link, plus whichever one is currently linked to the selected type.
-  const availableGoals = goalDefinitions.filter(g => {
-    // A type deleted this session doesn't hold its goal hostage — its tombstone
-    // keeps the goalId, but the link is gone with it.
-    const claimedElsewhere = localDefs.some(d => !d.removed && d.goalId === g.id && d.id !== selected?.id);
-    return !claimedElsewhere;
-  });
-  const linkedGoal = availableGoals.find(g => g.id === selected?.goalId);
+  /**
+   * A goal belongs to at most one slot on one type — the two halves of a split
+   * pair are two slots, so this counts both. A type deleted this session doesn't
+   * hold its goals hostage: its tombstone keeps the ids, but the link is gone
+   * with it.
+   */
+  function claimedElsewhere(goalId: string): boolean {
+    return localDefs.some(d => (
+      !d.removed && d.id !== selected?.id && (d.goalId === goalId || d.lateGoalId === goalId)
+    ));
+  }
+
+  // Each slot offers every unclaimed goal except whatever the *other* slot on
+  // this same type holds — one goal on both sides of the cutoff would be a pair
+  // that isn't one.
+  const earlyGoals = goalDefinitions.filter(g => !claimedElsewhere(g.id) && g.id !== selected?.lateGoalId);
+  const lateGoals = goalDefinitions.filter(g => !claimedElsewhere(g.id) && g.id !== selected?.goalId);
+
+  const linkedGoal = goalDefinitions.find(g => g.id === selected?.goalId);
+  const lateGoal = goalDefinitions.find(g => g.id === selected?.lateGoalId);
+  /**
+   * Whether this type splits its completions across two goals by time of day —
+   * the cutoff's presence, not the evening goal's, since Day/Night is chosen
+   * before there's a second goal to pick. See EventTypeDefinition.goalSplitTime.
+   */
+  const isDayNight = !!selected?.goalSplitTime;
+  const splitTime = selected?.goalSplitTime || DEFAULT_GOAL_SPLIT_TIME;
 
   const color = selected ? eventTypeColor(selected.id, localColors) : DEFAULT_GOAL_COLOR;
   // Checkbox types (task) and optional-end types (contact) have no duration to
   // set — eventTypeDefaultMinutes returns null for those.
   const minutes = selected ? eventTypeDefaultMinutes(selected.id, localMinutes) : null;
-  const goalMode = selected?.goalMode ?? 'count';
+  const countChoice: CountChoice = isDayNight ? 'dayNight' : (selected?.goalMode ?? 'count');
   const reportStyle = selected?.reportStyle ?? 'status';
+
+  /**
+   * Day/Night is the one choice that isn't just a mode: it turns the link into a
+   * pair by giving it a cutoff, and every other choice takes that cutoff — and
+   * the evening goal hanging off it — back off again. Leaving either behind would
+   * be a goal still claimed by a type that no longer counts it, which is a goal
+   * that can't be deleted for a reason nothing on screen states.
+   */
+  function setCountChoice(next: CountChoice) {
+    if (!selected) return;
+    if (next === 'dayNight') {
+      patchType(selected.id, { goalMode: 'count', goalSplitTime: splitTime });
+      return;
+    }
+    setCutoffOpen(false);
+    patchType(selected.id, { goalMode: next, lateGoalId: null, goalSplitTime: null });
+  }
 
   return (
     <SheetModal visible={visible} onClose={handleClose}>
@@ -306,23 +377,39 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
         {selected ? (
           <>
             {/* Every field in one card — what identifies and links this type,
-                then how it behaves. A group of its own so the goal menu, which
+                then how it behaves. A group of its own so either goal menu, which
                 can reach past the card's bottom edge, floats over the delete
                 link below rather than painting behind it. */}
-            <View style={elevatedMenu === 'goal' && styles.groupFloating}>
+            <View style={(elevatedMenu === 'goal' || elevatedMenu === 'lateGoal') && styles.groupFloating}>
               <View style={[styles.card, { marginTop: 18 }]}>
                 <View style={styles.section}>
                   <Text style={styles.fieldLabel}>Name</Text>
-                  <View style={styles.nameField}>
-                    <TextInput
-                      style={styles.nameInput}
-                      value={selected.label}
-                      onChangeText={text => patchType(selected.id, { label: text })}
-                      onFocus={() => setOpenMenu(null)}
-                      placeholder="Event type name..."
-                      placeholderTextColor={Colors.textLight}
-                      returnKeyType="done"
-                    />
+                  <View style={styles.nameRow}>
+                    <View style={styles.nameField}>
+                      <TextInput
+                        style={styles.nameInput}
+                        value={selected.label}
+                        onChangeText={text => patchType(selected.id, { label: text })}
+                        onFocus={() => setOpenMenu(null)}
+                        placeholder="Event type name..."
+                        placeholderTextColor={Colors.textLight}
+                        returnKeyType="done"
+                      />
+                    </View>
+                    {/* Beside the name rather than at the foot of the sheet,
+                        matching the person and event editors: deleting is about
+                        the whole type, so it belongs against the thing that names
+                        it and not below the last field, where it read as one more
+                        part of the form. The Alert carries the destructive
+                        weight, so the glyph doesn't need to. */}
+                    <TouchableOpacity
+                      onPress={handleDeletePress}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete event type"
+                    >
+                      <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -348,7 +435,10 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     onPress={() => toggleMenu('goal')}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.rowLabel}>Linked Goal</Text>
+                    {/* Renamed while the type is a pair, because "Linked Goal"
+                        and "Evening Goal" as a pair of labels says nothing about
+                        which of the two this one is. */}
+                    <Text style={styles.rowLabel}>{isDayNight ? 'Morning Goal' : 'Linked Goal'}</Text>
                     {/* The goal's own icon in its own colour, the way the grid
                         and the goal editor draw it — a bare dot said which
                         colour it was and nothing about which goal. */}
@@ -370,19 +460,25 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     <MenuScrollView
                       open={openMenu === 'goal'}
                       // None is row 0, so every goal sits one further down.
-                      selectedIndex={selected.goalId ? 1 + availableGoals.findIndex(g => g.id === selected.goalId) : 0}
+                      selectedIndex={selected.goalId ? 1 + earlyGoals.findIndex(g => g.id === selected.goalId) : 0}
                       maxRows={GOAL_MENU_ROWS}
                     >
                       <DropdownItem
                         label="None"
-                        selected={selected.goalId === undefined}
-                        showSeparator={availableGoals.length > 0}
+                        selected={!selected.goalId}
+                        showSeparator={earlyGoals.length > 0}
                         onPress={() => {
-                          patchType(selected.id, { goalId: undefined, goalMode: undefined });
+                          // null, not undefined: an unlinked built-in has to
+                          // out-argue its own seeded default — see
+                          // EventTypeDefinition.goalId. The whole pair goes,
+                          // since an evening goal with no morning one is a link
+                          // getGoalContribution can't read. goalMode is left
+                          // alone for the same reason a re-link keeps it.
+                          patchType(selected.id, { goalId: null, lateGoalId: null, goalSplitTime: null });
                           setOpenMenu(null);
                         }}
                       />
-                      {availableGoals.map((g, i, arr) => (
+                      {earlyGoals.map((g, i, arr) => (
                         <DropdownItem
                           key={g.id}
                           label={g.label}
@@ -402,19 +498,135 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                   </DropdownMenu>
                 </View>
 
-                {selected.goalId !== undefined && (
+                {/* The second half of the pair — only for a Day/Night type, which
+                    is the point of putting that choice on the Goal Count Type
+                    control: a type measured in hours or completions has no use
+                    for this row and never shows it. This is what prayer's
+                    morning/nightly goals used to be hardcoded for; any type can
+                    carry the pair now, and prayer's is only a seeded default. */}
+                {isDayNight && (
+                  <View style={[styles.fieldRow, elevatedMenu === 'lateGoal' && styles.fieldRowOpen]}>
+                    <TouchableOpacity
+                      style={styles.row}
+                      onPress={() => toggleMenu('lateGoal')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.rowLabel}>Evening Goal</Text>
+                      {lateGoal && (
+                        <View style={[styles.goalIcon, { backgroundColor: isDark ? lateGoal.color : lateGoal.color + '20' }]}>
+                          <GoalIcon icon={lateGoal.icon} iconFamily={lateGoal.iconFamily} size={15} color={iconTint(lateGoal.color)} />
+                        </View>
+                      )}
+                      <Text style={styles.rowValue}>{lateGoal?.label ?? 'None'}</Text>
+                      <Ionicons
+                        name={openMenu === 'lateGoal' ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={Colors.textLight}
+                        style={{ marginLeft: 6 }}
+                      />
+                    </TouchableOpacity>
+
+                    <DropdownMenu open={openMenu === 'lateGoal'}>
+                      <MenuScrollView
+                        open={openMenu === 'lateGoal'}
+                        selectedIndex={selected.lateGoalId ? 1 + lateGoals.findIndex(g => g.id === selected.lateGoalId) : 0}
+                        maxRows={GOAL_MENU_ROWS}
+                      >
+                        <DropdownItem
+                          label="None"
+                          selected={!selected.lateGoalId}
+                          showSeparator={lateGoals.length > 0}
+                          onPress={() => {
+                            // The cutoff stays: it's what keeps this a Day/Night
+                            // type, and clearing it here would silently reset the
+                            // Goal Count Type control to Completion. Everything
+                            // counts toward the morning goal meanwhile.
+                            patchType(selected.id, { lateGoalId: null });
+                            setOpenMenu(null);
+                          }}
+                        />
+                        {lateGoals.map((g, i, arr) => (
+                          <DropdownItem
+                            key={g.id}
+                            label={g.label}
+                            selected={selected.lateGoalId === g.id}
+                            showSeparator={i < arr.length - 1}
+                            leading={<GoalIcon icon={g.icon} iconFamily={g.iconFamily} size={17} color={iconTint(g.color)} />}
+                            labelStyle={{ marginLeft: 10 }}
+                            onPress={() => {
+                              patchType(selected.id, { lateGoalId: g.id });
+                              setOpenMenu(null);
+                            }}
+                          />
+                        ))}
+                      </MenuScrollView>
+                    </DropdownMenu>
+                  </View>
+                )}
+
+                {/* Where the two halves divide. Shown for the whole of a
+                    Day/Night type's life, evening goal picked or not — it is what
+                    makes the type one, so hiding it until the pair was complete
+                    would hide the only control that says so. */}
+                {isDayNight && (
+                  <>
+                    <TouchableOpacity
+                      // Hands its hairline to the hint below while the wheel is
+                      // shut, so the two read as one block; keeps it while the
+                      // wheel is out, where it's the only thing separating the
+                      // row from its own panel.
+                      style={[styles.row, !cutoffOpen && styles.rowLast]}
+                      onPress={toggleCutoff}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.rowLabel}>Switches At</Text>
+                      <Text style={styles.rowValue}>{splitTime}</Text>
+                      <Ionicons
+                        name={cutoffOpen ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={Colors.textLight}
+                        style={{ marginLeft: 6 }}
+                      />
+                    </TouchableOpacity>
+                    <Collapsible open={cutoffOpen}>
+                      <View style={styles.timeWheelPanel}>
+                        <TimeWheelPicker
+                          value={splitTime}
+                          onChange={next => patchType(selected.id, { goalSplitTime: next })}
+                        />
+                      </View>
+                    </Collapsible>
+                    <Text style={styles.rowHint}>
+                      {lateGoal
+                        ? `Completions before ${splitTime} count toward ${linkedGoal?.label || 'the morning goal'}, and from ${splitTime} on toward ${lateGoal.label || 'the evening goal'}.`
+                        : `Every completion counts toward ${linkedGoal?.label || 'the morning goal'} until an evening goal is picked.`}
+                    </Text>
+                  </>
+                )}
+
+                {/* Day/Night sits here rather than being a dropdown of its own,
+                    so the rows above adapt to a choice made once instead of every
+                    type carrying an Evening Goal row it will never use. */}
+                {!!selected.goalId && (
                   <View style={styles.section}>
                     <Text style={styles.fieldLabel}>Goal Count Type</Text>
                     <View style={styles.segmentTrack}>
-                      {(['count', 'hours', 'quantity'] as const).map(mode => (
+                      {COUNT_CHOICES.map(choice => (
                         <TouchableOpacity
-                          key={mode}
-                          style={[styles.segment, goalMode === mode && styles.segmentActive]}
-                          onPress={() => patchType(selected.id, { goalMode: mode })}
+                          key={choice}
+                          style={[styles.segment, countChoice === choice && styles.segmentActive]}
+                          onPress={() => setCountChoice(choice)}
                           activeOpacity={0.75}
                         >
-                          <Text style={[styles.segmentText, goalMode === mode && styles.segmentTextActive]}>
-                            {mode === 'count' ? 'Completion' : mode === 'hours' ? 'Hours' : 'Quantity'}
+                          <Text
+                            style={[
+                              styles.segmentText,
+                              styles.segmentTextTight,
+                              countChoice === choice && styles.segmentTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {COUNT_CHOICE_LABEL[choice]}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -461,20 +673,13 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
           <Text style={styles.emptyHint}>Add an event type to start scheduling one.</Text>
         )}
 
-        {/* Above the delete row, not below it: adding is the ordinary thing to
-            do here and deleting is the exception, so the destructive action is
-            the last thing on the page rather than something to scroll past. */}
+        {/* The only thing under the card now that deleting has moved up beside
+            the name — adding a type is the one action here that isn't editing
+            what's already selected. */}
         <TouchableOpacity onPress={addType} style={styles.addBtn} activeOpacity={0.85}>
           <Ionicons name="add" size={18} color={Colors.white} />
           <Text style={styles.addBtnText}>Add an Event Type</Text>
         </TouchableOpacity>
-
-        {!!selected && (
-          <TouchableOpacity style={styles.deleteRow} onPress={handleDeletePress} activeOpacity={0.7}>
-            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-            <Text style={styles.deleteRowText}>Delete Event Type</Text>
-          </TouchableOpacity>
-        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -572,9 +777,17 @@ function makeStyles(C: ColorPalette) {
       color: C.textSecondary,
       marginBottom: 10,
     },
+    // The name field and the delete button, which shares its row rather than
+    // sitting at the foot of the sheet.
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
     // A recessed fill, same device the segmented control's track uses below, so
     // the field reads as something to tap into rather than a static label.
     nameField: {
+      flex: 1,
       backgroundColor: C.background,
       borderRadius: 10,
       paddingHorizontal: 12,
@@ -599,6 +812,25 @@ function makeStyles(C: ColorPalette) {
     rowLabel: { flex: 1, fontSize: 15, color: C.text },
     rowValue: { fontSize: 14, color: C.textSecondary },
     rowDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
+    // Which goal each side of the cutoff feeds, spelled out — the two rows above
+    // state the pair and the time, and neither says which way round they apply.
+    // Carries the hairline for the block, as EditGoalsModal's hint does.
+    rowHint: {
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      fontSize: 12,
+      color: C.textLight,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    // The cutoff's time wheel, opening in the flow under its row. No rounded
+    // bottom corners, unlike the Settings screen's: fields follow it inside the
+    // same card, so it is never the card's last element.
+    timeWheelPanel: {
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      backgroundColor: C.card,
+    },
     // The linked goal's icon on its own tinted disc, as the goal grid draws it.
     // In dark mode the disc takes the goal's full colour and the glyph lightens
     // off it, since a 20%-alpha wash of anything on near-black is invisible.
@@ -639,6 +871,11 @@ function makeStyles(C: ColorPalette) {
       elevation: 2,
     },
     segmentText: { fontSize: 13, fontWeight: '600', color: C.textSecondary },
+    // Four segments in a track the other controls fill with three, so "Completion"
+    // has ~71pt to sit in on the narrowest phone rather than ~85. A point off the
+    // type fits it; `adjustsFontSizeToFit` would have been the obvious answer and
+    // is iOS-only, so Android would have ellipsized instead of shrinking.
+    segmentTextTight: { fontSize: 12 },
     segmentTextActive: { color: C.text },
     emptyHint: {
       marginTop: 24,
@@ -676,22 +913,6 @@ function makeStyles(C: ColorPalette) {
       fontSize: 15,
       fontWeight: '700',
       color: C.white,
-    },
-    deleteRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      // 22 when this sat under the card, where it needed to stand clear of a
-      // whole block of fields. It now follows the add button, which is one
-      // control, so it only needs to not look attached to it.
-      marginTop: 16,
-      paddingVertical: 10,
-    },
-    deleteRowText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: C.danger,
     },
   });
 }
