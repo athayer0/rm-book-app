@@ -34,20 +34,34 @@ function primaryAddress(addresses: Contacts.Address[] | undefined): string | und
   return parts.length > 0 ? parts.join(', ') : undefined;
 }
 
-type LoadState = 'loading' | 'denied' | 'error' | 'ready';
+/** Up to two letters for the row's avatar circle — first + last name initials. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? '?';
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+type LoadState = 'intro' | 'loading' | 'denied' | 'error' | 'ready';
 
 /**
  * Pulls names and numbers out of the phone's own contacts app, so someone
  * already tracked there doesn't have to be retyped by hand. Only offered here,
  * not folded into the FAB's quick-add stack — this asks for a system
  * permission and a device round trip, which the bubble menu never does.
+ *
+ * Opens on an `intro` step rather than firing the OS permission prompt
+ * immediately: iOS's own picker lets someone share their whole address book,
+ * and without a beat of explanation first that reads as the app asking for
+ * all of it. The intro says up front that sharing one or two people is fine.
+ * Skipped when permission was already granted in an earlier session.
  */
 export function ImportContactsModal({ visible, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people, addPerson } = usePeople();
 
-  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [loadState, setLoadState] = useState<LoadState>('intro');
   const [contacts, setContacts] = useState<DeviceContact[]>([]);
   // 'limited' (iOS 18+ only) means the OS is only sharing a subset of contacts —
   // an empty or short list here doesn't mean the address book itself is empty.
@@ -78,22 +92,39 @@ export function ImportContactsModal({ visible, onClose }: Props) {
     setLoadState('ready');
   }
 
+  async function requestAndLoad() {
+    setLoadState('loading');
+    try {
+      const { status, accessPrivileges: privileges } = await Contacts.requestPermissionsAsync();
+      setAccessPrivileges(privileges);
+      if (status !== 'granted') {
+        setLoadState('denied');
+        return;
+      }
+      await loadContacts();
+    } catch {
+      setLoadState('error');
+    }
+  }
+
   useEffect(() => {
     if (!visible) return;
     setSearch('');
     setSelected(new Set());
-    setLoadState('loading');
     (async () => {
       try {
-        const { status, accessPrivileges: privileges } = await Contacts.requestPermissionsAsync();
-        setAccessPrivileges(privileges);
-        if (status !== 'granted') {
-          setLoadState('denied');
-          return;
+        // A non-prompting check first: someone who already granted access in a
+        // past session shouldn't see the intro step again on every open.
+        const { status, accessPrivileges: privileges } = await Contacts.getPermissionsAsync();
+        if (status === 'granted') {
+          setAccessPrivileges(privileges);
+          setLoadState('loading');
+          await loadContacts();
+        } else {
+          setLoadState('intro');
         }
-        await loadContacts();
       } catch {
-        setLoadState('error');
+        setLoadState('intro');
       }
     })();
     // loadContacts only reads module-level APIs, not component state — safe to
@@ -155,18 +186,45 @@ export function ImportContactsModal({ visible, onClose }: Props) {
         </TouchableOpacity>
         <View style={styles.headerLabels}>
           <Text style={styles.headerTitle}>Import Contacts</Text>
-          <Text style={styles.headerCount}>
-            {selected.size === 0 ? 'None selected' : `${selected.size} selected`}
-          </Text>
+          {loadState === 'ready' && (
+            <Text style={styles.headerCount}>
+              {selected.size === 0 ? 'None selected' : `${selected.size} selected`}
+            </Text>
+          )}
         </View>
-        <TouchableOpacity onPress={handleImport} disabled={selected.size === 0 || importing}>
-          <Text style={[styles.done, (selected.size === 0 || importing) && styles.doneDisabled]}>
-            {importing ? 'Adding…' : 'Import'}
-          </Text>
-        </TouchableOpacity>
+        {loadState === 'ready' ? (
+          <TouchableOpacity onPress={handleImport} disabled={selected.size === 0 || importing}>
+            <Text style={[styles.done, (selected.size === 0 || importing) && styles.doneDisabled]}>
+              {importing ? 'Adding…' : 'Import'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.closeBtn} />
+        )}
       </View>
 
       <View style={styles.body}>
+        {loadState === 'intro' && (
+          <View style={styles.introWrap}>
+            <View style={styles.introIconCircle}>
+              <Ionicons name="people" size={36} color={Colors.onPrimary} />
+            </View>
+            <Text style={styles.introTitle}>Import people you choose</Text>
+            <Text style={styles.introBody}>
+              Next, your phone will ask which contacts to share with this app.
+              Sharing just one or two people is completely fine — sharing more
+              is entirely optional, and there's nothing to share at all if you'd
+              rather add people by hand.
+            </Text>
+            <TouchableOpacity style={styles.introBtn} onPress={requestAndLoad} activeOpacity={0.85}>
+              <Text style={styles.introBtnText}>Choose Contacts to Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} activeOpacity={0.7} hitSlop={8}>
+              <Text style={styles.introSkip}>Not Now</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {loadState === 'ready' && (
           <View style={styles.searchBar}>
             <Ionicons name="search" size={16} color={Colors.textLight} style={styles.searchIcon} />
@@ -197,7 +255,8 @@ export function ImportContactsModal({ visible, onClose }: Props) {
             <Ionicons name="lock-closed-outline" size={48} color={Colors.textLight} />
             <Text style={styles.emptyTitle}>Contacts access denied</Text>
             <Text style={styles.emptyText}>
-              Allow contacts access in Settings to import people from your phone.
+              Allow access in Settings to import people from your phone — you'll
+              still choose exactly who gets added, nothing happens automatically.
             </Text>
             <TouchableOpacity style={styles.settingsBtn} onPress={() => Linking.openSettings()}>
               <Text style={styles.settingsBtnText}>Open Settings</Text>
@@ -221,13 +280,11 @@ export function ImportContactsModal({ visible, onClose }: Props) {
 
         {loadState === 'ready' && accessPrivileges === 'limited' && (
           <View style={styles.limitedBanner}>
-            <View style={styles.limitedBannerIcon}>
-              <Ionicons name="settings-outline" size={20} color={Colors.control} />
-            </View>
+            <Ionicons name="person-circle-outline" size={20} color={Colors.control} />
             <Text style={styles.limitedBannerText} numberOfLines={1}>
-              Only some contacts are shared.
+              Only some contacts shared.
             </Text>
-            <TouchableOpacity style={styles.limitedBannerBtn} onPress={openContactsSettings}>
+            <TouchableOpacity style={styles.limitedBannerBtn} onPress={openContactsSettings} activeOpacity={0.7}>
               <Text style={styles.limitedBannerBtnText}>Manage Settings</Text>
             </TouchableOpacity>
           </View>
@@ -246,54 +303,65 @@ export function ImportContactsModal({ visible, onClose }: Props) {
               <View style={styles.empty}>
                 <Ionicons name="people-outline" size={48} color={Colors.textLight} />
                 <Text style={styles.emptyTitle}>
-                  {search.length > 0 ? 'No matches' : 'No contacts found'}
+                  {search.length > 0 ? 'No matches' : 'No contacts shared yet'}
                 </Text>
                 {search.length === 0 && accessPrivileges === 'limited' && (
                   <>
                     <Text style={styles.emptyText}>
-                      None of your contacts have been shared with this app yet.
+                      That's completely fine — sharing contacts is optional. Choose
+                      just the people you'd like to import, or skip this entirely.
                     </Text>
                     <TouchableOpacity style={styles.settingsBtn} onPress={openContactsSettings}>
-                      <Text style={styles.settingsBtnText}>Open Settings</Text>
+                      <Text style={styles.settingsBtnText}>Choose Contacts</Text>
                     </TouchableOpacity>
                   </>
                 )}
               </View>
             ) : (
-              matches.map((contact, index) => {
-                const alreadyAdded = existingNames.has(contact.name.toLowerCase());
-                const isSelected = selected.has(contact.id);
-                return (
-                  <TouchableOpacity
-                    key={contact.id}
-                    style={[
-                      styles.row,
-                      index === 0 && styles.rowFirst,
-                      alreadyAdded && styles.rowDisabled,
-                    ]}
-                    onPress={() => toggle(contact)}
-                    disabled={alreadyAdded}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.rowText}>
-                      <Text style={styles.rowName}>{contact.name}</Text>
-                      {!!contact.phone && <Text style={styles.rowPhone}>{contact.phone}</Text>}
-                      {!!contact.address && (
-                        <Text style={styles.rowPhone} numberOfLines={1}>{contact.address}</Text>
+              <View style={styles.listCardShadow}>
+              <View style={styles.listCard}>
+                {matches.map((contact, index) => {
+                  const alreadyAdded = existingNames.has(contact.name.toLowerCase());
+                  const isSelected = selected.has(contact.id);
+                  return (
+                    <TouchableOpacity
+                      key={contact.id}
+                      style={[
+                        styles.row,
+                        index === 0 && styles.rowFirst,
+                        alreadyAdded && styles.rowDisabled,
+                      ]}
+                      onPress={() => toggle(contact)}
+                      disabled={alreadyAdded}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{initials(contact.name)}</Text>
+                      </View>
+                      <View style={styles.rowText}>
+                        <Text style={styles.rowName} numberOfLines={1}>{contact.name}</Text>
+                        {!!contact.phone && <Text style={styles.rowPhone}>{contact.phone}</Text>}
+                        {!!contact.address && (
+                          <Text style={styles.rowPhone} numberOfLines={1}>{contact.address}</Text>
+                        )}
+                      </View>
+                      {alreadyAdded ? (
+                        <View style={styles.addedPill}>
+                          <Ionicons name="checkmark" size={13} color={Colors.textLight} />
+                          <Text style={styles.addedLabel}>Added</Text>
+                        </View>
+                      ) : (
+                        <Ionicons
+                          name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={24}
+                          color={isSelected ? Colors.control : Colors.textLight}
+                        />
                       )}
-                    </View>
-                    {alreadyAdded ? (
-                      <Text style={styles.addedLabel}>Added</Text>
-                    ) : (
-                      <Ionicons
-                        name={isSelected ? 'checkbox' : 'square-outline'}
-                        size={22}
-                        color={isSelected ? Colors.control : Colors.textLight}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              </View>
             )}
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -322,6 +390,49 @@ function makeStyles(C: ColorPalette) {
     done: { fontSize: 16, fontWeight: '600', color: C.accent },
     doneDisabled: { color: C.textLight },
     body: { flex: 1, backgroundColor: C.background },
+    introWrap: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+    },
+    introIconCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: C.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+    },
+    introTitle: {
+      fontSize: 19,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    introBody: {
+      fontSize: 14.5,
+      lineHeight: 21,
+      color: C.textSecondary,
+      textAlign: 'center',
+      marginBottom: 28,
+    },
+    introBtn: {
+      width: '100%',
+      paddingVertical: 14,
+      borderRadius: 14,
+      backgroundColor: C.control,
+      alignItems: 'center',
+    },
+    introBtnText: { fontSize: 15.5, fontWeight: '600', color: C.white },
+    introSkip: {
+      fontSize: 14,
+      color: C.textLight,
+      marginTop: 18,
+      padding: 4,
+    },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -329,8 +440,8 @@ function makeStyles(C: ColorPalette) {
       marginHorizontal: 16,
       marginTop: 12,
       paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 14,
+      paddingVertical: 9,
+      borderRadius: 10,
     },
     searchIcon: { marginRight: 8 },
     searchInput: { flex: 1, fontSize: 15, color: C.text, padding: 0 },
@@ -340,47 +451,67 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
       marginHorizontal: 16,
       marginTop: 12,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: C.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
       gap: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 1,
     },
-    limitedBannerIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: C.control + '1a',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    limitedBannerText: { flex: 1, fontSize: 12, color: C.textSecondary },
+    limitedBannerText: { flex: 1, fontSize: 13, fontWeight: '500', color: C.text },
     limitedBannerBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 20,
       backgroundColor: C.control,
     },
-    limitedBannerBtnText: { fontSize: 12, fontWeight: '600', color: C.white },
+    limitedBannerBtnText: { fontSize: 12.5, fontWeight: '600', color: C.white },
     scroll: { flex: 1 },
     content: { paddingTop: 12 },
+    // Shadow only — kept off `listCard` because overflow:'hidden' clips a
+    // shadow along with everything else, which on iOS erases it outright.
+    listCardShadow: {
+      marginHorizontal: 16,
+      borderRadius: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    listCard: {
+      borderRadius: 14,
+      backgroundColor: C.card,
+      overflow: 'hidden',
+    },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: C.card,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
     },
     rowFirst: { borderTopWidth: 0 },
     rowDisabled: { opacity: 0.55 },
+    avatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: C.infoChipBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    avatarText: { fontSize: 13.5, fontWeight: '700', color: C.textSecondary },
     rowText: { flex: 1, marginRight: 12 },
     rowName: { fontSize: 15, fontWeight: '600', color: C.text },
     rowPhone: { fontSize: 13, color: C.textSecondary, marginTop: 2 },
-    addedLabel: { fontSize: 13, color: C.textLight, fontStyle: 'italic' },
+    addedPill: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    addedLabel: { fontSize: 13, color: C.textLight, fontWeight: '500' },
     empty: {
       alignItems: 'center',
       paddingTop: 64,

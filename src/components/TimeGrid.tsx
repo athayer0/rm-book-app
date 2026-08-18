@@ -198,7 +198,7 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   const nowM = currentMinutes % 60;
   const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
   const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
-  const HIDE_NEAR_PX = 10;
+  const HIDE_NEAR_PX = 5;
   // nowLabel (the red current-time text) sits above the line itself — see its
   // `top: -15` in makeStyles — so a marker can sit close to the label without
   // being close to the line. Hiding must check proximity to both.
