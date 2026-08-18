@@ -34,10 +34,11 @@ FEATURES
 [x] fix select (show all calendar shadows, turn off select mode when switching pages, fix select headers)
 [x] fix menu animations (color menu sizing, icon and color menu animations) might be fixed be redesigning the event and goal type menus to be dropdowns to select the type, better button for adding, and all the individual settings on the first menus instead of having to open a second. making color and icon the second menus, not third.
 [x] figure out monthly goals "monthly planning" (future/past goals, graph)
+[x] add day/night goals and goal link for prayers
+[x] increase range of red line and time text wherein the hour markers disappear
 
 [ ] ui overhaul (cleaner dropdowns that don't blend into the backround, import contacts ui, different icon library?)
 [ ] update onboarding with new event and goal system changes
-[ ] increase range of red line and time text wherein the hour markers disappear
 [ ] add spanish portuguese french etc
 
 BUGS
