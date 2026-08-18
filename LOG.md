@@ -36,9 +36,14 @@ FEATURES
 [x] figure out monthly goals "monthly planning" (future/past goals, graph)
 [x] add day/night goals and goal link for prayers
 [x] increase range of red line and time text wherein the hour markers disappear
+[x] ui overhaul (cleaner dropdowns that don't blend into the backround, different icon library?)
+[x] update onboarding with new event and goal system changes
 
-[ ] ui overhaul (cleaner dropdowns that don't blend into the backround, import contacts ui, different icon library?)
-[ ] update onboarding with new event and goal system changes
+[ ] new events and goals end up at bottom, sort by color order (or alphabetical) instead
+[ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
+[ ] individual event notifs
+[ ] repeating events move all or move one
+[ ] move onboarded flag from asyncStorage to supabase
 [ ] add spanish portuguese french etc
 
 BUGS

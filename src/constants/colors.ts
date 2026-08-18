@@ -84,6 +84,11 @@ export const LightColors = {
   // should follow if the form's fields are ever restyled.
   inputBg: '#F1F3F6',
   inputBorder: '#E3E6EA',
+  // Skeleton placeholder blocks (Home's loading state right after onboarding
+  // commits its writes in the background). A step off `card`, the same
+  // direction `infoChipBg` takes, so a pulsing block reads as sitting on the
+  // card rather than as a hole in it.
+  skeletonBase: '#E7E7E9',
   // Event reporting states, shared by the calendar's status badges and the
   // unreported-events shortcut. Centralised because two features have to agree:
   // an amber dot on the home row must mean the same thing as one on a block.
@@ -99,13 +104,10 @@ export const LightColors = {
   // mode it has to be *lighter* than the surface it covers, and its hairlines
   // are finer than the rules that divide a card's rows.
   //
-  // Note `menuSurface` is exactly `card`. That is not an oversight, but it does
-  // mean the surface distinguishes nothing: almost every menu in the app opens
-  // over a card, so white lands on white and the edge and the shadow are left
-  // doing all of the work. Apple can style a menu on shadow alone because its
-  // menus open over content; over a white sheet the same styling disappears,
-  // which is why there is a real hairline here rather than a transparent one.
-  menuSurface: '#FFFFFF',
+  // A step off `card` rather than equal to it: almost every menu in the app
+  // opens over a card, and white landing on white left the edge and shadow
+  // doing all the work of saying "this is a separate surface."
+  menuSurface: '#FAFAFA',
   menuSeparator: 'rgba(60,60,67,0.13)',
   // Deliberately heavier than menuSeparator: this is the boundary of the whole
   // panel, and an edge drawn at the same weight as the rules between its rows
@@ -158,6 +160,9 @@ export const DarkColors: typeof LightColors = {
   // more of the shape here than in light mode, where the fill alone reads.
   inputBg: '#262628',
   inputBorder: '#333336',
+  // Lifted further off `card` than infoChipBg, since the pulse needs to read
+  // even at its dimmest point against a near-black card.
+  skeletonBase: '#3A3A3C',
   // Lifted from the light values, which are mid-tones chosen against white and
   // go muddy on a dark card. Hue is preserved so the states stay recognisable.
   statusCompleted: '#3FB56B',

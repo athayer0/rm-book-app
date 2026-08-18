@@ -13,12 +13,14 @@ import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { UnreportedRow } from '../components/UnreportedRow';
+import { HomeSkeleton } from '../components/HomeSkeleton';
 import { EditGoalsModal } from '../modals/EditGoalsModal';
 import { GoalsModal } from '../modals/GoalsModal';
 import { GoalGraphModal } from '../modals/GoalGraphModal';
 import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
 import { GoalGrain } from '../utils/goalGrain';
 import { useUnreported } from '../hooks/useUnreported';
+import { useOnboardingFinishing } from '../hooks/useOnboarding';
 
 export function HomeScreen({ navigation, route }: any) {
   const Colors = useColors();
@@ -31,6 +33,7 @@ export function HomeScreen({ navigation, route }: any) {
   const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly } = useMonthlyGoals();
   const { count: unreportedCount } = useUnreported();
   const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
+  const onboardingFinishing = useOnboardingFinishing();
 
   useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
   const [editVisible, setEditVisible] = useState(false);
@@ -64,55 +67,61 @@ export function HomeScreen({ navigation, route }: any) {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Both grains in one card: they are two views of the same set of goal
-            definitions, and the pair of sheets below serve both, so splitting
-            them across two cards implied two independent features. EDIT sits on
-            the first heading only — there is one goal editor for both grains. */}
-        <View style={styles.card}>
-          <SectionHeader
-            title="Weekly Goals"
-            actionLabel="EDIT"
-            onAction={() => setEditVisible(true)}
-          />
-          <GoalGrid
-            definitions={definitions}
-            counts={counts}
-            goals={goals}
-            onPressGoal={() => openGoals('week')}
-          />
+        {onboardingFinishing ? (
+          <HomeSkeleton />
+        ) : (
+          <>
+            {/* Both grains in one card: they are two views of the same set of goal
+                definitions, and the pair of sheets below serve both, so splitting
+                them across two cards implied two independent features. EDIT sits on
+                the first heading only — there is one goal editor for both grains. */}
+            <View style={styles.card}>
+              <SectionHeader
+                title="Weekly Goals"
+                actionLabel="EDIT"
+                onAction={() => setEditVisible(true)}
+              />
+              <GoalGrid
+                definitions={definitions}
+                counts={counts}
+                goals={goals}
+                onPressGoal={() => openGoals('week')}
+              />
 
-          <SectionHeader title="Monthly Goals" tightTop />
-          <GoalGrid
-            definitions={definitions}
-            counts={monthlyCounts}
-            goals={monthlyGoals}
-            onPressGoal={() => openGoals('month')}
-            visibilityKey="monthlyVisible"
-          />
+              <SectionHeader title="Monthly Goals" tightTop />
+              <GoalGrid
+                definitions={definitions}
+                counts={monthlyCounts}
+                goals={monthlyGoals}
+                onPressGoal={() => openGoals('month')}
+                visibilityKey="monthlyVisible"
+              />
 
-          {/* Below both grids rather than under the weekly one, since each sheet
-              covers both grains on its own tabs. */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
-              onPress={() => openGoals('week')}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="list-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
-              <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Goals</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
-              onPress={() => setGraphVisible(true)}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="stats-chart-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
-              <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Progress</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              {/* Below both grids rather than under the weekly one, since each sheet
+                  covers both grains on its own tabs. */}
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
+                  onPress={() => openGoals('week')}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="list-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
+                  <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Goals</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
+                  onPress={() => setGraphVisible(true)}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="stats-chart-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
+                  <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Progress</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-        <UnreportedRow count={unreportedCount} onPress={() => setUnreportedVisible(true)} />
+            <UnreportedRow count={unreportedCount} onPress={() => setUnreportedVisible(true)} />
+          </>
+        )}
       </ScrollView>
 
       <EditGoalsModal

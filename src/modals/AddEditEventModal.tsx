@@ -841,7 +841,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
             {recurring && (
               <>
-                <View style={[styles.columns, { marginTop: 12 }, elevatedPicker === 'rule' && styles.openPickerRow]}>
+                <View style={[styles.columns, { marginTop: 24 }, elevatedPicker === 'rule' && styles.openPickerRow]}>
                   <View style={styles.column}>
                     <Text style={styles.label}>Frequency</Text>
                     <View>

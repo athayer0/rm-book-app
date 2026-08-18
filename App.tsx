@@ -209,9 +209,21 @@ function AppRoot() {
   if (!session) return <AuthScreen />;
   if (!synced) return <Splash />;
   return (
-    <OnboardingContext.Provider value={{ replay: onboarding.replay }}>
+    <OnboardingContext.Provider value={{ replay: onboarding.replay, finishing: onboarding.finishing }}>
       <AppNavigation />
-      <OnboardingScreen visible={onboarding.visible} onComplete={onboarding.complete} />
+      <OnboardingScreen
+        visible={onboarding.visible}
+        // Always lands on Home, whether this is a first run (already there)
+        // or a replay triggered from Settings (where the tab underneath the
+        // modal would otherwise still be Settings) — the skeleton this hands
+        // off to only shows on Home, so finishing anywhere else would leave
+        // nothing visible for it.
+        onDismiss={() => {
+          onboarding.dismiss();
+          if (navigationRef.isReady()) navigationRef.navigate('Home');
+        }}
+        onFinished={onboarding.finish}
+      />
     </OnboardingContext.Provider>
   );
 }

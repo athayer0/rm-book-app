@@ -9,10 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import type { ColorPalette } from '../constants/colors';
-import { useSettings } from '../hooks/useSettings';
+import { DEFAULT_EVENT_TYPES } from '../constants/eventTypeDefaults';
+import { DEFAULT_GOALS } from '../constants/defaultGoals';
+import { useSettings, AppSettings } from '../hooks/useSettings';
 import { useNotificationToggles } from '../hooks/useNotificationToggles';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
+import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { CalendarEvent, RecurringRule, eventTypeColor } from '../utils/eventUtils';
 import { addMinutesToTimeString } from '../utils/dateUtils';
 import { lightenColor } from '../utils/colorUtils';
@@ -21,14 +24,24 @@ import { ImportContactsModal } from '../modals/ImportContactsModal';
 
 interface Props {
   visible: boolean;
-  onComplete: () => void;
+  /** Hides the modal and marks onboarding done, before the commit writes below have finished. */
+  onDismiss: () => void;
+  /** Fires once every commit write has actually landed. */
+  onFinished: () => void;
 }
 
-// Welcome, then one page per tab in the app's own order (Home, Calendar,
-// People, Settings), then a closing page. Pages are written inline below
-// rather than data-driven — several of them hold interactive state (switches,
-// pickers) that a generic pages array would only complicate.
-const TOTAL_PAGES = 6;
+// Welcome, then Event Types (which both the goal list and the starter
+// schedule below it read from), then one page per remaining tab in the app's
+// own order (Home, Calendar, People, Settings), then a closing page. Pages
+// are written inline below rather than data-driven, since several of them
+// hold interactive state a generic pages array would only complicate.
+//
+// Nothing on any page writes to storage as it's touched. Every switch and pill
+// here only edits local draft state; the whole thing is committed in one pass
+// by commitAndComplete(), which runs on both "Get Started" and "Skip". That
+// makes Skip a shortcut to the end rather than a cancel: whatever was already
+// chosen on earlier pages still takes effect.
+const TOTAL_PAGES = 7;
 
 type ScheduleKind = 'work' | 'student';
 
@@ -43,9 +56,9 @@ interface StarterEntry {
 
 /**
  * The opt-in starter schedule: daily prayer/study/exercise/meals plus one
- * weekday block (Work or School — the only thing that differs by `kind`) and
- * Sunday church. Left with no `recurringUntil` — unlike a user-drawn recurring
- * event, which always gets an end date from the edit form — since this is a
+ * weekday block (Work or School, the only thing that differs by `kind`) and
+ * Sunday church. Left with no `recurringUntil`, unlike a user-drawn recurring
+ * event, which always gets an end date from the edit form, since this is a
  * routine the person is opting into indefinitely, not a series with a known
  * last occurrence.
  */
@@ -66,9 +79,9 @@ function starterEntries(kind: ScheduleKind): StarterEntry[] {
   ];
 }
 
-function buildStarterSchedule(kind: ScheduleKind, eventTypeColors: Record<string, string>): Omit<CalendarEvent, 'id'>[] {
+function buildStarterSchedule(entries: StarterEntry[], eventTypeColors: Record<string, string>): Omit<CalendarEvent, 'id'>[] {
   const anchor = format(new Date(), 'yyyy-MM-dd');
-  return starterEntries(kind).map(entry => ({
+  return entries.map(entry => ({
     title: entry.title,
     type: entry.type,
     color: eventTypeColor(entry.type, eventTypeColors),
@@ -81,7 +94,7 @@ function buildStarterSchedule(kind: ScheduleKind, eventTypeColors: Record<string
   }));
 }
 
-export function OnboardingScreen({ visible, onComplete }: Props) {
+export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -90,33 +103,56 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
   const { settings, updateSettings } = useSettings();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
   const { definitions, updateDefinitions } = useWeeklyGoals();
-  const { addEvent, deleteEvent } = useCalendarEvents();
+  const { addEvent } = useCalendarEvents();
+  const {
+    definitions: eventTypeDefinitions,
+    updateDefinitions: updateEventTypeDefinitions,
+  } = useEventTypeDefinitions();
 
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
 
-  const [wantsSchedule, setWantsSchedule] = useState(false);
+  // Every field below is a draft: nothing here writes to storage until
+  // commitAndComplete() runs. Each is seeded from the live data on open (see
+  // the reset effect) rather than starting from a hardcoded default, so
+  // replaying onboarding on an account that already has real settings shows
+  // what's actually there instead of quietly reverting it.
+  const [disabledTypeIds, setDisabledTypeIds] = useState<Set<string>>(new Set());
+  const [removedGoalIds, setRemovedGoalIds] = useState<Set<string>>(new Set());
+  const [wantsSchedule, setWantsSchedule] = useState(true);
   const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('work');
-  const createdScheduleIds = useRef<string[]>([]);
-  // Toggling the switch on and immediately picking a kind fires two overlapping
-  // async writes — both would read createdScheduleIds before either finishes,
-  // so neither could delete the other's events. Chaining every schedule edit
-  // onto this queue forces them to run one at a time, in the order tapped.
-  const scheduleQueue = useRef<Promise<void>>(Promise.resolve());
+  const [draftDailyReview, setDraftDailyReview] = useState(false);
+  const [draftEventReminders, setDraftEventReminders] = useState(false);
+  const [draftTheme, setDraftTheme] = useState<AppSettings['theme']>('system');
+  const [draftWeekStart, setDraftWeekStart] = useState<AppSettings['weekStart']>('sunday');
 
   const [showImport, setShowImport] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
-  // Kept mounted only while visible — cheapest way to guarantee a replay from
-  // Settings always starts on page one instead of resuming wherever a prior
-  // pass through this flow left off.
+  // Kept mounted only while visible, the cheapest way to guarantee a replay
+  // from Settings always starts on page one instead of resuming wherever a
+  // prior pass through this flow left off.
   useEffect(() => {
     if (visible) {
       setPage(0);
       scrollRef.current?.scrollTo({ x: 0, animated: false });
-      setWantsSchedule(false);
+
+      const activeTypeIds = new Set(eventTypeDefinitions.map(d => d.id));
+      setDisabledTypeIds(new Set(DEFAULT_EVENT_TYPES.filter(d => !activeTypeIds.has(d.id)).map(d => d.id)));
+
+      const activeGoalIds = new Set(definitions.map(d => d.id));
+      setRemovedGoalIds(new Set(DEFAULT_GOALS.filter(d => !activeGoalIds.has(d.id)).map(d => d.id)));
+
+      setWantsSchedule(true);
       setScheduleKind('work');
-      createdScheduleIds.current = [];
-      scheduleQueue.current = Promise.resolve();
+
+      setDraftDailyReview(settings.dailyReviewEnabled);
+      setDraftEventReminders(settings.eventReminderEnabled);
+      setDraftTheme(settings.theme);
+      setDraftWeekStart(settings.weekStart);
+
+      setShowImport(false);
+      setCompleting(false);
     }
   }, [visible]);
 
@@ -134,44 +170,77 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
     setPage(Math.round(e.nativeEvent.contentOffset.x / width));
   }
 
-  function enqueueScheduleOp(op: () => Promise<void>): void {
-    scheduleQueue.current = scheduleQueue.current.then(op, op);
+  function toggleEventType(id: string) {
+    setDisabledTypeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
-  async function applyStarterSchedule(kind: ScheduleKind) {
-    for (const id of createdScheduleIds.current) await deleteEvent(id);
-    const created: string[] = [];
-    for (const draft of buildStarterSchedule(kind, settings.eventTypeColors)) {
-      const row = await addEvent(draft);
-      created.push(row.id);
+  function toggleGoal(id: string) {
+    setRemovedGoalIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  /**
+   * Applies every draft choice in one pass. onDismiss() fires first and
+   * synchronously, so the modal closes onto Home immediately rather than
+   * leaving the user staring at a disabled button for however long the
+   * writes below take, up to nine sequential addEvent calls among them. Home
+   * shows a skeleton in the meantime (see useOnboardingFinishing()) and
+   * onFinished() clears it once everything below has actually landed, in a
+   * `finally` so a mid-sequence failure can't leave it stuck.
+   *
+   * Built-in rows are rewritten from the live, already-merged definitions
+   * (not the bare defaults) so a switch left untouched carries forward
+   * whatever customization already existed on a replay, and only the ones
+   * actually flipped off pick up `removed: true`.
+   */
+  async function commitAndComplete() {
+    if (completing) return;
+    setCompleting(true);
+    onDismiss();
+
+    try {
+      const typeCustoms = eventTypeDefinitions.filter(d => !d.builtIn);
+      const typeBuiltIns = DEFAULT_EVENT_TYPES.map(defaultDef => {
+        const live = eventTypeDefinitions.find(d => d.id === defaultDef.id) ?? defaultDef;
+        return disabledTypeIds.has(defaultDef.id) ? { ...live, removed: true } : live;
+      });
+      await updateEventTypeDefinitions([...typeBuiltIns, ...typeCustoms]);
+
+      const goalCustoms = definitions.filter(d => !d.builtIn);
+      const goalBuiltIns = DEFAULT_GOALS.map(defaultDef => {
+        const live = definitions.find(d => d.id === defaultDef.id) ?? defaultDef;
+        return removedGoalIds.has(defaultDef.id) ? { ...live, removed: true } : live;
+      });
+      await updateDefinitions([...goalBuiltIns, ...goalCustoms]);
+
+      if (wantsSchedule) {
+        const activeTypeIds = new Set(DEFAULT_EVENT_TYPES.filter(d => !disabledTypeIds.has(d.id)).map(d => d.id));
+        const entries = starterEntries(scheduleKind).filter(e => activeTypeIds.has(e.type));
+        for (const draft of buildStarterSchedule(entries, settings.eventTypeColors)) {
+          await addEvent(draft);
+        }
+      }
+
+      await toggleDailyReview(draftDailyReview);
+      await toggleEventReminders(draftEventReminders);
+      await updateSettings({ theme: draftTheme, weekStart: draftWeekStart });
+    } finally {
+      onFinished();
     }
-    createdScheduleIds.current = created;
-  }
-
-  async function clearStarterSchedule() {
-    for (const id of createdScheduleIds.current) await deleteEvent(id);
-    createdScheduleIds.current = [];
-  }
-
-  function handleToggleSchedule(value: boolean) {
-    setWantsSchedule(value);
-    enqueueScheduleOp(() => (value ? applyStarterSchedule(scheduleKind) : clearStarterSchedule()));
-  }
-
-  function handleSelectScheduleKind(kind: ScheduleKind) {
-    setScheduleKind(kind);
-    if (wantsSchedule) enqueueScheduleOp(() => applyStarterSchedule(kind));
-  }
-
-  function toggleGoalVisible(id: string) {
-    updateDefinitions(definitions.map(d => (d.id === id ? { ...d, visible: !d.visible } : d)));
   }
 
   return (
     <Modal visible animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
       <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
         {!isLast && (
-          <TouchableOpacity style={[styles.skip, { top: insets.top + 12 }]} onPress={onComplete} hitSlop={12}>
+          <TouchableOpacity style={[styles.skip, { top: insets.top + 12 }]} onPress={commitAndComplete} hitSlop={12}>
             <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
         )}
@@ -196,44 +265,81 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
             </Text>
           </ScrollView>
 
-          {/* Home — weekly goals */}
+          {/* Event Types */}
+          <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="list" size={48} color={Colors.onPrimary} />
+            </View>
+            <Text style={styles.title}>Choose your event types</Text>
+            <Text style={styles.body}>
+              Select the types of events you would like to use in the Calendar page. Each event may
+              also be linked to a goal, so completing that kind of event updates the goal
+              automatically.
+            </Text>
+            <View style={styles.card}>
+              {DEFAULT_EVENT_TYPES.map((def, i, arr) => {
+                const color = eventTypeColor(def.id, settings.eventTypeColors);
+                return (
+                  <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
+                    <View style={[styles.typeDot, { backgroundColor: color }]} />
+                    <Text style={styles.goalLabel}>{def.label}</Text>
+                    <Switch
+                      value={!disabledTypeIds.has(def.id)}
+                      onValueChange={() => toggleEventType(def.id)}
+                      trackColor={{ true: Colors.control }}
+                      thumbColor={Colors.white}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={styles.footnote}>
+              Add, remove, or link event types to a goal anytime from Settings → Event Types.
+            </Text>
+          </ScrollView>
+
+          {/* Home, weekly goals */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
               <Ionicons name="home" size={44} color={Colors.onPrimary} />
             </View>
             <Text style={styles.title}>Home: your weekly goals</Text>
             <Text style={styles.body}>
-              Pick which of these goals you want to track. You can add new ones or unhide
-              these anytime.
+              Select the goals you would like to track. View and personalize your weekly and
+              monthly goals from the Home page. Progress graphs can be seen and future goals can
+              be set from there as well.
             </Text>
             <View style={styles.card}>
-              {definitions.filter(d => d.builtIn).map((def, i, arr) => (
+              {DEFAULT_GOALS.map((def, i, arr) => (
                 <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
                   <View style={[styles.goalIconWrap, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
                     <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
                   <Text style={styles.goalLabel}>{def.label}</Text>
                   <Switch
-                    value={def.visible}
-                    onValueChange={() => toggleGoalVisible(def.id)}
+                    value={!removedGoalIds.has(def.id)}
+                    onValueChange={() => toggleGoal(def.id)}
                     trackColor={{ true: Colors.control }}
                     thumbColor={Colors.white}
                   />
                 </View>
               ))}
             </View>
+            <Text style={styles.footnote}>
+              Add, remove, or link goals to an event type anytime from Home → Edit Goals.
+            </Text>
           </ScrollView>
 
-          {/* Calendar — starter schedule */}
+          {/* Calendar, starter schedule */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
               <Ionicons name="calendar" size={44} color={Colors.onPrimary} />
             </View>
             <Text style={styles.title}>Calendar: log your days</Text>
             <Text style={styles.body}>
-              Add prayer, scripture study, church, exercise, and more to your calendar. Marking
-              them complete counts toward your weekly goals automatically. You can add events
-              at any time.
+              Enjoy the familiar feel of scheduling out and reporting on your days on the
+              Calendar page. You can start with a ready-made schedule below, or build your own
+              from scratch.
             </Text>
             <View style={styles.card}>
               <View style={[styles.toggleRow, !wantsSchedule && styles.rowLast]}>
@@ -243,7 +349,7 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
                 </View>
                 <Switch
                   value={wantsSchedule}
-                  onValueChange={handleToggleSchedule}
+                  onValueChange={setWantsSchedule}
                   trackColor={{ true: Colors.control }}
                   thumbColor={Colors.white}
                 />
@@ -254,7 +360,7 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
                     <TouchableOpacity
                       key={kind}
                       style={[styles.pill, scheduleKind === kind && styles.pillActive]}
-                      onPress={() => handleSelectScheduleKind(kind)}
+                      onPress={() => setScheduleKind(kind)}
                     >
                       <Text style={[styles.pillText, scheduleKind === kind && styles.pillTextActive]}>
                         {kind === 'work' ? "I work" : "I'm a student"}
@@ -266,20 +372,21 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
             </View>
             {wantsSchedule && (
               <Text style={styles.footnote}>
-                You can edit or delete any of these anytime from the Calendar tab.
+                Add, edit, delete, and report events anytime from the Calendar page.
               </Text>
             )}
           </ScrollView>
 
-          {/* People — import contacts */}
+          {/* People, import contacts */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={44} color={Colors.onPrimary} />
             </View>
             <Text style={styles.title}>People: those who matter most</Text>
             <Text style={styles.body}>
-              Save contact info, keep track of where each person stands, and see
-              your history together at a glance. You can add people at any time.
+              Save contact info and track everything from potential dates to recent converts and
+              their progress on the covenant path. View someone's timeline to see what
+              events they've been a part of.
             </Text>
             <TouchableOpacity style={styles.importCard} onPress={() => setShowImport(true)} activeOpacity={0.8}>
               <View style={styles.importIconWrap}>
@@ -291,17 +398,20 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
               </View>
               <Ionicons name="chevron-forward" size={18} color={Colors.textLight} />
             </TouchableOpacity>
+            <Text style={styles.footnote}>
+              You can also add, edit, or remove people manually at any time.
+            </Text>
           </ScrollView>
 
-          {/* Settings — notifications and a couple of preferences */}
+          {/* Settings, notifications and a couple of preferences */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
               <Ionicons name="settings" size={44} color={Colors.onPrimary} />
             </View>
             <Text style={styles.title}>Settings: make it yours</Text>
             <Text style={styles.body}>
-              Turn on reminders now, or leave them off. These can be changed anytime from the
-              Settings tab.
+              Choose your preferences now, or leave the defaults. Everything here and more can be
+              personalized anytime from the Settings page.
             </Text>
             <View style={styles.card}>
               <View style={styles.toggleRow}>
@@ -310,8 +420,8 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
                   <Text style={styles.toggleHint}>A nightly nudge to report today's events.</Text>
                 </View>
                 <Switch
-                  value={settings.dailyReviewEnabled}
-                  onValueChange={toggleDailyReview}
+                  value={draftDailyReview}
+                  onValueChange={setDraftDailyReview}
                   trackColor={{ true: Colors.control }}
                   thumbColor={Colors.white}
                 />
@@ -322,8 +432,8 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
                   <Text style={styles.toggleHint}>A heads-up shortly before each event starts.</Text>
                 </View>
                 <Switch
-                  value={settings.eventReminderEnabled}
-                  onValueChange={toggleEventReminders}
+                  value={draftEventReminders}
+                  onValueChange={setDraftEventReminders}
                   trackColor={{ true: Colors.control }}
                   thumbColor={Colors.white}
                 />
@@ -336,10 +446,10 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
                   {(['light', 'dark', 'system'] as const).map(theme => (
                     <TouchableOpacity
                       key={theme}
-                      style={[styles.pillSmall, settings.theme === theme && styles.pillActive]}
-                      onPress={() => updateSettings({ theme })}
+                      style={[styles.pillSmall, draftTheme === theme && styles.pillActive]}
+                      onPress={() => setDraftTheme(theme)}
                     >
-                      <Text style={[styles.pillTextSmall, settings.theme === theme && styles.pillTextActive]}>
+                      <Text style={[styles.pillTextSmall, draftTheme === theme && styles.pillTextActive]}>
                         {theme.charAt(0).toUpperCase() + theme.slice(1)}
                       </Text>
                     </TouchableOpacity>
@@ -352,10 +462,10 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
                   {(['sunday', 'monday'] as const).map(day => (
                     <TouchableOpacity
                       key={day}
-                      style={[styles.pillSmall, settings.weekStart === day && styles.pillActive]}
-                      onPress={() => updateSettings({ weekStart: day })}
+                      style={[styles.pillSmall, draftWeekStart === day && styles.pillActive]}
+                      onPress={() => setDraftWeekStart(day)}
                     >
-                      <Text style={[styles.pillTextSmall, settings.weekStart === day && styles.pillTextActive]}>
+                      <Text style={[styles.pillTextSmall, draftWeekStart === day && styles.pillTextActive]}>
                         {day.charAt(0).toUpperCase() + day.slice(1)}
                       </Text>
                     </TouchableOpacity>
@@ -374,7 +484,7 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
             <Text style={styles.scripture}>
               "But be ye doers of the word, and not hearers only."
             </Text>
-            <Text style={styles.scriptureRef}>— James 1:22</Text>
+            <Text style={styles.scriptureRef}>James 1:22</Text>
           </ScrollView>
         </ScrollView>
 
@@ -394,7 +504,8 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
             )}
             <TouchableOpacity
               style={styles.nextButton}
-              onPress={() => (isLast ? onComplete() : goTo(page + 1))}
+              onPress={() => (isLast ? commitAndComplete() : goTo(page + 1))}
+              disabled={completing}
             >
               <Text style={styles.nextButtonText}>{isLast ? 'Get Started' : 'Next'}</Text>
               {!isLast && <Ionicons name="chevron-forward" size={18} color={Colors.onPrimary} style={{ marginLeft: 2 }} />}
@@ -412,12 +523,25 @@ function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: C.background },
     pager: { flex: 1 },
+    // Filled with the same colour as the app's cards, so a card or line of body
+    // text scrolling underneath (each page scrolls on its own, independent of
+    // this fixed corner) gets cleanly covered instead of showing through and
+    // overlapping the label.
     skip: {
       position: 'absolute',
-      right: 20,
+      right: 16,
       zIndex: 1,
       paddingVertical: 8,
-      paddingHorizontal: 4,
+      paddingHorizontal: 14,
+      borderRadius: 16,
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
     },
     skipText: { fontSize: 15, color: C.textSecondary },
     page: {
@@ -492,6 +616,14 @@ function makeStyles(C: ColorPalette) {
       borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
+      marginRight: 12,
+    },
+    // Event types get a flat color swatch rather than an icon-on-tint disc,
+    // since a type has no icon of its own elsewhere in the app either.
+    typeDot: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
       marginRight: 12,
     },
     goalLabel: { flex: 1, fontSize: 14, color: C.text },
