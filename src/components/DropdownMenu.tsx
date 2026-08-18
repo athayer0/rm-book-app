@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Easing, Pressable, StyleSheet, Text, View,
+  Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View,
   type StyleProp, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '../hooks/useColors';
+import { ScrollEdgeFade, useScrollEdges } from './ScrollEdgeFade';
 import type { ColorPalette } from '../constants/colors';
 
 /**
@@ -171,6 +172,72 @@ export function DropdownItem({
           the rule and leaving a pale line through the middle of the tint. */}
       {showSeparator && <View style={styles.separator} pointerEvents="none" />}
     </Pressable>
+  );
+}
+
+interface MenuScrollProps {
+  /** The same flag driving the DropdownMenu around this. */
+  open: boolean;
+  /**
+   * Position of the selected row among the rows inside, counting any fixed
+   * leading row (a "None" entry) as one of them. -1 when nothing is selected,
+   * which leaves the list at the top.
+   */
+  selectedIndex: number;
+  /** How many rows fit before it scrolls. Halves are deliberate — see below. */
+  maxRows: number;
+  children: React.ReactNode;
+}
+
+/**
+ * A menu's list, for the menus long enough to scroll inside themselves. Three
+ * things that a bare ScrollView in a DropdownMenu doesn't do, and that every
+ * such menu wants:
+ *
+ *  - **It caps at a half row.** Ending on a visibly cut row is what says the
+ *    list continues; a clean edge at the last full row reads as the end of it.
+ *  - **It opens on the selection**, rather than at the top of the list. A field
+ *    reading "Temple" that opens on a list apparently starting at "Travel", with
+ *    no sign the checkmark is further down, is the failure this avoids. Deferred
+ *    a frame because the ScrollView mounts with the menu and has nothing to
+ *    scroll until layout has run, and unanimated because the menu is
+ *    simultaneously animating itself in.
+ *  - **It fades at whichever edge has more behind it** — the rounded,
+ *    `overflow: hidden` menu clips the native scroll indicator almost flush, so
+ *    the fades are the only cue left.
+ */
+export function MenuScrollView({ open, selectedIndex, maxRows, children }: MenuScrollProps) {
+  const Colors = useColors();
+  const ref = useRef<ScrollView>(null);
+  const edges = useScrollEdges();
+
+  useEffect(() => {
+    if (!open || selectedIndex < 0) return;
+    const frame = requestAnimationFrame(() => {
+      // Lands the selection at the top of the visible list; ScrollView clamps
+      // it, so a selection near the end shows the tail instead.
+      ref.current?.scrollTo({ y: selectedIndex * MENU_ITEM_HEIGHT, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, selectedIndex]);
+
+  return (
+    <>
+      <ScrollView
+        ref={ref}
+        style={{ maxHeight: MENU_ITEM_HEIGHT * maxRows }}
+        nestedScrollEnabled
+        bounces={false}
+        overScrollMode="never"
+        {...edges.scrollViewProps}
+      >
+        {children}
+      </ScrollView>
+      {/* menuSurface, not card — the menu doesn't sit on the card's colour, so
+          fading to `card` would leave a visible band. */}
+      <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={edges.showTopFade} />
+      <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={edges.showBottomFade} />
+    </>
   );
 }
 

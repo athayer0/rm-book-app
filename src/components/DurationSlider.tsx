@@ -57,17 +57,24 @@ export function DurationSlider({ minutes, onChange }: Props) {
 
   return (
     <View>
-      <Text style={styles.value}>{durationLabel(draft)}</Text>
+      {/* One line above the track: the two ends, and the current value centred
+          between them — the value reads as a point on that range rather than as
+          a heading over it, and the row under the thumb stays empty.
+
+          Equal thirds rather than space-between, so the value sits on the
+          track's true centre. Sized to content it would drift with the widths of
+          the two labels either side of it, which change ("5 min" against
+          "1 hr 45 min"). */}
+      <View style={styles.bounds}>
+        <Text style={[styles.boundLabel, styles.boundStart]}>{durationLabel(MIN_MINUTES)}</Text>
+        <Text style={styles.value}>{durationLabel(draft)}</Text>
+        <Text style={[styles.boundLabel, styles.boundEnd]}>{durationLabel(MAX_MINUTES)}</Text>
+      </View>
 
       <View style={styles.track} {...track.panHandlers} onLayout={track.onLayout}>
         <View style={styles.rail} pointerEvents="none" />
         <View style={[styles.fill, { width: `${fraction * 100}%` }]} pointerEvents="none" />
         <View style={[styles.thumb, { left: `${fraction * 100}%` }]} pointerEvents="none" />
-      </View>
-
-      <View style={styles.bounds}>
-        <Text style={styles.boundLabel}>{durationLabel(MIN_MINUTES)}</Text>
-        <Text style={styles.boundLabel}>{durationLabel(MAX_MINUTES)}</Text>
       </View>
     </View>
   );
@@ -78,11 +85,11 @@ function makeStyles(C: ColorPalette) {
   const RAIL = 6;
   return StyleSheet.create({
     value: {
+      flex: 1,
       fontSize: 14,
       fontWeight: '700',
       color: C.control,
       textAlign: 'center',
-      marginBottom: 4,
     },
     track: {
       height: THUMB + 12,
@@ -119,9 +126,13 @@ function makeStyles(C: ColorPalette) {
     },
     bounds: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      // The small grey ends sit on the value's baseline rather than centred
+      // against a line half again their size.
+      alignItems: 'baseline',
       marginHorizontal: THUMB / 2,
     },
-    boundLabel: { fontSize: 11, color: C.textLight },
+    boundLabel: { flex: 1, fontSize: 11, color: C.textLight },
+    boundStart: { textAlign: 'left' },
+    boundEnd: { textAlign: 'right' },
   });
 }

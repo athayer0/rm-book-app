@@ -49,7 +49,6 @@ create table if not exists people (
   -- the contact methods above.
   address text,
   notes text,
-  starred boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   deleted_at timestamptz,
@@ -66,6 +65,13 @@ alter table people
   add column if not exists messenger text;
 alter table people
   add column if not exists address text;
+-- Favourites are gone from the app, so the
+-- column goes with them. A project created
+-- before this still has it; nothing writes it
+-- any more, so it would only ever be dead
+-- weight. Only runs if the file is re-run.
+alter table people
+  drop column if exists starred;
 alter table people enable row level security;
 drop policy if exists "users own their people"
   on people;
@@ -125,6 +131,11 @@ alter table calendar_events
 -- already do for 'hours' mode.
 alter table calendar_events
   add column if not exists quantity integer;
+-- What that quantity counts -- 'miles', 'reps'. Free text, and per event rather
+-- than per type: nothing reads it but the block that draws it beside the number,
+-- so there is no list for a constraint to hold it to.
+alter table calendar_events
+  add column if not exists units text;
 alter table calendar_events
   enable row level security;
 drop policy if exists "users own their events"

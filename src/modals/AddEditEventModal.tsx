@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Switch, Alert, Pressable,
@@ -16,7 +16,7 @@ import {
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
 import { InlineDatePicker } from '../components/InlineDatePicker';
-import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
+import { DropdownMenu, DropdownItem, Collapsible, MenuScrollView } from '../components/DropdownMenu';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
@@ -28,7 +28,6 @@ import { usePeople, Person } from '../hooks/usePeople';
 import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
 import { PersonPickerModal } from './PersonPickerModal';
-import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { format } from 'date-fns';
 
 interface Props {
@@ -53,11 +52,9 @@ interface Props {
 }
 
 // Ends on half a row rather than a whole one, so a list longer than this says so
-// by being visibly cut. Read off MENU_ITEM_HEIGHT rather than written as a number:
-// the open-picker effect scrolls by idx * MENU_ITEM_HEIGHT to land the selected
-// row at the top, and any drift from the real row height compounds with idx,
-// walking that row further off the top the deeper it sits in the list.
-const TYPE_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
+// by being visibly cut. MenuScrollView turns it into a height off MENU_ITEM_HEIGHT
+// and scrolls the selected row to the top by the same measure.
+const TYPE_MENU_ROWS = 4.5;
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
@@ -154,6 +151,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [attendees, setAttendees] = useState<string[]>([]);
   const [contactMethod, setContactMethod] = useState(settings.defaultContactMethod);
   const [quantity, setQuantity] = useState(0);
+  const [units, setUnits] = useState('');
   // One picker open at a time — a single value makes that structural instead of
   // something six separate booleans have to agree on.
   const [openPicker, setOpenPicker] = useState<PickerId | null>(null);
@@ -165,6 +163,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const showEndsOnPicker = openPicker === 'endsOn';
   const showMethodPicker = openPicker === 'method';
   const [showPersonPicker, setShowPersonPicker] = useState(false);
+  // Which free-text field has the keyboard, so it can draw its focus edge. One
+  // value rather than a boolean each, for the same reason `openPicker` is one:
+  // only one of them can be focused, and two booleans could disagree about it.
+  const [focusedField, setFocusedField] = useState<'title' | 'notes' | null>(null);
   /**
    * An event that already exists opens as a page about itself; only editing it
    * shows the form. A new one has nothing to display, so it starts in the form
@@ -172,8 +174,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
    */
   const [mode, setMode] = useState<'view' | 'edit'>(event ? 'view' : 'edit');
   const [error, setError] = useState('');
-  const typeScrollRef = useRef<ScrollView>(null);
-  const typeScrollEdges = useScrollEdges();
 
   /**
    * Seed every field from the event, or from the defaults for a new one.
@@ -203,6 +203,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       setAttendees(event.people ?? []);
       setContactMethod(resolveContactMethod(event.contactMethod, event.type));
       setQuantity(event.quantity ?? 0);
+      setUnits(event.units ?? '');
     } else {
       const initialType = prefill?.type ?? definitions[0]?.id ?? 'scripture';
       const initialStart = prefill?.startTime ?? defaultStartTime ?? '9:00 AM';
@@ -223,6 +224,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       // where an existing event's stored method is the whole answer.
       setContactMethod(resolveContactMethod(prefill?.contactMethod, initialType, settings.defaultContactMethod));
       setQuantity(prefill?.quantity ?? 0);
+      setUnits(prefill?.units ?? '');
     }
     setOpenPicker(null);
     setShowPersonPicker(false);
@@ -249,17 +251,6 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, currentStatus, visible]);
 
-  useEffect(() => {
-    if (showTypePicker) {
-      const idx = EVENT_TYPES.findIndex(t => t === type);
-      if (idx >= 0) {
-        requestAnimationFrame(() => {
-          typeScrollRef.current?.scrollTo({ y: idx * MENU_ITEM_HEIGHT, animated: false });
-        });
-      }
-    }
-  }, [showTypePicker]);
-
   // Reporting happens on the display view now. Both controls there hand back the
   // status they resolve to, including undefined when the active one is tapped
   // again, so this just adopts it and passes it on.
@@ -281,6 +272,20 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     } catch (e) {
       console.error('[AddEditEventModal] quantity save failed:', e);
       setError('Failed to save quantity. Please try again.');
+    }
+  }
+
+  // Units commit from the display view the same way, and for the same reason
+  // have to be spliced past state that hasn't applied yet. Empty means cleared,
+  // so it goes as undefined — toRow turns that into a null column, where '' would
+  // leave the block drawing a unit made of nothing.
+  async function handleUnitsChange(newUnits: string) {
+    setUnits(newUnits);
+    try {
+      await onSave({ ...buildEventData(), units: newUnits || undefined });
+    } catch (e) {
+      console.error('[AddEditEventModal] units save failed:', e);
+      setError('Failed to save units. Please try again.');
     }
   }
 
@@ -429,6 +434,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       people: attendees.length ? attendees : undefined,
       contactMethod: usesContactMethod(type) ? contactMethod : undefined,
       quantity: eventTypeById[type]?.goalMode === 'quantity' ? quantity : undefined,
+      units: eventTypeById[type]?.goalMode === 'quantity' && units ? units : undefined,
     };
   }
 
@@ -562,6 +568,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             status={localStatus}
             onStatusChange={onStatusChange ? handleStatusTap : undefined}
             onQuantityChange={handleQuantityChange}
+            onUnitsChange={handleUnitsChange}
             onDelete={onDelete ? handleDelete : undefined}
           />
         ) : (
@@ -575,13 +582,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             <Pressable style={styles.cardBackdrop} onPress={closeFloatingPicker} />
           )}
           <View style={styles.group}>
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>Title</Text>
             <View style={styles.titleRow}>
               <TextInput
-                style={[styles.input, styles.titleInput]}
+                style={[styles.input, styles.titleInput, focusedField === 'title' && styles.inputFocused]}
                 value={title}
                 onChangeText={setTitle}
-                onFocus={closePickers}
+                onFocus={() => { closePickers(); setFocusedField('title'); }}
+                onBlur={() => setFocusedField(null)}
                 placeholder={typeLabel(type) || 'Event title'}
                 placeholderTextColor={Colors.textLight}
               />
@@ -608,13 +616,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
                 </TouchableOpacity>
                 <DropdownMenu open={showTypePicker}>
-                  <ScrollView
-                    ref={typeScrollRef}
-                    style={{ maxHeight: TYPE_LIST_MAX_HEIGHT }}
-                    nestedScrollEnabled
-                    bounces={false}
-                    overScrollMode="never"
-                    {...typeScrollEdges.scrollViewProps}
+                  <MenuScrollView
+                    open={showTypePicker}
+                    selectedIndex={EVENT_TYPES.indexOf(type)}
+                    maxRows={TYPE_MENU_ROWS}
                   >
                     {EVENT_TYPES.map((t, i) => (
                       <DropdownItem
@@ -626,11 +631,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         onPress={() => handleTypeChange(t)}
                       />
                     ))}
-                  </ScrollView>
-                  {/* menuSurface, not card — the menu no longer sits on the card's
-                      colour, so fading to `card` would leave a visible band. */}
-                  <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={typeScrollEdges.showTopFade} />
-                  <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={typeScrollEdges.showBottomFade} />
+                  </MenuScrollView>
                 </DropdownMenu>
               </View>
             </View>
@@ -808,23 +809,24 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               onPress={() => { closePickers(); setShowPersonPicker(true); }}
               activeOpacity={0.7}
             >
-              <Ionicons name="add" size={18} color={Colors.goalTextAction} />
+              <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
               <Text style={styles.addPersonText}>Add Person</Text>
             </TouchableOpacity>
           </View>
 
           <View style={[styles.group]}>
-            <Text style={styles.label}>Notes</Text>
-            <TextInput
-              style={[styles.input, styles.notesInput]}
-              value={notes}
-              onChangeText={setNotes}
-              onFocus={closePickers}
-              placeholder="Add notes..."
-              placeholderTextColor={Colors.textLight}
-              multiline
-              numberOfLines={3}
-            />
+            <View style={styles.switchRow}>
+              <Text style={styles.label}>Backup Event</Text>
+              <Switch
+                value={isBackup}
+                // Sits above the dismiss backdrop now that the card does, so it
+                // closes any open dropdown itself — the same reason the Recurring
+                // switch below it does.
+                onValueChange={v => { closePickers(); setIsBackup(v); }}
+                trackColor={{ true: Colors.control }}
+                thumbColor={Colors.white}
+              />
+            </View>
           </View>
 
           <View style={[styles.group, styles.pickerRow, (elevatedPicker === 'rule' || elevatedPicker === 'endsOn') && styles.openPickerRow]}>
@@ -914,19 +916,20 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           </View>
 
           <View style={[styles.group]}>
-            <View style={styles.switchRow}>
-              <Text style={styles.label}>Backup Event</Text>
-              <Switch
-                value={isBackup}
-                // Sits above the dismiss backdrop now that the card does, so it
-                // closes any open dropdown itself — the same reason the Recurring
-                // switch above it does.
-                onValueChange={v => { closePickers(); setIsBackup(v); }}
-                trackColor={{ true: Colors.control }}
-                thumbColor={Colors.white}
-              />
-            </View>
+            <Text style={styles.label}>Notes</Text>
+            <TextInput
+              style={[styles.input, styles.notesInput, focusedField === 'notes' && styles.inputFocused]}
+              value={notes}
+              onChangeText={setNotes}
+              onFocus={() => { closePickers(); setFocusedField('notes'); }}
+              onBlur={() => setFocusedField(null)}
+              placeholder="Add notes..."
+              placeholderTextColor={Colors.textLight}
+              multiline
+              numberOfLines={3}
+            />
           </View>
+
           </View>
 
           <View style={{ height: 40 }} />
@@ -962,7 +965,7 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
-    // The display header's ×-and-Edit pair, sized the way WeeklyPlanningModal
+    // The display header's ×-and-Edit pair, sized the way EditGoalsModal
     // sizes its close button: equal 60pt slots on both ends so the title sits
     // centred whatever the right-hand label says.
     closeBtn: { width: 60, alignItems: 'flex-start' },
@@ -1000,9 +1003,10 @@ function makeStyles(C: ColorPalette) {
       elevation: 2,
       zIndex: 20,
     },
-    // No rule between groups: the form is already full of hairlines under the
-    // fields themselves, and a second kind of line reads as another one of those
-    // rather than as a division. The labels carry the separation instead.
+    // No rule between groups: every field already draws its own edge — a box
+    // around the text fields, a hairline under each picker — and one more line
+    // between groups reads as another of those rather than as a division. The
+    // labels carry the separation instead.
     group: { padding: 12 },
     // Two fields sharing a group's width — type and date, start and end.
     columns: { flexDirection: 'row', gap: 8 },
@@ -1024,14 +1028,27 @@ function makeStyles(C: ColorPalette) {
       letterSpacing: 0.5,
       marginBottom: 8,
     },
+    // The two free-text fields, and only those. A box rather than the pickers'
+    // underline: a picker's value is chosen, so a rule under it is enough, but
+    // these are typed into and want a target to tap and a shape to hold the text.
+    //
+    // The border is drawn at full width in both states and only changes colour on
+    // focus — thickening it instead would reflow the text inside by half a point
+    // on every focus, which reads as the field twitching.
     input: {
       fontSize: 16,
       color: C.text,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: C.border,
-      paddingVertical: 4,
+      backgroundColor: C.inputBg,
+      borderWidth: 1,
+      borderColor: C.inputBorder,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
     },
-    notesInput: { minHeight: 56, textAlignVertical: 'top', paddingTop: 4 },
+    // `control`, not `primary`: this is interactive furniture saying where the
+    // keyboard is pointed, the same as a checkmark or an active pill.
+    inputFocused: { borderColor: C.control },
+    notesInput: { minHeight: 88, textAlignVertical: 'top', paddingTop: 10 },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1067,20 +1084,23 @@ function makeStyles(C: ColorPalette) {
     },
     personIcon: { marginRight: 10 },
     personName: { flex: 1, fontSize: 15, color: C.text },
-    // Matches WeeklyPlanningModal's "Add a Goal" — the same centred ＋-and-label
-    // link, since both open something rather than committing anything.
+    // The person editor's "Add contact method" / "Add address" rows, since all
+    // three do the same thing: a ⊕ and a label that opens something rather than
+    // committing anything. Same glyph, size, weight and colour as those.
     addPersonBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       // Shrunk to its own width and left-aligned, so it starts on the same edge
       // as the PEOPLE label and the names above it, and the tap target is the
-      // link rather than the full width of the card.
+      // link rather than the full width of the card. The person editor's rows
+      // are the full width because they are alone in their group; this one
+      // follows a list it adds to.
       alignSelf: 'flex-start',
-      gap: 6,
+      gap: 8,
       marginTop: 8,
       paddingVertical: 6,
     },
-    addPersonText: { fontSize: 14, fontWeight: '700', color: C.goalTextAction },
+    addPersonText: { fontSize: 15, fontWeight: '500', color: C.control },
     /**
      * Dismisses an open floating picker on a tap outside the card. Stays below
      * the card (20), so it covers the form's surroundings only.

@@ -6,7 +6,7 @@ import type { ColorPalette } from '../constants/colors';
 import { SheetModal } from '../components/SheetModal';
 import { BottomSheet } from '../components/BottomSheet';
 import { StatusCheckbox } from '../components/StatusCheckbox';
-import { IconPicker, ICON_OPTIONS } from '../components/IconPicker';
+import { IconPicker, DEFAULT_ICON } from '../components/IconPicker';
 import { GoalIcon } from '../components/GoalIcon';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { useSettings } from '../hooks/useSettings';
@@ -47,7 +47,7 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
     }
     if (atLimit) return;
     updateSettings({
-      quickAddTypes: [...selected, { id, icon: ICON_OPTIONS[0].name, iconFamily: ICON_OPTIONS[0].family }],
+      quickAddTypes: [...selected, { id, icon: DEFAULT_ICON.name, iconFamily: DEFAULT_ICON.family }],
     });
   }
 
@@ -145,7 +145,7 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
               icon={editingEntry.icon}
               iconFamily={editingEntry.iconFamily ?? 'Ionicons'}
               color={Colors.control}
-              // Stays open on a tap — see EditGoalSheet's matching comment.
+              // Stays open on a tap — see IconPicker's own comment on why.
               onSelect={opt => setIcon(editingId!, opt)}
             />
           )}

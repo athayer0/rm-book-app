@@ -278,7 +278,7 @@ export function OnboardingScreen({ visible, onComplete }: Props) {
             </View>
             <Text style={styles.title}>People: those who matter most</Text>
             <Text style={styles.body}>
-              Save contact info, favorite the people you don't want to lose touch with, and see
+              Save contact info, keep track of where each person stands, and see
               your history together at a glance. You can add people at any time.
             </Text>
             <TouchableOpacity style={styles.importCard} onPress={() => setShowImport(true)} activeOpacity={0.8}>

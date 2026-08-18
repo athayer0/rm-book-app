@@ -60,10 +60,15 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
       borderRadius: 12,
       margin: 4,
-      minHeight: 72,
+      // minHeight and paddingVertical have to come down together: the icon disc
+      // is only 40 tall, so a single-line label leaves the content shorter than
+      // the minimum and it is the minimum that sets the card's height. Trimming
+      // the padding alone would have shrunk nothing but a wrapped two-line card.
+      minHeight: 66,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 12,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
       gap: 12,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
@@ -71,9 +76,13 @@ function makeStyles(C: ColorPalette) {
       shadowRadius: 4,
       elevation: 2,
     },
+    // Longhand rather than `padding`, since the base card now sets
+    // paddingVertical — a shorthand here would lose the vertical axis to it
+    // whichever order the two are merged in.
     cardCompact: {
-      minHeight: 60,
-      padding: 10,
+      minHeight: 56,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
     },
     iconWrapper: {
       width: 40,

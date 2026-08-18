@@ -16,8 +16,15 @@ export interface GoalDefinition {
   icon: string;
   iconFamily: string;
   color: string;
+  /** Shown on the Home screen's weekly grid, and tracked at week grain. */
   visible: boolean;
-  /** Shown on the Home screen's monthly grid. Independent of `visible` — a goal can be weekly, monthly, neither, or both. */
+  /**
+   * The same, at month grain. Still an independent boolean, but the Goal Period
+   * control in EditGoalsModal only ever writes three of the four combinations —
+   * both-false means tracked nowhere, which is indistinguishable from the goal
+   * not existing. `goalPeriod()` there reads any stray both-false as weekly, so
+   * no migration pass is needed for definitions predating that control.
+   */
   monthlyVisible: boolean;
   builtIn: boolean;
   /**
@@ -86,7 +93,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     iconFamily: 'Ionicons',
     color: '#E05C6B',
     visible: true,
-    monthlyVisible: false,
+    monthlyVisible: true,
     builtIn: true,
   },
   {

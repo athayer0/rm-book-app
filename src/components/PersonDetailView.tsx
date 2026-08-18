@@ -28,10 +28,11 @@ interface Props {
   messenger: string | null;
   address: string | null;
   notes: string;
-  starred: boolean;
   settings: AppSettings;
   /** Notes the attempt against this person, then hands off to the other app. */
   onContact: (method: string, open: () => void) => void;
+  /** Absent hides the trash icon — the caller owns confirmation and the actual delete. */
+  onDelete?: () => void;
 }
 
 /**
@@ -39,19 +40,20 @@ interface Props {
  *
  * The same uppercase labels as the editor, minus every affordance: no rules under
  * the values, no chevron on the status, no × on a contact method. Unlike the
- * editor, which gives each field a card of its own, everything here — including
- * their name — shares one card and is separated by rules, reading as a page
- * about the person rather than a stack of things to fill in.
+ * editor, which gives each field a card of its own, everything here — starting
+ * with their name, under a NAME label like any other field — shares one card and
+ * is separated by rules, reading as a page about the person rather than a stack
+ * of things to fill in.
  *
  * What stays live are the actions — call, text, WhatsApp, Messenger, Maps — since
- * those do something to the world rather than edit the record. The star is shown
- * only when set, and only as a mark; toggling it is an edit.
+ * those do something to the world rather than edit the record, plus the trash,
+ * which sits beside the name the same way it sits beside an event's title.
  *
  * Empty fields are dropped rather than shown blank, so what's here is what the
  * person actually has.
  */
 export function PersonDetailView({
-  name, status, phone, whatsapp, messenger, address, notes, starred, settings, onContact,
+  name, status, phone, whatsapp, messenger, address, notes, settings, onContact, onDelete,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -75,6 +77,28 @@ export function PersonDetailView({
    * one or below the last as soon as a neighbour dropped out.
    */
   const groups: { key: string; node: React.ReactNode }[] = [];
+
+  groups.push({
+    key: 'name',
+    node: (
+      <>
+        <Text style={styles.label}>Name</Text>
+        <View style={styles.nameRow}>
+          <Text style={[styles.value, styles.nameValue]}>{trimmedName || 'Unnamed'}</Text>
+          {onDelete && (
+            <TouchableOpacity
+              onPress={onDelete}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete person"
+            >
+              <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </>
+    ),
+  });
 
   groups.push({
     key: 'status',
@@ -221,14 +245,8 @@ export function PersonDetailView({
     <ScrollView style={styles.scroll} bounces={false} overScrollMode="never">
       <View style={styles.cardShadow}>
       <View style={styles.card}>
-        <View style={styles.hero}>
-          <Text style={styles.heroName}>{trimmedName || 'Unnamed'}</Text>
-          {starred && (
-            <Ionicons name="star" size={22} color={Colors.favorite} accessibilityLabel="Favorite" />
-          )}
-        </View>
-        {groups.map((group) => (
-          <View key={group.key} style={[styles.group, styles.groupDivided]}>
+        {groups.map((group, i) => (
+          <View key={group.key} style={[styles.group, i > 0 && styles.groupDivided]}>
             {group.node}
           </View>
         ))}
@@ -243,17 +261,10 @@ export function PersonDetailView({
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     scroll: { flex: 1, backgroundColor: C.background },
-    // The card's own first row rather than a group, so the name can run larger
-    // and centered while still sharing the card's rounded corners and background.
-    hero: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      padding: 12,
-      paddingTop: 16,
-      paddingBottom: 14,
-    },
-    heroName: { flex: 1, fontSize: 24, fontWeight: '600', color: C.text },
+    // A labelled group like every other, not a hero: the name is one of the
+    // person's fields, and the event page states its title the same way.
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    nameValue: { flex: 1 },
     // One card for the whole person. The padding lives on the groups instead, so
     // the rules between them run the full width and read as divisions of one
     // thing rather than as gaps between several.

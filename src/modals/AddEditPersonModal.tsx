@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Pressable,
+  StyleSheet, Pressable, Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
@@ -48,6 +48,12 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const RECENT_CONVERT_STATUS = 'Recent Converts';
 
+/**
+ * The two fields drawn as boxes. The rest of the form's inputs keep the
+ * underline, and with it no focus state to track.
+ */
+type FieldKey = 'name' | 'notes';
+
 export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -60,9 +66,19 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const [messenger, setMessenger] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  const [starred, setStarred] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
+  // Which boxed field has the keyboard, so it can draw its focus edge. One value
+  // rather than a boolean each, the same as the event editor: only one can be
+  // focused, and separate booleans could disagree about it.
+  const [focusedField, setFocusedField] = useState<FieldKey | null>(null);
+  /** Everything a focused field needs: shut the menus, and claim the edge. */
+  function focusProps(field: FieldKey) {
+    return {
+      onFocus: () => { closePickers(); setFocusedField(field); },
+      onBlur: () => setFocusedField(null),
+    };
+  }
   /**
    * Which group wins the paint order. Lags the two booleans on the way down and
    * only ever moves to the other picker, never back to null: a menu animates out
@@ -100,7 +116,6 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setMessenger(person.messenger ?? null);
       setAddress(person.address ?? null);
       setNotes(person.notes ?? '');
-      setStarred(person.starred);
     } else {
       setName('');
       setStatus('Other');
@@ -109,7 +124,6 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       setMessenger(null);
       setAddress(null);
       setNotes('');
-      setStarred(false);
     }
     setShowStatusPicker(false);
     setShowMethodPicker(false);
@@ -203,7 +217,6 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       messenger: messenger === null ? undefined : messenger.trim(),
       address: address === null ? undefined : address.trim(),
       notes: notes.trim(),
-      starred,
     });
     // Someone who already exists has a page to go back to; a new person does not.
     if (person) setMode('view'); else onClose();
@@ -213,6 +226,31 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
     if (!person) { onClose(); return; }
     resetForm();
     setMode('view');
+  }
+
+  /**
+   * Confirm, then delete and close.
+   *
+   * The confirmation is the modal's rather than the caller's, the same way the
+   * event sheet owns its own: the trash is a 20pt glyph beside the name now, not
+   * a full-width button that had to be gone looking for, so nothing else stands
+   * between a mis-tap and the person being gone.
+   */
+  function handleDelete() {
+    if (!person || !onDelete) return;
+    Alert.alert(
+      'Delete Person',
+      `Delete ${person.name.trim() || 'this person'}? Their events stay, without them attached.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => { onDelete(person.id); onClose(); },
+        },
+      ],
+      { cancelable: true },
+    );
   }
 
   /**
@@ -314,9 +352,9 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             messenger={messenger}
             address={address}
             notes={notes}
-            starred={starred}
             settings={settings}
             onContact={contactVia}
+            onDelete={person && onDelete ? handleDelete : undefined}
           />
         )}
 
@@ -343,29 +381,27 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             <Text style={styles.label}>Name</Text>
             <View style={styles.fieldRow}>
               <TextInput
-                style={[styles.input, styles.fieldInput]}
+                style={[styles.input, styles.inputBoxed, styles.fieldInput, focusedField === 'name' && styles.inputFocused]}
                 value={name}
                 onChangeText={setName}
-                onFocus={closePickers}
+                {...focusProps('name')}
                 placeholder="Full name"
                 placeholderTextColor={Colors.textLight}
               />
-              {/* The favourite toggle lives on the name row rather than in a
-                  labelled section of its own — it is one bit about the person,
-                  and the filled star already says which way it is set. */}
-              <TouchableOpacity
-                onPress={() => { closePickers(); setStarred(!starred); }}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityState={{ selected: starred }}
-                accessibilityLabel={starred ? 'Remove from favorites' : 'Mark as favorite'}
-              >
-                <Ionicons
-                  name={starred ? 'star' : 'star-outline'}
-                  size={22}
-                  color={starred ? Colors.favorite : Colors.textLight}
-                />
-              </TouchableOpacity>
+              {/* Beside the name rather than at the foot of the form, matching
+                  the event editor: deleting is about the whole record, so it
+                  belongs against the thing that names it and not below the last
+                  field, where it read as one more part of the form. */}
+              {person && onDelete && (
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete person"
+                >
+                  <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -620,10 +656,10 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           <View style={[styles.group]}>
             <Text style={styles.label}>Notes</Text>
             <TextInput
-              style={[styles.input, styles.notesInput]}
+              style={[styles.input, styles.inputBoxed, styles.notesInput, focusedField === 'notes' && styles.inputFocused]}
               value={notes}
               onChangeText={setNotes}
-              onFocus={closePickers}
+              {...focusProps('notes')}
               placeholder="Notes about this person..."
               placeholderTextColor={Colors.textLight}
               multiline
@@ -631,16 +667,6 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             />
           </View>
           </View>
-
-          {person && onDelete && (
-            <TouchableOpacity
-              style={styles.deleteBtn}
-              onPress={() => { onDelete(person.id); onClose(); }}
-            >
-              <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-              <Text style={styles.deleteText}>Delete Person</Text>
-            </TouchableOpacity>
-          )}
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -686,7 +712,7 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '700',
       color: C.text,
     },
-    // The display header's ×-and-Edit pair, sized the way WeeklyPlanningModal
+    // The display header's ×-and-Edit pair, sized the way EditGoalsModal
     // sizes its close button: equal 60pt slots on both ends so the title sits
     // centred whatever the right-hand label says.
     closeBtn: { width: 60, alignItems: 'flex-start' },
@@ -752,9 +778,10 @@ function makeStyles(C: ColorPalette) {
       elevation: 2,
       zIndex: 20,
     },
-    // No rule between groups: the form is already full of hairlines under the
-    // fields themselves, and a second kind of line reads as another one of those
-    // rather than as a division. The labels carry the separation instead.
+    // No rule between groups: every field already draws its own edge — a box
+    // around Name and Notes, a hairline under everything else — and one more
+    // line between groups reads as another of those rather than as a division.
+    // The labels carry the separation instead.
     group: { padding: 12 },
     // A field that only wants half a group's width. The second column is left
     // empty rather than the field being given a percentage, so a half here lines
@@ -772,6 +799,8 @@ function makeStyles(C: ColorPalette) {
       letterSpacing: 0.5,
       marginBottom: 8,
     },
+    // The default for this form: a rule under the value, the same as the status
+    // picker's. Phone, WhatsApp, Messenger and Address all keep it.
     input: {
       fontSize: 16,
       color: C.text,
@@ -779,7 +808,29 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       paddingVertical: 4,
     },
-    // An input with something beside it. Only the name row's star is left: the
+    // Name and Notes only. Those two are what the sheet is really about — who
+    // this is and what you know about them — and a box says "write here" in a
+    // way a rule under one line does not, particularly for Notes, which has no
+    // shape at all until it has been typed into. The contact fields are short,
+    // known-format values and stay as rules; boxing all six turned the card into
+    // a wall of identical rectangles.
+    //
+    // The border is drawn at full width in both states and only changes colour on
+    // focus — thickening it instead would reflow the text inside by half a point
+    // on every focus, which reads as the field twitching.
+    inputBoxed: {
+      backgroundColor: C.inputBg,
+      borderWidth: 1,
+      borderColor: C.inputBorder,
+      borderBottomWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    // `control`, not `primary`: this is interactive furniture saying where the
+    // keyboard is pointed, the same as a checkmark or an active pill.
+    inputFocused: { borderColor: C.control },
+    // An input with something beside it. Only the name row's trash is left: the
     // call, message and map buttons moved to the display view, where using a
     // number is what you're there to do.
     fieldRow: {
@@ -813,9 +864,9 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '500',
     },
     notesInput: {
-      minHeight: 56,
+      minHeight: 88,
       textAlignVertical: 'top',
-      paddingTop: 4,
+      paddingTop: 10,
     },
     picker: {
       flexDirection: 'row',
@@ -865,21 +916,6 @@ function makeStyles(C: ColorPalette) {
     cardBackdrop: {
       ...StyleSheet.absoluteFillObject,
       zIndex: 25,
-    },
-    deleteBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      margin: 16,
-      padding: 14,
-      borderRadius: 14,
-      backgroundColor: C.danger + '12',
-    },
-    deleteText: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: C.danger,
     },
   });
 }

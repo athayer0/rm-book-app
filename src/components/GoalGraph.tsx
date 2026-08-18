@@ -11,17 +11,19 @@ import type { ColorPalette } from '../constants/colors';
 import { GoalDefinition } from '../constants/defaultGoals';
 import { GoalIcon } from './GoalIcon';
 import { DropdownMenu, DropdownItem } from './DropdownMenu';
-import { useWeeklyGoals, resolveGoal } from '../hooks/useWeeklyGoals';
-import { getWeekKeyByOffset, formatWeekLabel } from '../utils/dateUtils';
+import { resolveGoal } from '../hooks/useWeeklyGoals';
+import { GoalGrain, GRAIN, PeriodDataReader } from '../utils/goalGrain';
 
-interface WeekPoint {
-  weekKey: string;
+interface PeriodPoint {
+  periodKey: string;
   actual: number;
   goal: number;
 }
 
 interface Props {
   definitions: GoalDefinition[];
+  grain: GoalGrain;
+  getPeriodData: PeriodDataReader;
 }
 
 const LEFT_PAD = 32;
@@ -33,7 +35,7 @@ const TOP_PAD = 22;
 // The label baseline is at +22, so anything under ~26 starts clipping descenders.
 const BOTTOM_PAD = 27;
 const CHART_H = 180;
-const N_WEEKS = 6;
+const N_PERIODS = 6;
 // Ten lines over CHART_H is ~18px apart, tight but legible at fontSize 9 — and
 // it's what keeps a max of 10 or under labelled by ones.
 const MAX_GRID_LINES = 10;
@@ -52,17 +54,17 @@ function tickStep(max: number): number {
   return 10 ** 12;
 }
 
-export function GoalGraphTab({ definitions }: Props) {
+export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
-  const { getWeekData } = useWeeklyGoals();
-  const visibleDefs = definitions.filter(d => d.visible);
+  const { visibilityKey, keyByOffset, axisLabel, summary } = GRAIN[grain];
+  const visibleDefs = definitions.filter(d => d[visibilityKey]);
 
   const [selectedId, setSelectedId] = useState<string>(visibleDefs[0]?.id ?? '');
-  const [weekData, setWeekData] = useState<WeekPoint[]>([]);
-  const [nextWeek, setNextWeek] = useState<{ actual: number; goal: number | null }>({ actual: 0, goal: null });
+  const [periodData, setPeriodData] = useState<PeriodPoint[]>([]);
+  const [nextPeriod, setNextPeriod] = useState<{ actual: number; goal: number | null }>({ actual: 0, goal: null });
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -73,23 +75,23 @@ export function GoalGraphTab({ definitions }: Props) {
     const def = definitions.find(d => d.id === id);
     if (!def) return;
 
-    const points: WeekPoint[] = [];
-    for (let offset = -(N_WEEKS - 1); offset <= 0; offset++) {
-      const wk = getWeekKeyByOffset(offset);
-      const { counts, goals } = await getWeekData(wk);
+    const points: PeriodPoint[] = [];
+    for (let offset = -(N_PERIODS - 1); offset <= 0; offset++) {
+      const key = keyByOffset(offset);
+      const { counts, goals } = await getPeriodData(key);
       points.push({
-        weekKey: wk,
+        periodKey: key,
         actual: counts[id] ?? 0,
         // Never future, so this always resolves to a number the bar maths can use.
         goal: resolveGoal(goals[id], false) ?? 0,
       });
     }
-    setWeekData(points);
+    setPeriodData(points);
 
-    const nextWk = getWeekKeyByOffset(1);
-    const { counts: nc, goals: ng } = await getWeekData(nextWk);
-    setNextWeek({ actual: nc[id] ?? 0, goal: resolveGoal(ng[id], true) });
-  }, [definitions, getWeekData]);
+    const nextKey = keyByOffset(1);
+    const { counts: nc, goals: ng } = await getPeriodData(nextKey);
+    setNextPeriod({ actual: nc[id] ?? 0, goal: resolveGoal(ng[id], true) });
+  }, [definitions, getPeriodData, keyByOffset]);
 
   useEffect(() => {
     if (selectedId) loadData(selectedId);
@@ -104,11 +106,11 @@ export function GoalGraphTab({ definitions }: Props) {
   const svgW = containerWidth;
   const svgH = TOP_PAD + CHART_H + BOTTOM_PAD;
   const drawW = svgW - LEFT_PAD - RIGHT_PAD;
-  const colW = drawW / N_WEEKS;
+  const colW = drawW / N_PERIODS;
   const barW = colW * 0.5;
 
-  const rawMax = weekData.length
-    ? Math.max(...weekData.map(p => p.goal), ...weekData.map(p => p.actual), 1)
+  const rawMax = periodData.length
+    ? Math.max(...periodData.map(p => p.goal), ...periodData.map(p => p.actual), 1)
     : 1;
   const maxVal = rawMax * 1.2;
 
@@ -122,19 +124,12 @@ export function GoalGraphTab({ definitions }: Props) {
   const gridLevels: number[] = [];
   for (let v = step; v <= rawMax; v += step) gridLevels.push(v);
 
-  const linePoints = weekData
+  const linePoints = periodData
     .map((p, i) => `${dotX(i)},${yFor(p.actual)}`)
     .join(' ');
 
-  // The axis only needs to say which week a column is, so it carries the start
-  // date alone — formatWeekLabel's full "MMM d – MMM d" range is more than six
-  // columns have room for.
-  function xLabel(wk: string): string {
-    return formatWeekLabel(wk).split(' – ')[0] ?? '';
-  }
-
-  const lastWeek = weekData[N_WEEKS - 2] ?? { actual: 0, goal: 0 };
-  const thisWeek = weekData[N_WEEKS - 1] ?? { actual: 0, goal: 0 };
+  const prevPoint = periodData[N_PERIODS - 2] ?? { actual: 0, goal: 0 };
+  const currentPoint = periodData[N_PERIODS - 1] ?? { actual: 0, goal: 0 };
 
   const goalBarFill = Colors.border;
 
@@ -187,7 +182,7 @@ export function GoalGraphTab({ definitions }: Props) {
         </View>
       </View>
 
-      {/* Dismisses the menu on a tap anywhere else in the tab. Sits under
+      {/* Dismisses the menu on a tap anywhere else in the sheet. Sits under
           dropdownWrapper's own zIndex, so the trigger stays reachable and one
           tap still closes the menu by re-tapping it rather than being eaten. */}
       {dropdownOpen && (
@@ -204,26 +199,26 @@ export function GoalGraphTab({ definitions }: Props) {
         {selectedDef && (
           <View style={styles.summaryRow}>
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>Last week</Text>
+              <Text style={styles.summaryLabel}>{summary.prev}</Text>
               <Text style={styles.summaryValue}>
-                <Text style={{ color: selectedDef.color }}>{lastWeek.actual}</Text>
-                <Text style={styles.summaryGoalText}>/{lastWeek.goal}</Text>
+                <Text style={{ color: selectedDef.color }}>{prevPoint.actual}</Text>
+                <Text style={styles.summaryGoalText}>/{prevPoint.goal}</Text>
               </Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>This week</Text>
+              <Text style={styles.summaryLabel}>{summary.current}</Text>
               <Text style={styles.summaryValue}>
-                <Text style={{ color: selectedDef.color }}>{thisWeek.actual}</Text>
-                <Text style={styles.summaryGoalText}>/{thisWeek.goal}</Text>
+                <Text style={{ color: selectedDef.color }}>{currentPoint.actual}</Text>
+                <Text style={styles.summaryGoalText}>/{currentPoint.goal}</Text>
               </Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>Next week</Text>
+              <Text style={styles.summaryLabel}>{summary.next}</Text>
               <Text style={styles.summaryValue}>
-                <Text style={{ color: Colors.textLight }}>{nextWeek.actual}</Text>
-                <Text style={styles.summaryGoalText}>/{nextWeek.goal ?? '—'}</Text>
+                <Text style={{ color: Colors.textLight }}>{nextPeriod.actual}</Text>
+                <Text style={styles.summaryGoalText}>/{nextPeriod.goal ?? '—'}</Text>
               </Text>
             </View>
           </View>
@@ -233,7 +228,7 @@ export function GoalGraphTab({ definitions }: Props) {
           style={styles.chartContainer}
           onLayout={(e: LayoutChangeEvent) => setContainerWidth(e.nativeEvent.layout.width)}
         >
-          {containerWidth > 0 && weekData.length === N_WEEKS && selectedDef && (
+          {containerWidth > 0 && periodData.length === N_PERIODS && selectedDef && (
             <Svg width={svgW} height={svgH}>
               {gridLevels.map((val, gi) => {
                 const y = yFor(val);
@@ -261,7 +256,7 @@ export function GoalGraphTab({ definitions }: Props) {
                 );
               })}
 
-              {weekData.map((p, i) => {
+              {periodData.map((p, i) => {
                 const bh = (p.goal / maxVal) * CHART_H;
                 const by = TOP_PAD + CHART_H - bh;
                 return (
@@ -277,7 +272,7 @@ export function GoalGraphTab({ definitions }: Props) {
                 );
               })}
 
-              {weekData.length > 1 && (
+              {periodData.length > 1 && (
                 <Polyline
                   points={linePoints}
                   fill="none"
@@ -287,7 +282,7 @@ export function GoalGraphTab({ definitions }: Props) {
                 />
               )}
 
-              {weekData.map((p, i) => {
+              {periodData.map((p, i) => {
                 const cy = yFor(p.actual);
                 const cx = dotX(i);
                 return (
@@ -314,7 +309,7 @@ export function GoalGraphTab({ definitions }: Props) {
                 );
               })}
 
-              {weekData.map((p, i) => (
+              {periodData.map((p, i) => (
                 <SvgText
                   key={`xlabel-${i}`}
                   x={dotX(i)}
@@ -323,7 +318,7 @@ export function GoalGraphTab({ definitions }: Props) {
                   fill={Colors.textSecondary}
                   textAnchor="middle"
                 >
-                  {xLabel(p.weekKey)}
+                  {axisLabel(p.periodKey)}
                 </SvgText>
               ))}
             </Svg>
@@ -345,8 +340,8 @@ function makeStyles(C: ColorPalette) {
       paddingBottom: 6,
       zIndex: 10,
     },
-    // Covers the whole tab, chart included; the wrapper above outranks it, so
-    // the trigger and the open menu are the only things it doesn't cover.
+    // Covers the whole sheet body, chart included; the wrapper above outranks it,
+    // so the trigger and the open menu are the only things it doesn't cover.
     dropdownBackdrop: {
       ...StyleSheet.absoluteFillObject,
       zIndex: 1,

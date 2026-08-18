@@ -27,6 +27,12 @@ interface Props {
   onDragCancel?: () => void;
   dragHoverY?: number | null;
   dragGrabOffsetY?: number;
+  // Extra drop-target shadows for a multi-select drag — one per selected event
+  // other than the grabbed one, each given as its pixel offset from the grabbed
+  // block's top edge plus its own rendered height. The grabbed block's shadow
+  // comes from dragEventHeight, so the whole selection previews where it lands
+  // regardless of which block the finger is actually holding.
+  dragGroupShadows?: { id: string; offsetY: number; height: number }[];
   gridStartHour?: number;
   gridEndHour?: number;
   slotHeight?: number;
@@ -53,7 +59,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors, slotHeight), [Colors, slotHeight]);
 
@@ -276,6 +282,19 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
                 style={[styles.dragHighlight, { top: dragSlot * DRAG_SLOT_HEIGHT + 1, height: dragEventHeight ?? SLOT_HEIGHT }]}
               />
             )}
+
+            {/* Siblings hold the pixel gap they started with, which is the same
+                minute delta the drop replays off each one's own start time. */}
+            {dragSlot !== null && dragGroupShadows?.map(shadow => (
+              <View
+                key={shadow.id}
+                pointerEvents="none"
+                style={[styles.dragHighlight, {
+                  top: dragSlot * DRAG_SLOT_HEIGHT + 1 + shadow.offsetY,
+                  height: shadow.height,
+                }]}
+              />
+            ))}
 
             {events.map(event => {
               const { col, numCols } = eventLayout.get(event.id) ?? { col: 0, numCols: 1 };

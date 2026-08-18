@@ -26,17 +26,17 @@ export function GoalGrid({ definitions, counts, goals, onPressGoal, compact, vis
       {rows.map((row, ri) => (
         <View key={ri} style={styles.row}>
           {row.map(def => (
-            <GoalCard
-              key={def.id}
-              definition={def}
-              count={counts[def.id] ?? 0}
-              // The grid only ever shows the current week, which never resolves to null.
-              goal={resolveGoal(goals[def.id], false) ?? 0}
-              onPress={onPressGoal}
-              compact={compact}
-            />
+            <View key={def.id} style={styles.cell}>
+              <GoalCard
+                definition={def}
+                count={counts[def.id] ?? 0}
+                // The grid only ever shows the current week, which never resolves to null.
+                goal={resolveGoal(goals[def.id], false) ?? 0}
+                onPress={onPressGoal}
+                compact={compact}
+              />
+            </View>
           ))}
-          {row.length === 1 && <View style={styles.placeholder} />}
         </View>
       ))}
     </View>
@@ -52,8 +52,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 0,
   },
-  placeholder: {
-    flex: 1,
-    margin: 4,
+  // A column is half the row by construction, so the last card on an odd row is
+  // the same width as a paired one on its own — this replaced an invisible
+  // filler View rendered beside it to force the gutter, which produced the same
+  // pixels only as long as its flex and margins were kept identical to a card's.
+  //
+  // flexDirection row so the card's own `flex: 1` still runs along the
+  // horizontal axis exactly as it did when the card was a direct child of the
+  // row, and its default vertical `stretch` still fills the cell — which the
+  // row's own `alignItems: stretch` has already grown to the taller card's
+  // height. That is what keeps two cards in a row the same height when one
+  // label wraps to a second line and the other doesn't.
+  cell: {
+    width: '50%',
+    flexDirection: 'row',
   },
 });

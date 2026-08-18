@@ -16,7 +16,8 @@ import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TIME_COL_WIDTH = 52;
 const TIME_GAP = 4; // styles.time marginLeft
-const REPEAT_GAP = 3; // between the repeat marker and the status badge
+const GUTTER_GAP = 3; // between any two of the right-hand gutter's markers
+const UNITS_GAP = 3; // between the quantity and its units, inside the one marker
 const METHOD_GAP = 5; // between the method marker and the title
 
 // The title's line height and the method glyph, both as multiples of the block's
@@ -25,6 +26,13 @@ const METHOD_GAP = 5; // between the method marker and the title
 // geometry drifting.
 const TITLE_LINE_RATIO = 1.3;
 const METHOD_ICON_RATIO = 1.45;
+/**
+ * The gutter quantity, as a multiple of the block's font size — larger than the
+ * title, since on a quantity event the number is what's being read. Stays under
+ * the repeat marker's 1.75 so it doesn't outweigh the icons beside it, and small
+ * enough that its line box still fits COMPACT_EVENT_HEIGHT at every density.
+ */
+const QUANTITY_FONT_RATIO = 1.3;
 
 /**
  * The status marker's size, at every density and for both forms it takes — the
@@ -174,14 +182,42 @@ export function EventBlock({
   const isRecurring = !!event.recurring;
   const showRepeatIcon = isRecurring && !inSelectMode;
 
-  // The right-hand gutter: the status badge sits nearest the edge, the repeat
-  // marker to its left. With no badge the marker takes the badge's place, at the
-  // same 6pt inset. Both are absolute, so the gutter has to be reserved as
-  // paddingRight or the title would run underneath them.
-  const repeatRight = showBadge ? 6 + badge + REPEAT_GAP : 6;
-  const gutter = showBadge
-    ? 6 + badge + (showRepeatIcon ? REPEAT_GAP + repeatSize : 0)
-    : showRepeatIcon ? 6 + repeatSize : BLOCK.paddingRight;
+  // A quantity-mode type's event carries its own number — the same figure the
+  // detail sheet's stepper edits, and what getGoalContribution() adds to the
+  // goal. Shown only once there's something to show: a 0 is the state every such
+  // event starts in, and the status marker already says it's unreported.
+  const quantityLabel =
+    !isBackup && !inSelectMode
+    && eventTypeById[event.type]?.goalMode === 'quantity'
+    && (event.quantity ?? 0) > 0
+      ? String(event.quantity)
+      : null;
+  const quantityFontSize = Math.round(fontSize * QUANTITY_FONT_RATIO);
+  // What the number counts, if the event says. Rides alongside at the title's own
+  // size rather than the number's, so "5 miles" reads as one value with the digit
+  // leading it instead of two things of equal weight. Only ever shown with a
+  // number — a unit by itself counts nothing.
+  const unitsLabel = quantityLabel ? (event.units?.trim() || null) : null;
+  // Deliberately generous — each Text sizes to its own content, so this figure
+  // only reserves room. Under-reserving would let the repeat marker slide
+  // underneath the digits; over-reserving costs the title a few points.
+  const quantityWidth = quantityLabel
+    ? Math.ceil(quantityLabel.length * quantityFontSize * 0.62)
+      + (unitsLabel ? UNITS_GAP + Math.ceil(unitsLabel.length * fontSize * 0.62) : 0)
+    : 0;
+
+  // The right-hand gutter, filled from the edge inward: status badge, then the
+  // quantity, then the repeat marker. Each one's `right` is everything already
+  // placed outside it, so whichever are absent simply close up. All are
+  // absolute, so the gutter has to be reserved as paddingRight or the title
+  // would run underneath them.
+  const quantityRight = showBadge ? 6 + badge + GUTTER_GAP : 6;
+  const repeatRight = quantityRight + (quantityLabel ? quantityWidth + GUTTER_GAP : 0);
+  const gutter =
+    showRepeatIcon ? repeatRight + repeatSize
+    : quantityLabel ? quantityRight + quantityWidth
+    : showBadge ? 6 + badge
+    : BLOCK.paddingRight;
 
   // Contacts and dates lead with how they happened — a phone glyph on a phone
   // call, a screen on a video date. It rides the title row, so it sits on the
@@ -293,6 +329,34 @@ export function EventBlock({
           </View>
         )}
 
+        {quantityLabel && (
+          <View style={[styles.statusWrap, { right: quantityRight }]}>
+            {/* Nested so the pair can sit on a shared baseline while the wrap
+                still centres it in the block's height — one row can't do both,
+                since baseline alignment is what would otherwise position it
+                vertically. */}
+            <View style={styles.quantityRow}>
+              <Text
+                style={[styles.quantity, {
+                  fontSize: quantityFontSize,
+                  lineHeight: Math.round(quantityFontSize * TITLE_LINE_RATIO),
+                }]}
+                numberOfLines={1}
+              >
+                {quantityLabel}
+              </Text>
+              {unitsLabel && (
+                <Text
+                  style={[styles.units, { fontSize, lineHeight: titleLineHeight, marginLeft: UNITS_GAP }]}
+                  numberOfLines={1}
+                >
+                  {unitsLabel}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {!inSelectMode && isCheckbox && (
           <GestureDetector gesture={Gesture.Tap().runOnJS(true).onEnd(() => onToggleStatus?.())}>
             <View style={[styles.statusWrap, { width: badge }]} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
@@ -372,6 +436,22 @@ function makeStyles(C: ColorPalette) {
       color: C.textSecondary,
       marginLeft: TIME_GAP,
       flexShrink: 0,
+    },
+    quantityRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+    },
+    // A value rather than a label, so it carries the title's weight and colour
+    // instead of the time's — it's the point of the event, not an annotation.
+    quantity: {
+      fontWeight: '700',
+      color: C.text,
+    },
+    // The unit is the annotation, so here the time's treatment is right: it
+    // names what the number is without competing with it.
+    units: {
+      fontWeight: '600',
+      color: C.textSecondary,
     },
     statusWrap: {
       position: 'absolute',

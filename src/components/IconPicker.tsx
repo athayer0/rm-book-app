@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
+import { BottomSheet } from './BottomSheet';
 import { GoalIcon } from './GoalIcon';
 
 export interface IconOption { name: string; family: string; }
@@ -43,8 +44,25 @@ export const ICON_OPTIONS: IconOption[] = [
   { name: 'water',               family: 'Ionicons' },
 ];
 
+/**
+ * What anything given an icon here starts out as — a new goal, a type just
+ * added to the quick-add bubbles. Named for the same reason `DEFAULT_GOAL_COLOR`
+ * is: reading it off `ICON_OPTIONS[0]` would make the starting icon a side
+ * effect of how that list happens to be sorted, so an insertion at the top
+ * would silently change what everything added afterwards looks like.
+ *
+ * Two people: generic enough to be about anything, and — beside the neutral
+ * grey a new goal starts on — it reads as a placeholder rather than as a choice
+ * already made.
+ */
+export const DEFAULT_ICON: IconOption = { name: 'people', family: 'Ionicons' };
+
 const CELL_SIZE = 52;
 const GRID_GAP = 10;
+
+// Enough for the whole grid on a normal phone; BottomSheet clamps it on a
+// short one and the grid scrolls inside.
+const SHEET_HEIGHT = 420;
 
 interface Props {
   icon: string;
@@ -58,8 +76,7 @@ interface Props {
  * Every icon on offer, laid out as a plain wrapping grid. A tap updates the
  * selection in place rather than immediately closing whatever this is a step
  * inside of — the caller's own Cancel/Done is what leaves the grid, same as
- * the colour picker. Used as a full-page step inside a caller's own
- * BottomSheet (see EditGoalSheet's `iconPickerOpen`) and as
+ * the colour picker. Used inside `IconPickerSheet` below and as
  * QuickAddTypesModal's own small icon sheet — both hand it the same
  * icon/iconFamily/color/onSelect contract, so it has no opinion on what
  * wraps it.
@@ -99,8 +116,64 @@ export function IconPicker({ icon, iconFamily, color, onSelect }: Props) {
   );
 }
 
+interface SheetProps {
+  visible: boolean;
+  /** The icon the sheet opens on, and what Cancel restores. */
+  icon: string;
+  iconFamily: string;
+  /** Tint for the selected cell — the goal's own colour. */
+  color: string;
+  /** Names what is being given an icon. */
+  title?: string;
+  onCancel: () => void;
+  onDone: (opt: IconOption) => void;
+}
+
+/**
+ * The grid above in a bottom sheet, drafted and committed on Done — the
+ * counterpart to `ColorPickerSheet`, and what a row on a list screen opens.
+ *
+ * Only ever open this from a screen that is at most one Modal deep (a
+ * `SheetModal`, or the tab screen itself). See `ColorPickerSheet` for what a
+ * third stacked native Modal does on iOS.
+ */
+export function IconPickerSheet({
+  visible, icon, iconFamily, color, title, onCancel, onDone,
+}: SheetProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+
+  const [draft, setDraft] = useState<IconOption>({ name: icon, family: iconFamily });
+
+  useEffect(() => {
+    if (!visible) return;
+    setDraft({ name: icon, family: iconFamily });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title={title ?? 'Icon'}
+      height={SHEET_HEIGHT}
+      onCancel={onCancel}
+      onDone={() => onDone(draft)}
+    >
+      <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
+        <IconPicker
+          icon={draft.name}
+          iconFamily={draft.family}
+          color={color}
+          onSelect={setDraft}
+        />
+      </ScrollView>
+    </BottomSheet>
+  );
+}
+
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
+    sheetContent: { padding: 16 },
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',

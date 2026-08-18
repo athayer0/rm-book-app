@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, useWindowDimensions,
+  View, Text, TouchableOpacity, StyleSheet, useWindowDimensions,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -10,28 +10,33 @@ import { useTrackDrag } from '../hooks/useTrackDrag';
 import { BottomSheet } from './BottomSheet';
 import type { ColorPalette } from '../constants/colors';
 import {
-  contrastInk, hexToHsv, hexToRgb, hsvToHex, hueHex, normalizeHex, rgbToHex, type HSV,
+  contrastInk, hexToHsv, hsvToHex, hueHex, normalizeHex, type HSV,
 } from '../utils/colorUtils';
 
 /**
  * The colour picker for the whole app: a bottom sheet over half the screen with
- * three ways to land on the same value — a grid of ready-made swatches, a
- * saturation/brightness field under a hue ramp, and RGB sliders with a hex
- * field. Replaces the inline strips that used to expand inside a row and shove
- * everything under them down the screen.
+ * two ways to land on the same value — a grid of ready-made swatches, and a
+ * saturation/brightness field under a hue ramp. Replaces the inline strips that
+ * used to expand inside a row and shove everything under them down the screen.
  *
  * The draft is committed on Done and thrown away on Cancel, so the caller sees
  * one write per visit rather than one per drag — and a colour that drives the
  * whole theme can be explored without every intermediate value being persisted
  * and synced.
+ *
+ * Being a `Modal` (via BottomSheet), only open this from a screen at most one
+ * Modal deep — a `SheetModal` list, or a tab screen. Opened from inside another
+ * BottomSheet it would be the third stacked native Modal, and iOS won't
+ * reliably present that: it used to read as "tapping Color does nothing and the
+ * app is stuck". Somewhere that needs a picker three deep should render
+ * `ColorPickerBody` as a step inside the sheet it already has instead.
  */
 
-type Tab = 'grid' | 'spectrum' | 'sliders';
+type Tab = 'grid' | 'spectrum';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'grid', label: 'Grid' },
   { key: 'spectrum', label: 'Spectrum' },
-  { key: 'sliders', label: 'Sliders' },
 ];
 
 const HUE_STOPS = ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF', '#FF0000'];
@@ -108,7 +113,6 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
   // sheet whose caller re-renders, and the before/after swatch has to keep
   // showing where this visit started.
   const [opened, setOpened] = useState(() => normalizeHex(color) ?? '#000000');
-  const [hexEdit, setHexEdit] = useState<string | null>(null);
 
   const draft = hsvToHex(hsv.h, hsv.s, hsv.v);
 
@@ -118,13 +122,11 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
     setOpened(start);
     setHsv(hexToHsv(start));
     setTab('grid');
-    setHexEdit(null);
   }, [visible]);
 
   function pick(hex: string) {
     Haptics.selectionAsync();
     setHsv(hexToHsv(hex));
-    setHexEdit(null);
   }
 
   return (
@@ -143,69 +145,25 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
         opened={opened}
         defaultColor={defaultColor}
         tab={tab}
-        hexEdit={hexEdit}
         onPick={pick}
         onChangeHsv={setHsv}
         onTabChange={setTab}
-        onHexEdit={setHexEdit}
       />
     </BottomSheet>
   );
 }
 
-/**
- * State for a colour picker embedded directly in a caller's own sheet, rather
- * than opened as a second nested BottomSheet.
- *
- * EditGoalSheet and EditEventTypeSheet used to open `ColorPickerSheet` as a
- * Modal stacked on top of their *own* BottomSheet Modal — three native Modals
- * deep, counting the list sheet underneath. iOS won't reliably present a third
- * nested modal at once, which is what read as "tapping Color does nothing and
- * the app is stuck." Embedding the picker as a step inside the caller's own
- * BottomSheet (see ColorPickerBody) keeps the whole flow to one Modal.
- *
- * `active` plays the role `visible` plays for ColorPickerSheet above: state
- * resets whenever it flips to true, since this stays mounted the whole time
- * rather than mounting fresh per visit.
- */
-export function useEmbeddedColorPicker(active: boolean, color: string) {
-  const [hsv, setHsv] = useState<HSV>(() => hexToHsv(normalizeHex(color) ?? '#000000'));
-  const [tab, setTab] = useState<Tab>('grid');
-  const [opened, setOpened] = useState(() => normalizeHex(color) ?? '#000000');
-  const [hexEdit, setHexEdit] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!active) return;
-    const start = normalizeHex(color) ?? '#000000';
-    setOpened(start);
-    setHsv(hexToHsv(start));
-    setTab('grid');
-    setHexEdit(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
-
-  const draft = hsvToHex(hsv.h, hsv.s, hsv.v);
-
-  function pick(hex: string) {
-    Haptics.selectionAsync();
-    setHsv(hexToHsv(hex));
-    setHexEdit(null);
-  }
-
-  return { hsv, setHsv, tab, setTab, hexEdit, setHexEdit, opened, draft, pick };
-}
-
 type Styles = ReturnType<typeof makeStyles>;
 
 /**
- * The picker itself — preview swatches, tabs, grid/spectrum/sliders — with no
- * opinion on what wraps it. `ColorPickerSheet` puts this in its own BottomSheet;
- * EditGoalSheet/EditEventTypeSheet render it as a step inside their own, via
- * `useEmbeddedColorPicker`. Fully controlled, so either caller's state drives it.
+ * The picker itself — preview swatches, tabs, grid and spectrum — with no
+ * opinion on what wraps it. `ColorPickerSheet` puts it in a BottomSheet; it is
+ * exported for anything that wants to present it some other way. Fully
+ * controlled, so the caller's state drives it.
  */
 export function ColorPickerBody({
-  styles, Colors, hsv, draft, opened, defaultColor, tab, hexEdit,
-  onPick, onChangeHsv, onTabChange, onHexEdit,
+  styles, Colors, hsv, draft, opened, defaultColor, tab,
+  onPick, onChangeHsv, onTabChange,
 }: {
   styles: Styles;
   Colors: ColorPalette;
@@ -214,11 +172,9 @@ export function ColorPickerBody({
   opened: string;
   defaultColor?: string;
   tab: Tab;
-  hexEdit: string | null;
   onPick: (hex: string) => void;
   onChangeHsv: (next: HSV) => void;
   onTabChange: (t: Tab) => void;
-  onHexEdit: (v: string | null) => void;
 }) {
   const showReset = !!defaultColor && normalizeHex(defaultColor) !== draft;
 
@@ -277,16 +233,6 @@ export function ColorPickerBody({
         </View>
         <View style={[styles.panelPage, tab !== 'spectrum' && styles.panelHidden]} pointerEvents={tab === 'spectrum' ? 'auto' : 'none'}>
           <SpectrumPanel styles={styles} hsv={hsv} draft={draft} onChange={onChangeHsv} />
-        </View>
-        <View style={[styles.panelPage, tab !== 'sliders' && styles.panelHidden]} pointerEvents={tab === 'sliders' ? 'auto' : 'none'}>
-          <SlidersPanel
-            styles={styles}
-            Colors={Colors}
-            draft={draft}
-            hexEdit={hexEdit}
-            onHexEdit={onHexEdit}
-            onChange={onChangeHsv}
-          />
         </View>
       </View>
     </>
@@ -444,130 +390,6 @@ function SpectrumPanel({
 function insetPos(fraction: number, trackSize: number, thumbSize: number): number | `${number}%` {
   if (trackSize <= 0) return `${fraction * 100}%`;
   return thumbSize / 2 + fraction * (trackSize - thumbSize);
-}
-
-/* ------------------------------------------------------------- Sliders tab */
-
-const CHANNELS = [
-  { key: 'r', label: 'Red' },
-  { key: 'g', label: 'Green' },
-  { key: 'b', label: 'Blue' },
-] as const;
-
-function SlidersPanel({
-  styles, Colors, draft, hexEdit, onHexEdit, onChange,
-}: {
-  styles: Styles;
-  Colors: ColorPalette;
-  draft: string;
-  hexEdit: string | null;
-  onHexEdit: (v: string | null) => void;
-  onChange: (next: HSV) => void;
-}) {
-  const uid = useRef(Math.random().toString(36).slice(2, 8)).current;
-  const rgb = hexToRgb(draft);
-
-  // Held in a ref so the three PanResponders, built once, always set their own
-  // channel against the value on screen rather than the one from first render.
-  const current = useRef(rgb);
-  current.current = rgb;
-
-  function setChannel(key: 'r' | 'g' | 'b', value: number) {
-    const next = { ...current.current, [key]: Math.round(value * 255) };
-    // Back through HSV because that is what the sheet holds — the round trip is
-    // exact for any colour a slider can produce, bar hue at pure black.
-    onChange(hexToHsv(rgbToHex(next.r, next.g, next.b)));
-    onHexEdit(null);
-  }
-
-  const tracks = {
-    r: useTrackDrag(fx => setChannel('r', fx)),
-    g: useTrackDrag(fx => setChannel('g', fx)),
-    b: useTrackDrag(fx => setChannel('b', fx)),
-  };
-
-  function commitHex(text: string) {
-    const parsed = normalizeHex(text);
-    if (parsed) onChange(hexToHsv(parsed));
-    onHexEdit(null);
-  }
-
-  return (
-    <View style={styles.rgbWrap}>
-      {CHANNELS.map(({ key, label }) => {
-        const value = rgb[key];
-        // Each rail ramps its own channel end to end with the other two held
-        // where they are, so it previews the colour the drag would produce.
-        const from = rgbToHex(...channelEnds(rgb, key, 0));
-        const to = rgbToHex(...channelEnds(rgb, key, 255));
-        return (
-          <View key={key} style={styles.channelRow}>
-            <Text style={styles.channelLabel}>{label}</Text>
-            <View style={styles.channelTrack} {...tracks[key].panHandlers} onLayout={tracks[key].onLayout}>
-              <View style={styles.stripFill} pointerEvents="none">
-                <Svg width="100%" height="100%">
-                  <Defs>
-                    <LinearGradient id={`${key}-${uid}`} x1="0" y1="0" x2="1" y2="0">
-                      <Stop offset="0" stopColor={from} />
-                      <Stop offset="1" stopColor={to} />
-                    </LinearGradient>
-                  </Defs>
-                  <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${key}-${uid})`} />
-                </Svg>
-              </View>
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.stripThumb,
-                  { left: insetPos(value / 255, tracks[key].size.w, STRIP_THUMB), backgroundColor: draft },
-                ]}
-              />
-            </View>
-            <Text style={styles.channelValue}>{value}</Text>
-          </View>
-        );
-      })}
-
-      <View style={styles.hexRow}>
-        <Text style={styles.channelLabel}>Hex</Text>
-        <View style={styles.hexField}>
-          <Text style={styles.hexHash}>#</Text>
-          <TextInput
-            style={styles.hexInput}
-            value={hexEdit ?? draft.slice(1)}
-            onChangeText={text => {
-              const cleaned = text.replace(/[^0-9a-fA-F]/g, '').slice(0, 6).toUpperCase();
-              onHexEdit(cleaned);
-              // Applied as soon as it is a colour at all, so a pasted value
-              // lands without needing the keyboard dismissed first.
-              if (cleaned.length === 6 || cleaned.length === 3) {
-                const parsed = normalizeHex(cleaned);
-                if (parsed) onChange(hexToHsv(parsed));
-              }
-            }}
-            onEndEditing={e => commitHex(e.nativeEvent.text)}
-            onSubmitEditing={e => commitHex(e.nativeEvent.text)}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={6}
-            placeholder="000000"
-            placeholderTextColor={Colors.textLight}
-            returnKeyType="done"
-          />
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/** The rgb triple with one channel pinned — the two ends of that channel's rail. */
-function channelEnds(
-  rgb: { r: number; g: number; b: number },
-  key: 'r' | 'g' | 'b',
-  value: number,
-): [number, number, number] {
-  const next = { ...rgb, [key]: value };
-  return [next.r, next.g, next.b];
 }
 
 // Just enough for the card to show between cells — the grid should read as one
@@ -732,47 +554,5 @@ function makeStyles(C: ColorPalette) {
       elevation: 3,
     },
 
-    rgbWrap: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
-    channelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-    // Wide enough for "Green" — the widest of the four labels that share this
-    // column — so all four rails start on the same x.
-    channelLabel: { width: 48, fontSize: 13, fontWeight: '700', color: C.textSecondary },
-    channelTrack: {
-      flex: 1,
-      height: STRIP_HEIGHT,
-      // Only half a thumb of clearance on the left: the label column already
-      // gives the track's start room to overhang into.
-      marginRight: stripThumb / 2,
-      marginLeft: stripThumb / 4,
-      justifyContent: 'center',
-    },
-    // Fixed width and tabular figures so the rails don't shift as the numbers
-    // go from one digit to three mid-drag.
-    channelValue: {
-      width: 36,
-      fontSize: 13,
-      color: C.text,
-      textAlign: 'right',
-      fontVariant: ['tabular-nums'],
-    },
-    hexRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-    hexField: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      backgroundColor: C.background,
-    },
-    hexHash: { fontSize: 15, color: C.textLight },
-    hexInput: {
-      width: 96,
-      fontSize: 15,
-      color: C.text,
-      paddingVertical: 0,
-      letterSpacing: 1,
-    },
   });
 }

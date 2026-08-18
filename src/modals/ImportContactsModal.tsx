@@ -135,7 +135,6 @@ export function ImportContactsModal({ visible, onClose }: Props) {
         status: 'Other',
         phone: contact.phone ?? '',
         address: contact.address,
-        starred: false,
         notes: '',
       });
     }

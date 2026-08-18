@@ -6,7 +6,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors } from '../constants/colors';
 import {
-  CalendarEvent, EventStatus, isReportableType, isCheckboxType, hasEndTime,
+  CalendarEvent, EventStatus, isReportableType, isCheckboxType, hasEndTime, UNITS_MAX_LENGTH,
 } from '../utils/eventUtils';
 import {
   CONTACT_METHODS, contactMethodLabel, methodFieldLabel, resolveContactMethod, usesContactMethod,
@@ -34,6 +34,8 @@ interface Props {
   onStatusChange?: (status: EventStatus | undefined) => void;
   /** Absent when the caller doesn't persist quantity, which makes the stepper read-only. */
   onQuantityChange?: (quantity: number) => void;
+  /** Absent when the caller doesn't persist units, which makes that box read-only. */
+  onUnitsChange?: (units: string) => void;
   /** Absent hides the trash icon — the caller owns confirmation and the actual delete. */
   onDelete?: () => void;
 }
@@ -80,7 +82,9 @@ const CHECKBOX_SIZE = 38;
  * Empty fields are dropped rather than shown blank, so what's here is what the
  * event actually has.
  */
-export function EventDetailView({ event, settings, status, onStatusChange, onQuantityChange, onDelete }: Props) {
+export function EventDetailView({
+  event, settings, status, onStatusChange, onQuantityChange, onUnitsChange, onDelete,
+}: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { people: allPeople } = usePeople();
@@ -109,6 +113,23 @@ export function EventDetailView({ event, settings, status, onStatusChange, onQua
     if (clamped !== (event.quantity ?? 0)) onQuantityChange?.(clamped);
   }
 
+  // Units follow quantity exactly: held locally while focused so a half-typed
+  // word survives the re-render, resynced from the event when it isn't, and
+  // committed on blur rather than per keystroke — every letter would otherwise
+  // be its own write and its own queued sync op.
+  const [unitsText, setUnitsText] = useState(event.units ?? '');
+  const [unitsFocused, setUnitsFocused] = useState(false);
+  useEffect(() => {
+    if (!unitsFocused) setUnitsText(event.units ?? '');
+  }, [event.id, event.units, unitsFocused]);
+
+  function commitUnits() {
+    setUnitsFocused(false);
+    const trimmed = unitsText.trim();
+    setUnitsText(trimmed);
+    if (trimmed !== (event.units ?? '')) onUnitsChange?.(trimmed);
+  }
+
   // Same fallback as the editor's: PERSON_STATUSES is a Record, so indexing it
   // is typed as always finding something, but a status this build no longer
   // defines — or an id with no person behind it — lands here.
@@ -134,7 +155,7 @@ export function EventDetailView({ event, settings, status, onStatusChange, onQua
     key: 'name',
     node: (
       <>
-        <Text style={styles.label}>Name</Text>
+        <Text style={styles.label}>Title</Text>
         <View style={styles.nameRow}>
           <Text style={[styles.value, styles.nameValue]}>{event.title}</Text>
           {isBackup && (
@@ -193,21 +214,43 @@ export function EventDetailView({ event, settings, status, onStatusChange, onQua
     groups.push({
       key: 'quantity',
       node: (
-        <>
-          <Text style={styles.label}>Quantity</Text>
-          <TextInput
-            style={styles.quantityBox}
-            value={quantityText}
-            onChangeText={setQuantityText}
-            onFocus={() => setQuantityFocused(true)}
-            onBlur={commitQuantity}
-            editable={!!onQuantityChange}
-            keyboardType="number-pad"
-            selectTextOnFocus
-            maxLength={3}
-            accessibilityLabel="Quantity"
-          />
-        </>
+        <View style={styles.quantityRow}>
+          <View>
+            <Text style={styles.label}>Quantity</Text>
+            <TextInput
+              style={styles.quantityBox}
+              value={quantityText}
+              onChangeText={setQuantityText}
+              onFocus={() => setQuantityFocused(true)}
+              onBlur={commitQuantity}
+              editable={!!onQuantityChange}
+              keyboardType="number-pad"
+              selectTextOnFocus
+              maxLength={3}
+              accessibilityLabel="Quantity"
+            />
+          </View>
+          {/* Takes the rest of the row: a unit is a word, and it reads as one
+              field with the number rather than a second thing below it. */}
+          <View style={styles.unitsField}>
+            <Text style={styles.label}>Units</Text>
+            <TextInput
+              style={[styles.quantityBox, styles.unitsBox]}
+              value={unitsText}
+              onChangeText={setUnitsText}
+              onFocus={() => setUnitsFocused(true)}
+              onBlur={commitUnits}
+              editable={!!onUnitsChange}
+              // Neutral on purpose: a real unit ("miles") reads as a value
+              // already filled in, and suggests this box wants that one.
+              placeholder="optional"
+              placeholderTextColor={Colors.textLight}
+              autoCapitalize="none"
+              maxLength={UNITS_MAX_LENGTH}
+              accessibilityLabel="Units"
+            />
+          </View>
+        </View>
       ),
     });
   }
@@ -250,19 +293,42 @@ export function EventDetailView({ event, settings, status, onStatusChange, onQua
     node: (
       <>
         <Text style={styles.label}>When</Text>
-        <Text style={styles.value}>{longDate(event.date)}</Text>
-        <Text style={[styles.value, styles.valueSpaced]}>
-          {isCheckboxType(event.type) || !hasEndTime(event)
-            ? event.startTime
-            : `${event.startTime} – ${event.endTime}`}
-        </Text>
+        {/*
+          Date and time carry an icon each rather than stacking as two more lines
+          of the same 16pt text: the group holds up to three facts about one
+          moment, and undifferentiated lines run together. The recurrence drops
+          out of the stack entirely and into a chip below — it describes the
+          series rather than this occurrence, so it should not read as a third
+          equal line.
+        */}
+        <View style={styles.whenRow}>
+          <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.whenIcon} />
+          <Text style={styles.value}>{longDate(event.date)}</Text>
+        </View>
+        <View style={[styles.whenRow, styles.whenRowSpaced]}>
+          <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.whenIcon} />
+          <Text style={styles.value}>
+            {isCheckboxType(event.type) || !hasEndTime(event)
+              ? event.startTime
+              : `${event.startTime} – ${event.endTime}`}
+          </Text>
+        </View>
         {event.recurring && (
-          <>
-            <Text style={[styles.value, styles.valueSpaced]}>{recurrenceSummary(event)}</Text>
-            {!!event.recurringUntil && (
-              <Text style={styles.subValue}>Until {shortDate(event.recurringUntil)}</Text>
-            )}
-          </>
+          <View style={styles.repeatChip}>
+            <Ionicons name="repeat" size={15} color={Colors.textSecondary} />
+            {/* One chip, not two: the end date qualifies the rule, and a chip of
+                its own would read as a second, unrelated fact. It takes a line of
+                its own inside the chip so a long rule and its end date don't run
+                together. */}
+            <View style={styles.repeatTextBlock}>
+              <Text style={styles.repeatText}>{recurrenceSummary(event)}</Text>
+              {!!event.recurringUntil && (
+                <Text style={[styles.repeatText, styles.repeatUntil]}>
+                  {`until ${shortDate(event.recurringUntil)}`}
+                </Text>
+              )}
+            </View>
+          </View>
         )}
       </>
     ),
@@ -375,8 +441,30 @@ function makeStyles(C: ColorPalette) {
     // The editor's input type without the input: same size and colour, no rule
     // underneath it and no padding pretending to be a tap target.
     value: { fontSize: 16, color: C.text },
-    valueSpaced: { marginTop: 4 },
-    subValue: { fontSize: 13, color: C.textLight, marginTop: 2 },
+    whenRow: { flexDirection: 'row', alignItems: 'center' },
+    whenRowSpaced: { marginTop: 12 },
+    // Fixed width so the two glyphs share a left edge whatever their own widths
+    // are, which is what makes the pair read as one block rather than two lines.
+    whenIcon: { width: 18, marginRight: 10, textAlign: 'center' },
+    repeatChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 6,
+      marginTop: 14,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: C.infoChipBg,
+    },
+    // flexShrink so a long rule ("Every week on Sun, Mon, …") wraps inside the
+    // chip instead of pushing it past the card.
+    repeatTextBlock: { flexShrink: 1 },
+    repeatText: { fontSize: 13, fontWeight: '500', color: C.textSecondary },
+    // Subordinated by weight, not colour: `textLight` is *brighter* than
+    // `textSecondary` in dark mode, so dimming with it would invert the
+    // hierarchy on one theme.
+    repeatUntil: { fontWeight: '400', marginTop: 2 },
     inlineValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     colorDot: { width: 14, height: 14, borderRadius: 7 },
     personRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7 },
@@ -392,7 +480,23 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    // Matches GoalWeeklyModal's numPill: a filled rounded box holding a large
+    // `stretch`, so the units box can match the number's height rather than
+    // sitting shorter because its font is smaller.
+    quantityRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
+    unitsField: { flex: 1 },
+    // Same box as the number, but a word rather than a figure: sized like the
+    // card's other values and left-aligned, since a unit read centred under its
+    // label looked like a second number that had lost its digits. `flex` takes
+    // the height the label leaves; Android needs to be told to centre in it.
+    unitsBox: {
+      alignSelf: 'stretch',
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'left',
+      textAlignVertical: 'center',
+    },
+    // Matches GoalPeriodList's numPill: a filled rounded box holding a large
     // number, left-aligned under its label rather than centred in the row.
     quantityBox: {
       alignSelf: 'flex-start',

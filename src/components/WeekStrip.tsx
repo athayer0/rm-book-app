@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useLayoutEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { format, addDays, startOfWeek } from 'date-fns';
+import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 
@@ -70,11 +70,13 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }
     });
 
   function renderWeek(days: Date[]) {
+    const today = new Date();
     return (
       <View style={{ width: SCREEN_WIDTH, flexDirection: 'row' }}>
         {days.map((day, i) => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const isSelected = dateStr === format(selectedDate, 'yyyy-MM-dd');
+          const isToday = isSameDay(day, today);
           const altBg = i % 2 === 0 ? Colors.weekStripBg : Colors.weekStripBgAlt;
 
           return (
@@ -88,10 +90,22 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }
               onPress={() => onSelectDate(day)}
               activeOpacity={0.8}
             >
-              <Text style={[styles.dayName, isSelected && styles.dayNameSelected]}>
+              <Text
+                style={[
+                  styles.dayName,
+                  isToday && styles.dayNameToday,
+                  isSelected && styles.dayNameSelected,
+                ]}
+              >
                 {format(day, 'EEE').slice(0, 2).toUpperCase()}
               </Text>
-              <Text style={[styles.dateNum, isSelected && styles.dateNumSelected]}>
+              <Text
+                style={[
+                  styles.dateNum,
+                  isToday && styles.dateNumToday,
+                  isSelected && styles.dateNumSelected,
+                ]}
+              >
                 {format(day, 'd')}
               </Text>
             </TouchableOpacity>
@@ -146,6 +160,10 @@ function makeStyles(C: ColorPalette) {
       letterSpacing: 0.5,
       marginBottom: 2,
     },
+    dayNameToday: {
+      color: C.selectedDayBorder,
+      fontWeight: '700',
+    },
     dayNameSelected: {
       color: C.selectedDayBorder,
       fontWeight: '700',
@@ -154,6 +172,10 @@ function makeStyles(C: ColorPalette) {
       fontSize: 15,
       fontWeight: '600',
       color: C.text,
+    },
+    dateNumToday: {
+      color: C.selectedDayBorder,
+      fontWeight: '700',
     },
     dateNumSelected: {
       color: C.selectedDayBorder,

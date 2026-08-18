@@ -13,11 +13,11 @@ import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { UnreportedRow } from '../components/UnreportedRow';
-import { WeeklyPlanningModal } from '../modals/WeeklyPlanningModal';
-import { MonthlyPlanningModal } from '../modals/MonthlyPlanningModal';
-import { GoalWeeklyModal } from '../modals/GoalWeeklyModal';
-import { GoalMonthlyModal } from '../modals/GoalMonthlyModal';
+import { EditGoalsModal } from '../modals/EditGoalsModal';
+import { GoalsModal } from '../modals/GoalsModal';
+import { GoalGraphModal } from '../modals/GoalGraphModal';
 import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
+import { GoalGrain } from '../utils/goalGrain';
 import { useUnreported } from '../hooks/useUnreported';
 
 export function HomeScreen({ navigation, route }: any) {
@@ -34,15 +34,16 @@ export function HomeScreen({ navigation, route }: any) {
 
   useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
   const [editVisible, setEditVisible] = useState(false);
-  const [monthlyEditVisible, setMonthlyEditVisible] = useState(false);
-  const [planningVisible, setPlanningVisible] = useState(false);
-  const [planningTab, setPlanningTab] = useState<'goals' | 'graph'>('goals');
-  const [monthlyPlanningVisible, setMonthlyPlanningVisible] = useState(false);
+  const [goalsVisible, setGoalsVisible] = useState(false);
+  const [graphVisible, setGraphVisible] = useState(false);
+  // Which tab each sheet opens on. Tapping a grid opens that grid's own grain;
+  // the buttons below both grids have no one grain to mean, so they open weekly.
+  const [goalsGrain, setGoalsGrain] = useState<GoalGrain>('week');
   const [unreportedVisible, setUnreportedVisible] = useState(false);
 
-  function openPlanning(tab: 'goals' | 'graph') {
-    setPlanningTab(tab);
-    setPlanningVisible(true);
+  function openGoals(grain: GoalGrain) {
+    setGoalsGrain(grain);
+    setGoalsVisible(true);
   }
 
   // The daily-review notification tap navigates here with this param (set in
@@ -63,6 +64,10 @@ export function HomeScreen({ navigation, route }: any) {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Both grains in one card: they are two views of the same set of goal
+            definitions, and the pair of sheets below serve both, so splitting
+            them across two cards implied two independent features. EDIT sits on
+            the first heading only — there is one goal editor for both grains. */}
         <View style={styles.card}>
           <SectionHeader
             title="Weekly Goals"
@@ -73,12 +78,24 @@ export function HomeScreen({ navigation, route }: any) {
             definitions={definitions}
             counts={counts}
             goals={goals}
-            onPressGoal={() => openPlanning('goals')}
+            onPressGoal={() => openGoals('week')}
           />
+
+          <SectionHeader title="Monthly Goals" tightTop />
+          <GoalGrid
+            definitions={definitions}
+            counts={monthlyCounts}
+            goals={monthlyGoals}
+            onPressGoal={() => openGoals('month')}
+            visibilityKey="monthlyVisible"
+          />
+
+          {/* Below both grids rather than under the weekly one, since each sheet
+              covers both grains on its own tabs. */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
-              onPress={() => openPlanning('goals')}
+              onPress={() => openGoals('week')}
               activeOpacity={0.75}
             >
               <Ionicons name="list-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
@@ -86,34 +103,19 @@ export function HomeScreen({ navigation, route }: any) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
-              onPress={() => openPlanning('graph')}
+              onPress={() => setGraphVisible(true)}
               activeOpacity={0.75}
             >
               <Ionicons name="stats-chart-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
-              <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Last 6 Weeks</Text>
+              <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Progress</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.card}>
-          <SectionHeader
-            title="Monthly Goals"
-            actionLabel="EDIT"
-            onAction={() => setMonthlyEditVisible(true)}
-          />
-          <GoalGrid
-            definitions={definitions}
-            counts={monthlyCounts}
-            goals={monthlyGoals}
-            onPressGoal={() => setMonthlyPlanningVisible(true)}
-            visibilityKey="monthlyVisible"
-          />
         </View>
 
         <UnreportedRow count={unreportedCount} onPress={() => setUnreportedVisible(true)} />
       </ScrollView>
 
-      <WeeklyPlanningModal
+      <EditGoalsModal
         visible={editVisible}
         onClose={() => setEditVisible(false)}
         definitions={definitions}
@@ -122,23 +124,18 @@ export function HomeScreen({ navigation, route }: any) {
         onUpdateEventTypeDefs={updateEventTypeDefinitions}
       />
 
-      <MonthlyPlanningModal
-        visible={monthlyEditVisible}
-        onClose={() => setMonthlyEditVisible(false)}
+      {/* Reloads both grains on close: the sheet's tabs write either one, and
+          which of them was touched isn't reported back. */}
+      <GoalsModal
+        visible={goalsVisible}
+        onClose={() => { setGoalsVisible(false); reload(); reloadMonthly(); }}
         definitions={definitions}
-        onUpdateDefinitions={updateDefinitions}
+        initialGrain={goalsGrain}
       />
 
-      <GoalWeeklyModal
-        visible={planningVisible}
-        onClose={() => { setPlanningVisible(false); reload(); }}
-        definitions={definitions}
-        initialTab={planningTab}
-      />
-
-      <GoalMonthlyModal
-        visible={monthlyPlanningVisible}
-        onClose={() => { setMonthlyPlanningVisible(false); reloadMonthly(); }}
+      <GoalGraphModal
+        visible={graphVisible}
+        onClose={() => setGraphVisible(false)}
         definitions={definitions}
       />
 
@@ -178,7 +175,12 @@ function makeStyles(C: ColorPalette) {
       flexGrow: 1,
       justifyContent: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 28,
+      // Asymmetric on purpose: the card sits closer under the maroon header than
+      // it does above the tab bar. Both grids share one card now, so the content
+      // is tall enough to fill the screen and these are the gaps you actually
+      // see — the justifyContent above only centres a short page.
+      paddingTop: 14,
+      paddingBottom: 28,
       gap: 16,
     },
     card: {
@@ -190,6 +192,9 @@ function makeStyles(C: ColorPalette) {
       shadowRadius: 6,
       elevation: 2,
     },
+    // 20 above the buttons, 16 below. The gap above is not paddingTop alone —
+    // the grid already contributes its own 8 of bottom padding and a card's 4 of
+    // margin, so paddingTop supplies only the remaining 8 of it.
     actionRow: {
       flexDirection: 'row',
       gap: 10,

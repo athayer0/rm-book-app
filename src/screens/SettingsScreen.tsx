@@ -331,7 +331,7 @@ export function SettingsScreen() {
 
   // Bulk reset of the type list itself — restores every built-in (including
   // any that were deleted) and drops every custom type. Mirrors
-  // EditEventTypeSheet's single-delete flow: a type still in use gets the
+  // EventTypesModal's single-delete flow: a type still in use gets the
   // "in use, delete its events too?" alert instead of the plain confirm.
   function confirmResetEventTypes() {
     const inUseCustoms = customEventTypes.filter(t => events.some(e => e.type === t.id));
@@ -537,6 +537,95 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* Event Types — name/status/goal-link editing plus color and duration
+            both live inside the "Customize" sheet now, per type. Colors and
+            durations used to have their own screens listing every type flat;
+            those are gone, but their bulk "Reset to Default" actions stay
+            here alongside a reset for the type list itself. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
+              <Text style={styles.rowLabel}>Customize</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.row}
+              disabled={customizedColorTypes.length === 0}
+              onPress={confirmResetEventColors}
+            >
+              {/* The greyed label and icon are the whole disabled state now —
+                  nothing to reset reads clearly enough without saying so. */}
+              <Text style={[styles.rowLabel, { color: customizedColorTypes.length ? Colors.text : Colors.textLight }]}>
+                Reset Colors to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={customizedColorTypes.length ? Colors.textLight : Colors.border}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.row}
+              disabled={customizedDurationTypes.length === 0}
+              onPress={confirmResetEventDurations}
+            >
+              <Text style={[styles.rowLabel, { color: customizedDurationTypes.length ? Colors.text : Colors.textLight }]}>
+                Reset Default Durations to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={customizedDurationTypes.length ? Colors.textLight : Colors.border}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={eventTypesAreDefault}
+              onPress={confirmResetEventTypes}
+            >
+              <Text style={[styles.rowLabel, { color: eventTypesAreDefault ? Colors.textLight : Colors.text }]}>
+                Reset Event Types to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={eventTypesAreDefault ? Colors.border : Colors.textLight}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Which types earn a bubble off the calendar's +, and their icon —
+            the only place an event type's icon is ever shown. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EVENT BUBBLE +</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('quickAdd')}>
+              <Text style={styles.rowLabel}>Customize</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              disabled={quickAddIsDefault}
+              onPress={confirmResetQuickAdd}
+            >
+              <Text style={[styles.rowLabel, { color: quickAddIsDefault ? Colors.textLight : Colors.text }]}>
+                Reset to Default
+              </Text>
+              <Ionicons
+                name="refresh"
+                size={16}
+                color={quickAddIsDefault ? Colors.border : Colors.textLight}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Daily Review Reminder — a local notification, off by default, that
             opens straight to the unreported-events backlog when tapped. */}
         {/* No lift: the time wheel opens in the flow, so no backdrop goes up
@@ -714,95 +803,6 @@ export function SettingsScreen() {
                 ))}
               </DropdownMenu>
             </View>
-          </View>
-        </View>
-
-        {/* Event Types — name/status/goal-link editing plus color and duration
-            both live inside the "Customize" sheet now, per type. Colors and
-            durations used to have their own screens listing every type flat;
-            those are gone, but their bulk "Reset to Default" actions stay
-            here alongside a reset for the type list itself. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
-          <View style={styles.card}>
-            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
-              <Text style={styles.rowLabel}>Customize</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.row}
-              disabled={customizedColorTypes.length === 0}
-              onPress={confirmResetEventColors}
-            >
-              {/* The greyed label and icon are the whole disabled state now —
-                  nothing to reset reads clearly enough without saying so. */}
-              <Text style={[styles.rowLabel, { color: customizedColorTypes.length ? Colors.text : Colors.textLight }]}>
-                Reset Colors to Default
-              </Text>
-              <Ionicons
-                name="refresh"
-                size={16}
-                color={customizedColorTypes.length ? Colors.textLight : Colors.border}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.row}
-              disabled={customizedDurationTypes.length === 0}
-              onPress={confirmResetEventDurations}
-            >
-              <Text style={[styles.rowLabel, { color: customizedDurationTypes.length ? Colors.text : Colors.textLight }]}>
-                Reset Default Durations to Default
-              </Text>
-              <Ionicons
-                name="refresh"
-                size={16}
-                color={customizedDurationTypes.length ? Colors.textLight : Colors.border}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
-              disabled={eventTypesAreDefault}
-              onPress={confirmResetEventTypes}
-            >
-              <Text style={[styles.rowLabel, { color: eventTypesAreDefault ? Colors.textLight : Colors.text }]}>
-                Reset Event Types to Default
-              </Text>
-              <Ionicons
-                name="refresh"
-                size={16}
-                color={eventTypesAreDefault ? Colors.border : Colors.textLight}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Which types earn a bubble off the calendar's +, and their icon —
-            the only place an event type's icon is ever shown. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT BUBBLE +</Text>
-          <View style={styles.card}>
-            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('quickAdd')}>
-              <Text style={styles.rowLabel}>Customize</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
-              disabled={quickAddIsDefault}
-              onPress={confirmResetQuickAdd}
-            >
-              <Text style={[styles.rowLabel, { color: quickAddIsDefault ? Colors.textLight : Colors.text }]}>
-                Reset to Default
-              </Text>
-              <Ionicons
-                name="refresh"
-                size={16}
-                color={quickAddIsDefault ? Colors.border : Colors.textLight}
-              />
-            </TouchableOpacity>
           </View>
         </View>
 

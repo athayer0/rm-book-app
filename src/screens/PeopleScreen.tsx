@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, TextInput, Pressable,
+  SafeAreaView, TextInput, Pressable, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,13 +21,11 @@ import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 
 type FilterSelection =
   | { kind: 'all' }
-  | { kind: 'favorites' }
   | { kind: 'group'; name: string; statuses: string[] }
   | { kind: 'status'; name: string };
 
 function matchesFilter(person: Person, selection: FilterSelection): boolean {
   if (selection.kind === 'all') return true;
-  if (selection.kind === 'favorites') return !!person.starred;
   if (selection.kind === 'group') return selection.statuses.includes(person.status);
   return person.status === selection.name;
 }
@@ -41,13 +39,6 @@ type ListRow =
   | { kind: 'person'; person: Person; key: string };
 
 function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
-  if (selection.kind === 'favorites') {
-    if (list.length === 0) return [];
-    return [
-      { kind: 'header', label: 'Favorites', key: 'header' },
-      ...list.map(person => ({ kind: 'person' as const, person, key: person.id })),
-    ];
-  }
   if (selection.kind === 'group' || selection.kind === 'status') {
     if (list.length === 0) return [];
     return [
@@ -56,13 +47,7 @@ function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
     ];
   }
   const rows: ListRow[] = [];
-  const favorites = list.filter(p => p.starred);
-  const rest = list.filter(p => !p.starred);
-  if (favorites.length > 0) {
-    rows.push({ kind: 'header', label: 'Favorites', key: 'header-favorites' });
-    favorites.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
-  }
-  for (const group of groupByStatus(rest)) {
+  for (const group of groupByStatus(list)) {
     if (group.label) rows.push({ kind: 'header', label: group.label, key: `header-${group.label}` });
     group.people.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
   }
@@ -94,17 +79,14 @@ export function PeopleScreen() {
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
+  // Tab screens stay mounted when you leave them, so select mode would still be
+  // on when you tab back. Drop it on blur — the cleanup of a focus effect.
+  useFocusEffect(useCallback(() => () => exitSelectMode(), []));
+
   const filtered = people
     .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     .filter(p => matchesFilter(p, filterSelection))
     .sort((a, b) => {
-      // Outside the 'all' view (which gets its own Favorites section from
-      // buildRows), a favorite just sorts to the top of whatever group/status/
-      // favorites list it's in rather than getting a header of its own.
-      if (filterSelection.kind !== 'all') {
-        const favDiff = Number(!!b.starred) - Number(!!a.starred);
-        if (favDiff !== 0) return favDiff;
-      }
       const diff = statusRank(a.status) - statusRank(b.status);
       return diff !== 0 ? diff : a.name.localeCompare(b.name);
     });
@@ -145,6 +127,26 @@ export function PeopleScreen() {
     });
   }
 
+  function handleDeleteSelected() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    Alert.alert(
+      'Delete People',
+      `Delete ${ids.length} selected ${ids.length === 1 ? 'person' : 'people'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            for (const id of ids) await deletePerson(id);
+            exitSelectMode();
+          },
+        },
+      ],
+    );
+  }
+
   async function applyBulkStatus(status: string) {
     const ids = Array.from(selectedIds);
     for (const id of ids) await updatePerson(id, { status });
@@ -165,59 +167,48 @@ export function PeopleScreen() {
         style={styles.header}
         onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
       >
-        {selectMode ? (
-          <>
-            <TouchableOpacity onPress={exitSelectMode} style={styles.headerSideZone}>
-              <Text style={styles.headerActionText}>Cancel</Text>
+        {/* Select mode keeps the same header — only three things change: the
+            checkbox fills in, the import/filter icons give way to Set Type, and
+            a trash can appears left of the checkbox once something is selected. */}
+        <Text style={styles.headerTitle}>People</Text>
+        <View style={styles.headerActions}>
+          {selectMode && selectedIds.size > 0 && (
+            <TouchableOpacity
+              style={styles.filterChip}
+              onPress={handleDeleteSelected}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Delete Selected"
+            >
+              <Ionicons name="trash-outline" size={23} color={Colors.onPrimary} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, styles.headerSelectTitle]}>
-              {selectedIds.size === 0 ? 'Select People' : `${selectedIds.size} Selected`}
-            </Text>
-            <View style={[styles.headerSideZone, styles.headerSideZoneRight]}>
-              <TouchableOpacity
-                onPress={() => setShowBulkStatusMenu(v => !v)}
-                disabled={selectedIds.size === 0}
-              >
-                <Text style={[styles.headerActionText, selectedIds.size === 0 && styles.headerActionTextDisabled]}>
-                  Set Type
-                </Text>
-              </TouchableOpacity>
-              <DropdownMenu open={showBulkStatusMenu} align="right" style={styles.filterDropdown}>
-                <ScrollView
-                  style={{ maxHeight: filterListMaxHeight }}
-                  nestedScrollEnabled
-                  bounces={false}
-                  overScrollMode="never"
-                  {...filterScrollEdges.scrollViewProps}
-                >
-                  {STATUS_OPTIONS.map((s, i) => (
-                    <DropdownItem
-                      key={s}
-                      label={statusDisplayName(s)}
-                      showSeparator={i < STATUS_OPTIONS.length - 1}
-                      leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
-                      onPress={() => applyBulkStatus(s)}
-                    />
-                  ))}
-                </ScrollView>
-                <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
-                <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
-              </DropdownMenu>
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={styles.headerTitle}>People</Text>
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.filterChip}
-                onPress={() => setSelectMode(true)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Select People"
-              >
-                <Ionicons name="checkbox-outline" size={24} color={Colors.onPrimary} />
-              </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.filterChip}
+            onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={selectMode ? 'Exit Select Mode' : 'Select People'}
+          >
+            <Ionicons
+              name={selectMode ? 'checkbox' : 'checkbox-outline'}
+              size={24}
+              color={Colors.onPrimary}
+            />
+          </TouchableOpacity>
+          {selectMode ? (
+            <TouchableOpacity
+              style={styles.headerTextAction}
+              onPress={() => setShowBulkStatusMenu(v => !v)}
+              disabled={selectedIds.size === 0}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.headerActionText, selectedIds.size === 0 && styles.headerActionTextDisabled]}>
+                Set Type
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <>
               <TouchableOpacity
                 style={styles.filterChip}
                 onPress={() => setShowImportModal(true)}
@@ -234,61 +225,82 @@ export function PeopleScreen() {
               >
                 <Ionicons name="options-outline" size={26} color={Colors.onPrimary} />
               </TouchableOpacity>
+            </>
+          )}
 
-              {/* Right-aligned and content-width: it hangs off an icon button far
-                  narrower than its own list, so stretching to the trigger would give
-                  a menu the width of one glyph. `top` overrides the default '100%'
-                  to keep the offset the header row has always used. */}
-              <DropdownMenu
-                open={showFilterDropdown}
-                align="right"
-                style={styles.filterDropdown}
-              >
-                <ScrollView
-                  style={{ maxHeight: filterListMaxHeight }}
-                  nestedScrollEnabled
-                  bounces={false}
-                  overScrollMode="never"
-                  {...filterScrollEdges.scrollViewProps}
-                >
-                  <DropdownItem
-                    label="All"
-                    selected={filterSelection.kind === 'all'}
-                    onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
-                  />
-                  {STATUS_GROUPS.map((g) => (
-                    <DropdownItem
-                      key={g.name}
-                      label={g.name}
-                      selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
-                      onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
-                    />
-                  ))}
-                  <DropdownItem
-                    label="Favorites"
-                    selected={filterSelection.kind === 'favorites'}
-                    showSeparator={false}
-                    leading={<Ionicons name="star" size={16} color={Colors.favorite} style={styles.filterChipIcon} />}
-                    onPress={() => { setFilterSelection({ kind: 'favorites' }); setShowFilterDropdown(false); }}
-                  />
-                  <MenuDivider />
-                  {STATUS_OPTIONS.map((s, i) => (
-                    <DropdownItem
-                      key={s}
-                      label={s}
-                      selected={filterSelection.kind === 'status' && filterSelection.name === s}
-                      showSeparator={i < STATUS_OPTIONS.length - 1}
-                      leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
-                      onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
-                    />
-                  ))}
-                </ScrollView>
-                <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
-                <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
-              </DropdownMenu>
-            </View>
-          </>
-        )}
+          {/* Both menus hang off the same right edge of this row, and only one
+              can be open at a time, so they share `filterDropdown`. Rendered
+              unconditionally rather than inside the branch above: DropdownMenu
+              unmounts itself once its exit animation finishes, and gating it on
+              selectMode would cut that animation off. */}
+          <DropdownMenu open={showBulkStatusMenu} align="right" style={styles.filterDropdown}>
+            <ScrollView
+              style={{ maxHeight: filterListMaxHeight }}
+              nestedScrollEnabled
+              bounces={false}
+              overScrollMode="never"
+              {...filterScrollEdges.scrollViewProps}
+            >
+              {STATUS_OPTIONS.map((s, i) => (
+                <DropdownItem
+                  key={s}
+                  label={statusDisplayName(s)}
+                  showSeparator={i < STATUS_OPTIONS.length - 1}
+                  leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
+                  onPress={() => applyBulkStatus(s)}
+                />
+              ))}
+            </ScrollView>
+            <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
+            <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
+          </DropdownMenu>
+
+        {/* Right-aligned and content-width: it hangs off an icon button far
+            narrower than its own list, so stretching to the trigger would give
+            a menu the width of one glyph. `top` overrides the default '100%'
+            to keep the offset the header row has always used. */}
+        <DropdownMenu
+          open={showFilterDropdown}
+          align="right"
+          style={styles.filterDropdown}
+        >
+          <ScrollView
+            style={{ maxHeight: filterListMaxHeight }}
+            nestedScrollEnabled
+            bounces={false}
+            overScrollMode="never"
+            {...filterScrollEdges.scrollViewProps}
+          >
+            <DropdownItem
+              label="All"
+              selected={filterSelection.kind === 'all'}
+              onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
+            />
+            {STATUS_GROUPS.map((g, i) => (
+              <DropdownItem
+                key={g.name}
+                label={g.name}
+                selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
+                showSeparator={i < STATUS_GROUPS.length - 1}
+                onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
+              />
+            ))}
+            <MenuDivider />
+            {STATUS_OPTIONS.map((s, i) => (
+              <DropdownItem
+                key={s}
+                label={s}
+                selected={filterSelection.kind === 'status' && filterSelection.name === s}
+                showSeparator={i < STATUS_OPTIONS.length - 1}
+                leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
+                onPress={() => { setFilterSelection({ kind: 'status', name: s }); setShowFilterDropdown(false); }}
+              />
+            ))}
+          </ScrollView>
+          <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={filterScrollEdges.showTopFade} />
+          <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={filterScrollEdges.showBottomFade} />
+        </DropdownMenu>
+        </View>
       </View>
 
       {(showFilterDropdown || showBulkStatusMenu) && (
@@ -381,14 +393,10 @@ function makeStyles(C: ColorPalette) {
       elevation: 20,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
-    // In select mode, "Cancel" and "Set Type" aren't the same width, so
-    // centering the title between them (space-between's default) leaves it
-    // visibly off the header's true center. Forcing both side zones to the
-    // same floor — wider than either one's own content — makes them equal,
-    // and flex:1 + centered text then centers against the header itself.
-    headerSelectTitle: { flex: 1, textAlign: 'center' },
-    headerSideZone: { minWidth: 80 },
-    headerSideZoneRight: { alignItems: 'flex-end' },
+    // Set Type sits in the row the icons sit in, so it takes the same height as
+    // a chip — otherwise the row's height changes on entering select mode, which
+    // is a fourth change to a header that's meant to have only three.
+    headerTextAction: { height: 36, justifyContent: 'center', paddingHorizontal: 4 },
     headerActionText: { fontSize: 16, fontWeight: '600', color: C.onPrimary },
     headerActionTextDisabled: { color: C.onPrimaryMuted },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },

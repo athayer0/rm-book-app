@@ -30,7 +30,6 @@ export interface Person {
   /** Free text, handed to the maps app as typed — see toMapQuery(). */
   address?: string;
   notes?: string;
-  starred: boolean;
   createdAt: string;
 }
 
@@ -72,10 +71,5 @@ export function usePeople() {
     await deleteConvertProgress(id, user?.id);
   }, [write, user]);
 
-  const toggleStar = useCallback(async (id: string) => {
-    const updated = await write(current => current.map(p => p.id === id ? { ...p, starred: !p.starred } : p));
-    await push(updated.find(p => p.id === id));
-  }, [write, push]);
-
-  return { people, addPerson, updatePerson, deletePerson, toggleStar, reload };
+  return { people, addPerson, updatePerson, deletePerson, reload };
 }

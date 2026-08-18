@@ -166,50 +166,71 @@ function makeStyles(C: ColorPalette) {
     headerCount: { fontSize: 12, color: C.textSecondary, marginTop: 2 },
     cancel: { fontSize: 16, color: C.textSecondary },
     done: { fontSize: 16, fontWeight: '600', color: C.accent },
-    body: { flex: 1, backgroundColor: C.background },
+    /**
+     * Everything below the header is the People tab's, value for value — the
+     * search well, the list surface, the section bands, the empty state. The two
+     * lists hold the same rows and are read the same way, so any difference here
+     * is just drift, and the picker had drifted: it put a card-coloured search
+     * bar on a background-coloured page, which is the People tab's arrangement
+     * exactly inverted.
+     *
+     * The header is deliberately not shared. That one is a sheet's — Cancel, a
+     * count, Done — not a screen's.
+     */
+    body: { flex: 1, backgroundColor: C.card, paddingTop: 10 },
+    // The well is `background` *on* the card, not a card floating on the page.
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: C.card,
+      backgroundColor: C.background,
       marginHorizontal: 16,
-      marginTop: 12,
+      marginTop: -1,
+      marginBottom: 0,
+      borderRadius: 14,
       paddingHorizontal: 12,
       paddingVertical: 8,
-      borderRadius: 14,
+      gap: 8,
     },
-    searchIcon: { marginRight: 8 },
-    searchInput: { flex: 1, fontSize: 15, color: C.text, padding: 0 },
-    scroll: { flex: 1 },
-    content: { paddingTop: 12 },
+    searchIcon: {},
+    searchInput: { flex: 1, fontSize: 16, color: C.text },
+    scroll: { flex: 1, backgroundColor: C.card },
+    content: { paddingTop: 12, paddingBottom: 20 },
+    // A filled band rather than bare text above the rows, which is what lets a
+    // heading separate two groups without a rule.
     sectionRow: {
+      backgroundColor: C.background,
       paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 6,
+      paddingVertical: 8,
     },
-    sectionRowFirst: { paddingTop: 0 },
+    // Only the first, and it closes the gap under the search bar: every later
+    // band already has rows above it to sit against.
+    sectionRowFirst: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+    },
     sectionLabel: {
       fontSize: 12,
       fontWeight: '700',
       color: C.textSecondary,
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
     },
     empty: {
       alignItems: 'center',
-      paddingTop: 64,
-      paddingHorizontal: 32,
+      paddingTop: 80,
     },
     emptyTitle: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '600',
-      color: C.text,
-      marginTop: 12,
+      color: C.textSecondary,
+      marginTop: 16,
     },
     emptyText: {
-      fontSize: 13,
-      color: C.textSecondary,
+      fontSize: 14,
+      color: C.textLight,
+      marginTop: 8,
       textAlign: 'center',
-      marginTop: 6,
+      paddingHorizontal: 32,
     },
   });
 }

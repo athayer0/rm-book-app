@@ -55,7 +55,22 @@ export interface CalendarEvent {
    * meaningful for a type whose `goalMode` is 'quantity'.
    */
   quantity?: number;
+  /**
+   * What `quantity` counts, typed by hand — "miles", "reps", "pages". Free text
+   * because it's a label the block renders beside the number and nothing else
+   * reads: no goal math consults it, so there is nothing for a fixed list to
+   * keep it in step with. Per event rather than per type, so the same "Exercise"
+   * type can log miles one day and minutes the next.
+   */
+  units?: string;
 }
+
+/**
+ * Longest units string. Short on purpose: the event block draws it beside the
+ * number in a gutter it shares with the repeat and status markers, so a unit
+ * long enough to need truncating there is one the block can't usefully show.
+ */
+export const UNITS_MAX_LENGTH = 12;
 
 export function generateId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);

@@ -60,12 +60,13 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
 const COLUMNS: Record<string, string[]> = {
   people: [
     'user_id', 'id', 'name', 'status', 'gender', 'phone', 'whatsapp', 'messenger', 'address',
-    'notes', 'starred', 'created_at', 'updated_at', 'deleted_at',
+    'notes', 'created_at', 'updated_at', 'deleted_at',
   ],
   calendar_events: [
     'user_id', 'id', 'title', 'type', 'color', 'date', 'start_time', 'end_time',
     'notes', 'recurring', 'recurring_rule', 'recurring_until', 'excluded_dates',
-    'recurring_days', 'backup', 'people', 'contact_method', 'quantity', 'updated_at', 'deleted_at',
+    'recurring_days', 'backup', 'people', 'contact_method', 'quantity', 'units',
+    'updated_at', 'deleted_at',
   ],
   goal_definitions: [
     'user_id', 'id', 'label', 'icon', 'icon_family', 'color',

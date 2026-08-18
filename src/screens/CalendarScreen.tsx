@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays, parseISO, differenceInCalendarDays } from 'date-fns';
 import { useColors } from '../hooks/useColors';
@@ -118,6 +119,10 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     prevDateStrRef.current = dateStr;
     if (selectMode && !dragActive) exitSelectMode();
   }, [dateStr, dragActive]);
+
+  // Tab screens stay mounted when you leave them, so select mode would still be
+  // on when you tab back. Drop it on blur — the cleanup of a focus effect.
+  useFocusEffect(useCallback(() => () => exitSelectMode(), []));
 
   // An event-reminder notification tap lands here (see App.tsx) with the
   // occurrence's date — jump to that day. Consumed once and cleared, same as
@@ -335,6 +340,21 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     endDrag();
   }
 
+  // The grid draws one drop-target shadow per selected event, not just for the
+  // block being held — so grabbing the bottom of three still previews all three
+  // landing spots. Offsets come off the same pre-drag snapshot as the ghosts,
+  // and a selection can never span days (see the day-change effect above), so
+  // every member lands on the day the drag is currently over.
+  function groupShadowOffsets() {
+    const group = groupDragOriginalRef.current;
+    if (!dragActive || !dragEvent || !group) return undefined;
+    const anchor = group.get(dragEvent.id);
+    if (!anchor) return undefined;
+    return Array.from(group.entries())
+      .filter(([id]) => id !== dragEvent.id)
+      .map(([id, sib]) => ({ id, offsetY: sib.topOffset - anchor.topOffset, height: sib.height }));
+  }
+
   function renderGhostBlock(key: string, color: string, title: string, height: number, topPx: number) {
     return (
       <View
@@ -389,7 +409,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
             <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.onPrimaryMuted} />
           </TouchableOpacity>
           <TouchableOpacity onPress={goToToday} style={styles.calendarIconBtn}>
-            <Ionicons name="calendar-outline" size={20} color={Colors.onPrimaryMuted} />
+            <Ionicons name="calendar-outline" size={20} color={Colors.onPrimary} />
           </TouchableOpacity>
         </View>
         <View style={styles.headerActions}>
@@ -450,6 +470,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
                   dragHoverY={dragActive ? ghostY : null}
                   dragGrabOffsetY={grabOffsetY}
                   dragEventHeight={dragActive && dragEvent ? renderedEventHeight(dragEvent, SLOT_HEIGHT) : undefined}
+                  dragGroupShadows={groupShadowOffsets()}
                   gridStartHour={settings.gridStartHour}
                   gridEndHour={settings.gridEndHour}
                   slotHeight={SLOT_HEIGHT}
@@ -707,17 +728,16 @@ function makeStyles(C: ColorPalette) {
       position: 'absolute',
       zIndex: 999,
     },
+    // No drop shadow: a group drag draws one ghost per selected event, and with
+    // blocks that sit back to back each shadow falls on the neighbour below
+    // instead of on the grid, so only whichever block ends up bottom-most looks
+    // lifted. Flat reads as one moving selection rather than an uneven stack.
     ghostBlock: {
       borderLeftWidth: 3,
       borderRadius: 4,
       paddingHorizontal: 8,
       paddingVertical: 4,
       justifyContent: 'flex-start',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.25,
-      shadowRadius: 6,
-      elevation: 8,
     },
     ghostTitle: {
       fontSize: 13,

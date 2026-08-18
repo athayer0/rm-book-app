@@ -55,8 +55,11 @@ export const LightColors = {
   // disappears on a dark card.
   rowSelectedBg: 'rgba(26,58,107,0.10)',
   // Navy, for the "add a thing" text actions — "Set goals" and "Add a Goal +" in
-  // the goal sheets, "Add Person" on an event. Named for where it started; it is
-  // now what any of those links look like.
+  // the goal sheets, "Add Event Type" in the types sheet. Named for where it
+  // started. The two editors' add-rows ("Add Person", "Add contact method",
+  // "Add address") ask for `control` directly instead, which comes to the same
+  // thing: useColors derives this token *from* control, so the two can never
+  // differ. Worth collapsing if anything ever needs them to.
   goalTextAction: '#1A3A6B',
   // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
   goalActionBg: '#1A3A6B',
@@ -64,15 +67,29 @@ export const LightColors = {
   // Tint behind the call and message buttons, so the `control` glyph sits on a
   // soft wash of its own colour rather than the bare card.
   contactActionBg: '#E1E5EC',
+  // A filled pill holding one piece of secondary metadata on a card — today the
+  // recurrence rule on an event. Neutral rather than tinted, since it states a
+  // fact rather than offering an action, and it must not compete with the
+  // colour-carrying rows above it. In dark mode it sits *lighter* than `card`
+  // for the same reason a menu does: a darker fill on a dark card reads as a
+  // hole punched in the surface rather than as a chip resting on it.
+  infoChipBg: '#F0F2F5',
+  // Free-text fields (an event's title and notes). These are filled boxes rather
+  // than the underlined rows the pickers use: an underline says "a value sits
+  // here", which is all a picker needs, but a box says "type into this", and a
+  // multi-line notes field with only a rule under its last line has no shape at
+  // all until you fill it. Near-identical to `infoChipBg` in light mode by
+  // coincidence of both being a quiet step off white — they are separate tokens
+  // because one is a control and the other is a label, and only one of them
+  // should follow if the form's fields are ever restyled.
+  inputBg: '#F1F3F6',
+  inputBorder: '#E3E6EA',
   // Event reporting states, shared by the calendar's status badges and the
   // unreported-events shortcut. Centralised because two features have to agree:
   // an amber dot on the home row must mean the same thing as one on a block.
   statusCompleted: '#1A7A40',
   statusFailed: '#B03030',
   statusPending: '#E8980E',
-  // The filled star on a favourited person. Amber rather than `control` so a
-  // favourite reads at a glance against a row of blue action glyphs.
-  favorite: '#E8980E',
   // Dimmed behind the FAB's quick-add stack. Lighter than modalBackdrop: the
   // stack is a menu hanging off a button, not a sheet, so the calendar under it
   // should still read as the thing you are adding to.
@@ -135,13 +152,17 @@ export const DarkColors: typeof LightColors = {
   statusOtherColor: '#FFFFFF',
   // Same wash, darkened so the pale-blue glyph keeps its contrast on a dark card.
   contactActionBg: '#1C2740',
+  // Lifted off `card` (#1E1E1E), not sunk below it — see the light-mode note.
+  infoChipBg: '#2A2A2C',
+  // Lifted off `card` for the same reason infoChipBg is, and the edge carries
+  // more of the shape here than in light mode, where the fill alone reads.
+  inputBg: '#262628',
+  inputBorder: '#333336',
   // Lifted from the light values, which are mid-tones chosen against white and
   // go muddy on a dark card. Hue is preserved so the states stay recognisable.
   statusCompleted: '#3FB56B',
   statusFailed: '#E36A6A',
   statusPending: '#F5B33C',
-  // Same lift as statusPending: the light amber goes muddy on a dark card.
-  favorite: '#F5B33C',
   // Deeper than the light value for the same reason modalBackdrop is: the same
   // alpha that dims a white calendar leaves a near-black one looking untouched.
   fabScrim: 'rgba(0,0,0,0.50)',
@@ -171,10 +192,16 @@ export type ColorPalette = typeof LightColors;
  * colour a side effect of how the list happened to be sorted, so reordering it
  * silently repainted every goal added afterwards.
  *
- * Blue because no built-in *goal* uses it, so a new goal is distinguishable from
- * the eight that ship until it is given a colour of its own.
+ * A neutral grey: every built-in goal ships with a hue of its own, so starting
+ * off the wheel entirely reads as "not coloured yet" rather than as a ninth
+ * colour competing with them. No built-in uses it, so a new goal is still
+ * distinguishable from the eight until it's given a colour.
+ *
+ * Mid-grey rather than pale or near-black on purpose — it's used both as the
+ * icon's own tint in light mode and, through `lightenColor`, in dark mode, so it
+ * has to have somewhere to go in both directions.
  */
-export const DEFAULT_GOAL_COLOR = '#2979FF';
+export const DEFAULT_GOAL_COLOR = '#8E8E93';
 
 // Key order is the display order: SettingsScreen and AddEditEventModal both
 // build their type lists with Object.keys(EventColors). EventTypeLabels and
