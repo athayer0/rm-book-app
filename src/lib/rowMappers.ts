@@ -58,6 +58,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     dailyReviewMinute: 'daily_review_minute',
     eventReminderEnabled: 'event_reminder_enabled',
     eventReminderMinutes: 'event_reminder_minutes',
+    eventReminderExcludedTypeIds: 'event_reminder_excluded_type_ids',
   },
 };
 
@@ -103,7 +104,7 @@ const COLUMNS: Record<string, string[]> = {
     'event_size', 'event_type_colors', 'event_type_default_minutes', 'quick_add_types',
     'default_country_code', 'default_contact_method', 'maps_app',
     'daily_review_enabled', 'daily_review_hour', 'daily_review_minute',
-    'event_reminder_enabled', 'event_reminder_minutes', 'updated_at',
+    'event_reminder_enabled', 'event_reminder_minutes', 'event_reminder_excluded_type_ids', 'updated_at',
   ],
 };
 

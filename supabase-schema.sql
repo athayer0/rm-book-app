@@ -512,6 +512,11 @@ create table if not exists settings (
   daily_review_minute int default 0,
   event_reminder_enabled boolean default false,
   event_reminder_minutes int default 5,
+  -- Event type ids excluded from reminders. Absence (the
+  -- default empty array) means every type reminds -- see
+  -- AppSettings.eventReminderExcludedTypeIds.
+  event_reminder_excluded_type_ids jsonb
+    default '[]'::jsonb,
   updated_at timestamptz default now()
 );
 alter table settings
@@ -557,6 +562,9 @@ alter table settings
 alter table settings
   add column if not exists
   event_reminder_minutes int default 5;
+alter table settings
+  add column if not exists
+  event_reminder_excluded_type_ids jsonb default '[]'::jsonb;
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

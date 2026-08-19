@@ -19,6 +19,7 @@ import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { QuickAddTypesModal } from '../modals/QuickAddTypesModal';
 import { EventTypesModal } from '../modals/EventTypesModal';
 import { ReorderEventTypesModal } from '../modals/ReorderEventTypesModal';
+import { EventReminderTypesModal } from '../modals/EventReminderTypesModal';
 import {
   DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition,
 } from '../constants/eventTypeDefaults';
@@ -152,7 +153,7 @@ export function SettingsScreen() {
   // Which theme colour the picker sheet is editing, if any.
   const [colorSheet, setColorSheet] = useState<ThemeColorRowKey | null>(null);
   // Which of the event-type screens is open.
-  const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | 'reorder' | null>(null);
+  const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | 'reorder' | 'reminderTypes' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
@@ -280,6 +281,13 @@ export function SettingsScreen() {
   const modifiedBuiltInTypes = eventTypeDefinitions.filter(d => d.builtIn && !isStockBuiltInType(d));
   const eventTypesAreDefault =
     customEventTypes.length === 0 && removedBuiltInTypes.length === 0 && modifiedBuiltInTypes.length === 0;
+
+  // Summarizes the reminder-types row's value without opening the sheet —
+  // "All types" is the common case (nothing excluded yet), otherwise how many
+  // of the current type list still send reminders.
+  const reminderTypesLabel = settings.eventReminderExcludedTypeIds.length === 0
+    ? 'All Types'
+    : `${eventTypeDefinitions.length - settings.eventReminderExcludedTypeIds.length} of ${eventTypeDefinitions.length}`;
 
   // Both resets are all-or-nothing and confirmed by an alert rather than a panel
   // of checkboxes. The alert names the count, since the row itself no longer
@@ -697,42 +705,53 @@ export function SettingsScreen() {
               />
             </View>
             {settings.eventReminderEnabled && (
-              <View style={[styles.fieldRow, elevatedDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
+              <>
+                <View style={[styles.fieldRow, elevatedDropdown === 'eventReminderLead' && styles.fieldRowOpen]}>
+                  <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => toggleDropdown('eventReminderLead')}
+                  >
+                    <Text style={styles.rowLabel}>Time Before</Text>
+                    <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
+                    <Ionicons
+                      name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={Colors.textLight}
+                      style={{ marginLeft: 6 }}
+                    />
+                  </TouchableOpacity>
+                  <DropdownMenu open={openDropdown === 'eventReminderLead'}>
+                    <ScrollView
+                      style={{ maxHeight: EVENT_REMINDER_LIST_MAX_HEIGHT }}
+                      nestedScrollEnabled
+                      bounces={false}
+                      overScrollMode="never"
+                      {...eventReminderScrollEdges.scrollViewProps}
+                    >
+                      {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
+                        <DropdownItem
+                          key={minutes}
+                          label={eventReminderLabel(minutes)}
+                          selected={settings.eventReminderMinutes === minutes}
+                          showSeparator={i < arr.length - 1}
+                          onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
+                        />
+                      ))}
+                    </ScrollView>
+                    <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={eventReminderScrollEdges.showTopFade} />
+                    <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={eventReminderScrollEdges.showBottomFade} />
+                  </DropdownMenu>
+                </View>
+
                 <TouchableOpacity
                   style={[styles.row, styles.rowLast]}
-                  onPress={() => toggleDropdown('eventReminderLead')}
+                  onPress={() => setEventSheet('reminderTypes')}
                 >
-                  <Text style={styles.rowLabel}>Time Before</Text>
-                  <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
-                  <Ionicons
-                    name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color={Colors.textLight}
-                    style={{ marginLeft: 6 }}
-                  />
+                  <Text style={styles.rowLabel}>Types</Text>
+                  <Text style={styles.rowValue}>{reminderTypesLabel}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textLight} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
-                <DropdownMenu open={openDropdown === 'eventReminderLead'}>
-                  <ScrollView
-                    style={{ maxHeight: EVENT_REMINDER_LIST_MAX_HEIGHT }}
-                    nestedScrollEnabled
-                    bounces={false}
-                    overScrollMode="never"
-                    {...eventReminderScrollEdges.scrollViewProps}
-                  >
-                    {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
-                      <DropdownItem
-                        key={minutes}
-                        label={eventReminderLabel(minutes)}
-                        selected={settings.eventReminderMinutes === minutes}
-                        showSeparator={i < arr.length - 1}
-                        onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
-                      />
-                    ))}
-                  </ScrollView>
-                  <ScrollEdgeFade edge="top" color={Colors.menuSurface} visible={eventReminderScrollEdges.showTopFade} />
-                  <ScrollEdgeFade edge="bottom" color={Colors.menuSurface} visible={eventReminderScrollEdges.showBottomFade} />
-                </DropdownMenu>
-              </View>
+              </>
             )}
           </View>
         </View>
@@ -1057,6 +1076,7 @@ export function SettingsScreen() {
         definitions={eventTypeDefinitions}
         onUpdateDefinitions={updateEventTypeDefinitions}
       />
+      <EventReminderTypesModal visible={eventSheet === 'reminderTypes'} onClose={() => setEventSheet(null)} />
     </SafeAreaView>
   );
 }

@@ -42,7 +42,6 @@ FEATURES
 [x] make tapping on goals take you to their edit menu
 [x] repeating events move all or move one
 
-[ ] move onboarded flag from asyncStorage to supabase
 [ ] add more personalization to onboarding (different event and goal color schemes)
 [ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [ ] individual event notifs

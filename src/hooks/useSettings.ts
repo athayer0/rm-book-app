@@ -59,6 +59,12 @@ export interface AppSettings {
   eventReminderEnabled: boolean;
   /** Minutes before an event's start the reminder fires. One of EVENT_REMINDER_MINUTE_OPTIONS. */
   eventReminderMinutes: number;
+  /**
+   * Event type ids excluded from reminders. Absence — not presence — is the
+   * default, so a type added after this setting existed (built-in or custom)
+   * still gets reminders until someone opts it out.
+   */
+  eventReminderExcludedTypeIds: string[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -93,6 +99,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dailyReviewMinute: 0,
   eventReminderEnabled: false,
   eventReminderMinutes: 5,
+  eventReminderExcludedTypeIds: [],
 };
 
 type SettingsContextValue = {

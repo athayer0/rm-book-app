@@ -98,9 +98,14 @@ export async function clearEventReminders(): Promise<void> {
 }
 
 /** Full rebuild rather than a diff — simpler, and correct even when an event's own time changed. */
-export async function syncEventReminders(events: CalendarEvent[], leadMinutes: number): Promise<void> {
+export async function syncEventReminders(
+  events: CalendarEvent[],
+  leadMinutes: number,
+  excludedTypeIds: string[] = [],
+): Promise<void> {
   await cancelAllEventReminders();
 
+  const excluded = new Set(excludedTypeIds);
   const now = new Date();
   const occurrences: { event: CalendarEvent; date: string; notifyAt: Date }[] = [];
 
@@ -109,6 +114,7 @@ export async function syncEventReminders(events: CalendarEvent[], leadMinutes: n
     const [year, month, day] = dateStr.split('-').map(Number);
 
     for (const occurrence of getEventsForDate(events, dateStr)) {
+      if (excluded.has(occurrence.type)) continue;
       const { hour, minute } = parseTimeString(occurrence.startTime);
       const start = new Date(year, month - 1, day, hour, minute, 0, 0);
       const notifyAt = new Date(start.getTime() - leadMinutes * 60_000);

@@ -172,8 +172,11 @@ function AppRoot() {
       if (settings.eventReminderEnabled) {
         const granted = await requestNotificationPermissions();
         if (cancelled) return;
-        if (granted) await syncEventReminders(events, settings.eventReminderMinutes);
-        else await clearEventReminders();
+        if (granted) {
+          await syncEventReminders(events, settings.eventReminderMinutes, settings.eventReminderExcludedTypeIds);
+        } else {
+          await clearEventReminders();
+        }
       } else {
         await clearEventReminders();
       }
@@ -187,7 +190,13 @@ function AppRoot() {
       cancelled = true;
       sub.remove();
     };
-  }, [settingsLoaded, settings.eventReminderEnabled, settings.eventReminderMinutes, events]);
+  }, [
+    settingsLoaded,
+    settings.eventReminderEnabled,
+    settings.eventReminderMinutes,
+    settings.eventReminderExcludedTypeIds,
+    events,
+  ]);
 
   // Tapped while backgrounded or foregrounded: the navigator is already
   // mounted, so the ref is ready immediately.
