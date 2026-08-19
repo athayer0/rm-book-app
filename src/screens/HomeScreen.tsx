@@ -37,6 +37,9 @@ export function HomeScreen({ navigation, route }: any) {
 
   useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
   const [editVisible, setEditVisible] = useState(false);
+  // Which goal EditGoalsModal opens on — set when a card is tapped, cleared
+  // (falling back to the first goal) when the header's EDIT link is used.
+  const [editGoalId, setEditGoalId] = useState<string | null>(null);
   const [goalsVisible, setGoalsVisible] = useState(false);
   const [graphVisible, setGraphVisible] = useState(false);
   // Which tab each sheet opens on. Tapping a grid opens that grid's own grain;
@@ -58,6 +61,13 @@ export function HomeScreen({ navigation, route }: any) {
   function openGoals(grain: GoalGrain) {
     setGoalsGrain(grain);
     setGoalsVisible(true);
+  }
+
+  // A card tap opens that goal's editor directly rather than the counts/targets
+  // sheet openGoals leads to.
+  function openGoalEditor(id: string) {
+    setEditGoalId(id);
+    setEditVisible(true);
   }
 
   function startGoalReorder() {
@@ -130,14 +140,14 @@ export function HomeScreen({ navigation, route }: any) {
                 actionLabel={reorderActive ? (reorderComplete ? 'Done' : 'Cancel') : 'EDIT'}
                 onAction={reorderActive
                   ? (reorderComplete ? commitGoalReorder : cancelGoalReorder)
-                  : () => setEditVisible(true)}
+                  : () => { setEditGoalId(null); setEditVisible(true); }}
               />
               <GoalGrid
                 definitions={definitions}
                 counts={counts}
                 goals={goals}
                 grain="week"
-                onPressGoal={() => openGoals('week')}
+                onPressGoal={openGoalEditor}
                 reorderActive={reorderActive}
                 tappedIds={weekTaps}
                 onTapGoal={tapWeekGoal}
@@ -152,7 +162,7 @@ export function HomeScreen({ navigation, route }: any) {
                 counts={monthlyCounts}
                 goals={monthlyGoals}
                 grain="month"
-                onPressGoal={() => openGoals('month')}
+                onPressGoal={openGoalEditor}
                 reorderActive={reorderActive}
                 tappedIds={monthTaps}
                 onTapGoal={tapMonthGoal}
@@ -196,6 +206,7 @@ export function HomeScreen({ navigation, route }: any) {
         eventTypeDefs={eventTypeDefinitions}
         onUpdateEventTypeDefs={updateEventTypeDefinitions}
         onReorderGoals={startGoalReorder}
+        initialGoalId={editGoalId}
       />
 
       {/* Reloads both grains on close: the sheet's tabs write either one, and

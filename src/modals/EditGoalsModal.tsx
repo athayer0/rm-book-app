@@ -75,6 +75,8 @@ interface Props {
   onUpdateEventTypeDefs: (defs: EventTypeDefinition[]) => Promise<void>;
   /** Closes this sheet (committing any pending edits, same as the X) and starts the Home screen's tap-to-order flow. */
   onReorderGoals: () => void;
+  /** Which goal the selector opens on. Falls back to the first goal when unset — tapping a card opens straight on it, the EDIT link doesn't. */
+  initialGoalId?: string | null;
 }
 
 /**
@@ -100,6 +102,7 @@ interface Props {
  */
 export function EditGoalsModal({
   visible, onClose, definitions, onUpdateDefinitions, eventTypeDefs, onUpdateEventTypeDefs, onReorderGoals,
+  initialGoalId,
 }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
@@ -131,8 +134,10 @@ export function EditGoalsModal({
       setLocalDefs(definitions);
       setLocalEventTypeDefs(eventTypeDefs);
       // Opens on the first goal rather than on nothing — the selector is the
-      // only way in, so an empty one would read as a broken screen.
-      setSelectedId(definitions.find(d => !d.removed)?.id ?? null);
+      // only way in, so an empty one would read as a broken screen. A card tap
+      // instead opens straight on the goal that was tapped.
+      const activeInitial = initialGoalId && definitions.find(d => d.id === initialGoalId && !d.removed);
+      setSelectedId(activeInitial ? initialGoalId : definitions.find(d => !d.removed)?.id ?? null);
       setOpenMenu(null);
       setIconSheetOpen(false);
       setColorSheetOpen(false);

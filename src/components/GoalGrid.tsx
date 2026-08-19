@@ -15,7 +15,7 @@ interface Props {
   goals: WeeklyGoals;
   /** Which grid this is — drives both visibility and position, independently of the other grain. */
   grain: GoalGrain;
-  onPressGoal?: () => void;
+  onPressGoal?: (id: string) => void;
   compact?: boolean;
   /**
    * Tap-to-number reorder mode (see HomeScreen): every visible card shows a
@@ -56,7 +56,7 @@ export function GoalGrid({
                   count={counts[def.id] ?? 0}
                   // The grid only ever shows the current week, which never resolves to null.
                   goal={resolveGoal(goals[def.id], false) ?? 0}
-                  onPress={reorderActive ? () => onTapGoal?.(def.id) : onPressGoal}
+                  onPress={reorderActive ? () => onTapGoal?.(def.id) : () => onPressGoal?.(def.id)}
                   compact={compact}
                 />
                 {reorderActive && (
