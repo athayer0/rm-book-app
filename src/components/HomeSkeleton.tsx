@@ -10,9 +10,10 @@ import { Skeleton } from './Skeleton';
  * starter schedule) are still landing, so the grid doesn't visibly jitter as
  * each one arrives — see useOnboardingFinishing().
  *
- * Row counts (3 weekly, 1 monthly) are a representative shape, not a promise
- * of the real count: this is a few-hundred-millisecond transitional state, so
- * matching exactly what the user chose isn't worth the extra plumbing.
+ * Row counts (4 weekly, 1 monthly) match DEFAULT_GOALS' shipped counts (8
+ * weekly, 2 monthly) at two cards per row, but this is still a representative
+ * shape, not a promise: this is a few-hundred-millisecond transitional state,
+ * so matching exactly what the user chose isn't worth the extra plumbing.
  */
 export function HomeSkeleton() {
   const Colors = useColors();
@@ -25,7 +26,7 @@ export function HomeSkeleton() {
           <Skeleton width={120} height={17} borderRadius={4} />
           <Skeleton width={36} height={14} borderRadius={4} />
         </View>
-        <SkeletonGrid rows={3} />
+        <SkeletonGrid rows={4} />
 
         <View style={[styles.header, styles.headerTightTop]}>
           <Skeleton width={130} height={17} borderRadius={4} />
