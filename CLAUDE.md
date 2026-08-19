@@ -13,6 +13,8 @@ npx tsc --noEmit        # type-check (no test suite exists)
 
 Supabase credentials are required as env vars: `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 
+**Never run `npx expo start --web` (or any other means of running this app in a browser) to verify changes.** Verification is `npx tsc --noEmit` plus the owner's own manual testing in Expo Go/a simulator — not a browser session.
+
 ## LOG.md
 
 `LOG.md` is the owner's own planning file — **never edit it.** Read it for context, but do not check off, reword, or trim an item even after implementing it. Say in your reply what's now done and leave the file alone.

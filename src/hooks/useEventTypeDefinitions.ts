@@ -61,7 +61,16 @@ export function useEventTypeDefinitions() {
   const { user } = useAuth();
   const defsState = useStoredState<EventTypeDefinition[]>(EVENT_TYPE_DEFINITIONS_KEY, EMPTY_DEFS);
 
-  const definitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_EVENT_TYPES;
+  // Sorted centrally, once, so every consumer (the type picker, quick-add list,
+  // the Event Type dropdown, ...) reflects the Settings > Event Types > Reorder
+  // order without sorting its own copy. Falls back to array position for
+  // anything that somehow lacks `order` — defensive only, since DEFAULT_EVENT_TYPES
+  // and every type-creation path populate it.
+  const merged = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_EVENT_TYPES;
+  const definitions = merged
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => (a.d.order ?? a.i) - (b.d.order ?? b.i))
+    .map(({ d }) => d);
 
   const byId = useMemo(
     () => Object.fromEntries(definitions.map(d => [d.id, d])) as Record<string, EventTypeDefinition>,

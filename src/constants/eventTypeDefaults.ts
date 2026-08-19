@@ -65,6 +65,13 @@ export interface EventTypeDefinition {
    */
   reportStyle?: 'checkbox' | 'status' | 'none';
   /**
+   * This type's position in every vertical list it appears in (the type
+   * picker, the quick-add list, ...) — one shared order, unlike a goal's pair,
+   * since a type isn't split across two independent grids. Sorted ascending by
+   * useEventTypeDefinitions, centrally, so no consumer sorts its own copy.
+   */
+  order: number;
+  /**
    * Tombstone, not a removal from the array — see the matching field on
    * GoalDefinition for why.
    */
@@ -80,10 +87,11 @@ export interface EventTypeDefinition {
  * shown is a quick-add bubble on the calendar's + — icons there are set per
  * selection in Settings > Quick Add (settings.quickAddTypes), not per type.
  */
-export const DEFAULT_EVENT_TYPES: EventTypeDefinition[] = Object.keys(EventColors).map(id => ({
+export const DEFAULT_EVENT_TYPES: EventTypeDefinition[] = Object.keys(EventColors).map((id, order) => ({
   id,
   label: EventTypeLabels[id],
   builtIn: true,
+  order,
 }));
 
 /**

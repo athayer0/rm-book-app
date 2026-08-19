@@ -207,6 +207,14 @@ create trigger goal_definitions_set_updated_at
   before insert or update on goal_definitions
   for each row
   execute function set_updated_at();
+-- This goal's position in the weekly grid / monthly grid, independent of each
+-- other — dragging a card in one grid says nothing about the other. `order`
+-- is a reserved SQL word, hence `sort_order` here mapped from the app's
+-- `order`/`monthlyOrder` fields (see rowMappers.ts FIELD_MAPS).
+alter table goal_definitions
+  add column if not exists sort_order int;
+alter table goal_definitions
+  add column if not exists monthly_sort_order int;
 
 -- ── event_type_definitions ─────────────────
 -- No icon here, unlike goal_definitions -- a type
@@ -260,6 +268,11 @@ alter table event_type_definitions
 -- feeds a goal.
 alter table event_type_definitions
   add column if not exists report_style text;
+-- This type's position in every vertical list it appears in — one shared
+-- order, unlike a goal's grain pair. Same reserved-word reasoning as
+-- goal_definitions.sort_order above.
+alter table event_type_definitions
+  add column if not exists sort_order int;
 alter table event_type_definitions
   enable row level security;
 drop policy if exists "users own their event types"

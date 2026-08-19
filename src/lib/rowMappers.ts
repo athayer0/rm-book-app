@@ -21,6 +21,8 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     iconFamily: 'icon_family',
     builtIn: 'built_in',
     monthlyVisible: 'monthly_visible',
+    order: 'sort_order',
+    monthlyOrder: 'monthly_sort_order',
   },
   event_type_definitions: {
     builtIn: 'built_in',
@@ -29,6 +31,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     lateGoalId: 'late_goal_id',
     goalSplitTime: 'goal_split_time',
     reportStyle: 'report_style',
+    order: 'sort_order',
   },
   goal_entries: {},
   goal_monthly_entries: {},
@@ -72,12 +75,13 @@ const COLUMNS: Record<string, string[]> = {
   ],
   goal_definitions: [
     'user_id', 'id', 'label', 'icon', 'icon_family', 'color',
-    'visible', 'monthly_visible', 'built_in', 'removed', 'updated_at', 'deleted_at',
+    'visible', 'monthly_visible', 'built_in', 'sort_order', 'monthly_sort_order',
+    'removed', 'updated_at', 'deleted_at',
   ],
   event_type_definitions: [
     'user_id', 'id', 'label',
     'visible', 'built_in', 'goal_id', 'goal_mode', 'late_goal_id', 'goal_split_time',
-    'report_style', 'removed', 'updated_at', 'deleted_at',
+    'report_style', 'sort_order', 'removed', 'updated_at', 'deleted_at',
   ],
   goal_entries: [
     'user_id', 'goal_id', 'week_key', 'count', 'target', 'updated_at', 'deleted_at',

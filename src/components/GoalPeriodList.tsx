@@ -11,7 +11,7 @@ import type { ColorPalette } from '../constants/colors';
 import { GoalDefinition, MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import { resolveGoal } from '../hooks/useWeeklyGoals';
 import {
-  GoalGrain, GRAIN, MIN_OFFSET, MAX_OFFSET, PeriodDataReader, PeriodValueWriter,
+  GoalGrain, GRAIN, MIN_OFFSET, MAX_OFFSET, PeriodDataReader, PeriodValueWriter, sortForGrain,
 } from '../utils/goalGrain';
 import { GoalIcon } from './GoalIcon';
 
@@ -94,7 +94,7 @@ export function GoalPeriodList({
 
   useEffect(() => { onEditingChange?.(editingRow !== null); }, [editingRow]);
 
-  const visibleDefs = definitions.filter(d => d[visibilityKey]);
+  const visibleDefs = sortForGrain(definitions.filter(d => d[visibilityKey]), grain);
   const periodKey = keyByOffset(offset);
   const isFuture = offset > 0;
 

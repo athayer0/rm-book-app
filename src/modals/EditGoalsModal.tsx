@@ -73,6 +73,8 @@ interface Props {
   onUpdateDefinitions: (defs: GoalDefinition[]) => Promise<void>;
   eventTypeDefs: EventTypeDefinition[];
   onUpdateEventTypeDefs: (defs: EventTypeDefinition[]) => Promise<void>;
+  /** Closes this sheet (committing any pending edits, same as the X) and starts the Home screen's tap-to-order flow. */
+  onReorderGoals: () => void;
 }
 
 /**
@@ -97,7 +99,7 @@ interface Props {
  * what used to freeze iOS, and is exactly what the old drill-in sheet cost.
  */
 export function EditGoalsModal({
-  visible, onClose, definitions, onUpdateDefinitions, eventTypeDefs, onUpdateEventTypeDefs,
+  visible, onClose, definitions, onUpdateDefinitions, eventTypeDefs, onUpdateEventTypeDefs, onReorderGoals,
 }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
@@ -155,6 +157,13 @@ export function EditGoalsModal({
       d.removed || d.label.trim() ? d : { ...d, label: UNTITLED }
     )));
     onUpdateEventTypeDefs(localEventTypeDefs);
+  }
+
+  // Same commit as the X, then hands off to the Home screen's tap-to-order flow
+  // rather than just closing.
+  function handleReorder() {
+    handleClose();
+    onReorderGoals();
   }
 
   // Each grid is capped on its own, so the two counts are tracked separately —
@@ -230,6 +239,8 @@ export function EditGoalsModal({
   function addGoal() {
     if (!canAddGoal) return;
     const id = `custom_${Date.now()}`;
+    const nextOrder = Math.max(0, ...localDefs.map(d => d.order ?? 0)) + 1;
+    const nextMonthlyOrder = Math.max(0, ...localDefs.map(d => d.monthlyOrder ?? 0)) + 1;
     setLocalDefs(prev => [...prev, {
       id,
       label: '',
@@ -238,6 +249,8 @@ export function EditGoalsModal({
       color: DEFAULT_GOAL_COLOR,
       ...PERIOD_FLAGS[weeklyFull ? 'monthly' : 'weekly'],
       builtIn: false,
+      order: nextOrder,
+      monthlyOrder: nextMonthlyOrder,
     }]);
     setSelectedId(id);
     setOpenMenu(null);
@@ -577,6 +590,19 @@ export function EditGoalsModal({
           </Text>
         </TouchableOpacity>
 
+        {/* Hands off to the Home screen rather than reordering in place here —
+            weekly and monthly are laid out as grids there, not this flat list,
+            so that's where tapping a new position for each goal actually means
+            something. */}
+        <TouchableOpacity
+          onPress={handleReorder}
+          activeOpacity={0.85}
+          style={styles.reorderBtn}
+        >
+          <Ionicons name="swap-vertical" size={18} color={Colors.textSecondary} />
+          <Text style={styles.reorderBtnText}>Reorder Goals</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -845,5 +871,22 @@ function makeStyles(C: ColorPalette) {
     // cap — just one that no longer offers to be pressed.
     addBtnDisabled: { backgroundColor: C.border },
     addBtnTextDisabled: { color: C.textSecondary },
+    // Secondary to Add a Goal — no fill or border, so the two don't compete
+    // for which is the primary action on this screen.
+    reorderBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
+      gap: 6,
+      marginTop: 12,
+      paddingHorizontal: 18,
+      paddingVertical: 9,
+    },
+    reorderBtnText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.textSecondary,
+    },
   });
 }

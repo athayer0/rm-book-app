@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../co
 import { ScrollEdgeFade, useScrollEdges } from '../components/ScrollEdgeFade';
 import { QuickAddTypesModal } from '../modals/QuickAddTypesModal';
 import { EventTypesModal } from '../modals/EventTypesModal';
+import { ReorderEventTypesModal } from '../modals/ReorderEventTypesModal';
 import {
   DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition,
 } from '../constants/eventTypeDefaults';
@@ -151,7 +152,7 @@ export function SettingsScreen() {
   // Which theme colour the picker sheet is editing, if any.
   const [colorSheet, setColorSheet] = useState<ThemeColorRowKey | null>(null);
   // Which of the event-type screens is open.
-  const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | null>(null);
+  const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | 'reorder' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // Content-relative y of the country-code section, from its onLayout.
   const codeSectionY = useRef(0);
@@ -551,6 +552,11 @@ export function SettingsScreen() {
           <View style={styles.card}>
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
               <Text style={styles.rowLabel}>Customize</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.row} onPress={() => setEventSheet('reorder')}>
+              <Text style={styles.rowLabel}>Reorder</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
@@ -1044,6 +1050,12 @@ export function SettingsScreen() {
         definitions={eventTypeDefinitions}
         onUpdateDefinitions={updateEventTypeDefinitions}
         goalDefinitions={goalDefinitions}
+      />
+      <ReorderEventTypesModal
+        visible={eventSheet === 'reorder'}
+        onClose={() => setEventSheet(null)}
+        definitions={eventTypeDefinitions}
+        onUpdateDefinitions={updateEventTypeDefinitions}
       />
     </SafeAreaView>
   );

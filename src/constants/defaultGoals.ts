@@ -28,6 +28,15 @@ export interface GoalDefinition {
   monthlyVisible: boolean;
   builtIn: boolean;
   /**
+   * This goal's position in the weekly grid — independent of `monthlyOrder`,
+   * since dragging a card in one grid has no bearing on where it sits in the
+   * other. Sorted ascending; ties fall back to array position (see
+   * sortForGrain in goalGrain.ts).
+   */
+  order: number;
+  /** This goal's position in the monthly grid. Independent of `order` — see above. */
+  monthlyOrder: number;
+  /**
    * Tombstone, not a removal from the array. Built-ins are always regenerated
    * from DEFAULT_GOALS by mergeWithDefaults(), so a deleted built-in has to be
    * remembered as deleted rather than dropped, or it would reappear on the next
@@ -55,6 +64,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: false,
     builtIn: true,
+    order: 0,
+    monthlyOrder: 0,
   },
   {
     id: 'nightly_prayer',
@@ -65,6 +76,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: false,
     builtIn: true,
+    order: 1,
+    monthlyOrder: 1,
   },
   {
     id: 'times_exercised',
@@ -75,6 +88,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: false,
     builtIn: true,
+    order: 2,
+    monthlyOrder: 2,
   },
   {
     id: 'personal_study',
@@ -85,6 +100,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: false,
     builtIn: true,
+    order: 3,
+    monthlyOrder: 3,
   },
   {
     id: 'total_dates',
@@ -95,6 +112,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: true,
     builtIn: true,
+    order: 4,
+    monthlyOrder: 4,
   },
   {
     id: 'service_hours',
@@ -105,6 +124,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: false,
     builtIn: true,
+    order: 5,
+    monthlyOrder: 5,
   },
   {
     id: 'church_hours',
@@ -115,6 +136,8 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: false,
     builtIn: true,
+    order: 6,
+    monthlyOrder: 6,
   },
   {
     id: 'temple_attendance',
@@ -125,5 +148,7 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
     visible: true,
     monthlyVisible: true,
     builtIn: true,
+    order: 7,
+    monthlyOrder: 7,
   },
 ];

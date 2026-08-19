@@ -184,11 +184,13 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
    */
   function addType() {
     const id = `custom_evt_${Date.now()}`;
+    const nextOrder = Math.max(0, ...localDefs.map(d => d.order ?? 0)) + 1;
     setLocalDefs(prev => [...prev, {
       id,
       label: '',
       builtIn: false,
       reportStyle: 'status',
+      order: nextOrder,
     }]);
     setLocalColors(prev => ({ ...prev, [id]: DEFAULT_GOAL_COLOR }));
     setLocalMinutes(prev => ({ ...prev, [id]: DEFAULT_TYPE_MINUTES }));

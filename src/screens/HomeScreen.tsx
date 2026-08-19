@@ -44,9 +44,58 @@ export function HomeScreen({ navigation, route }: any) {
   const [goalsGrain, setGoalsGrain] = useState<GoalGrain>('week');
   const [unreportedVisible, setUnreportedVisible] = useState(false);
 
+  // Tap-to-order goal reorder: EditGoalsModal's "Reorder Goals" button starts
+  // this instead of reordering in place there, since weekly/monthly are grids
+  // here, not the flat list that sheet edits. Each grain gets its own tap
+  // sequence — a goal shown on both grids gets numbered independently in each
+  // — and nothing is written until both sequences are complete and Done (the
+  // same button as Cancel, once every visible card in both grids is tapped)
+  // is pressed.
+  const [reorderActive, setReorderActive] = useState(false);
+  const [weekTaps, setWeekTaps] = useState<string[]>([]);
+  const [monthTaps, setMonthTaps] = useState<string[]>([]);
+
   function openGoals(grain: GoalGrain) {
     setGoalsGrain(grain);
     setGoalsVisible(true);
+  }
+
+  function startGoalReorder() {
+    setWeekTaps([]);
+    setMonthTaps([]);
+    setReorderActive(true);
+  }
+
+  function tapWeekGoal(id: string) {
+    setWeekTaps(prev => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  function tapMonthGoal(id: string) {
+    setMonthTaps(prev => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  const weekVisibleCount = definitions.filter(d => d.visible).length;
+  const monthVisibleCount = definitions.filter(d => d.monthlyVisible).length;
+  const reorderComplete = weekTaps.length === weekVisibleCount && monthTaps.length === monthVisibleCount;
+
+  function commitGoalReorder() {
+    const patched = definitions.map(d => {
+      const wIdx = weekTaps.indexOf(d.id);
+      const mIdx = monthTaps.indexOf(d.id);
+      return {
+        ...d,
+        ...(wIdx !== -1 ? { order: wIdx } : {}),
+        ...(mIdx !== -1 ? { monthlyOrder: mIdx } : {}),
+      };
+    });
+    updateDefinitions(patched);
+    setReorderActive(false);
+  }
+
+  function cancelGoalReorder() {
+    setReorderActive(false);
+    setWeekTaps([]);
+    setMonthTaps([]);
   }
 
   // The daily-review notification tap navigates here with this param (set in
@@ -77,40 +126,55 @@ export function HomeScreen({ navigation, route }: any) {
                 the first heading only — there is one goal editor for both grains. */}
             <View style={styles.card}>
               <SectionHeader
-                title="Weekly Goals"
-                actionLabel="EDIT"
-                onAction={() => setEditVisible(true)}
+                title={reorderActive ? `Weekly Goals (${weekTaps.length}/${weekVisibleCount})` : 'Weekly Goals'}
+                actionLabel={reorderActive ? (reorderComplete ? 'Done' : 'Cancel') : 'EDIT'}
+                onAction={reorderActive
+                  ? (reorderComplete ? commitGoalReorder : cancelGoalReorder)
+                  : () => setEditVisible(true)}
               />
               <GoalGrid
                 definitions={definitions}
                 counts={counts}
                 goals={goals}
+                grain="week"
                 onPressGoal={() => openGoals('week')}
+                reorderActive={reorderActive}
+                tappedIds={weekTaps}
+                onTapGoal={tapWeekGoal}
               />
 
-              <SectionHeader title="Monthly Goals" tightTop />
+              <SectionHeader
+                title={reorderActive ? `Monthly Goals (${monthTaps.length}/${monthVisibleCount})` : 'Monthly Goals'}
+                tightTop
+              />
               <GoalGrid
                 definitions={definitions}
                 counts={monthlyCounts}
                 goals={monthlyGoals}
+                grain="month"
                 onPressGoal={() => openGoals('month')}
-                visibilityKey="monthlyVisible"
+                reorderActive={reorderActive}
+                tappedIds={monthTaps}
+                onTapGoal={tapMonthGoal}
               />
 
               {/* Below both grids rather than under the weekly one, since each sheet
-                  covers both grains on its own tabs. */}
+                  covers both grains on its own tabs. Disabled during reorder so a tap
+                  can't wander off into another sheet mid-sequence. */}
               <View style={styles.actionRow}>
                 <TouchableOpacity
-                  style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
+                  style={[styles.actionBtn, isDark && styles.actionBtnSwapped, reorderActive && styles.actionBtnDisabled]}
                   onPress={() => openGoals('week')}
+                  disabled={reorderActive}
                   activeOpacity={0.75}
                 >
                   <Ionicons name="list-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
                   <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Goals</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionBtn, isDark && styles.actionBtnSwapped]}
+                  style={[styles.actionBtn, isDark && styles.actionBtnSwapped, reorderActive && styles.actionBtnDisabled]}
                   onPress={() => setGraphVisible(true)}
+                  disabled={reorderActive}
                   activeOpacity={0.75}
                 >
                   <Ionicons name="stats-chart-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
@@ -131,6 +195,7 @@ export function HomeScreen({ navigation, route }: any) {
         onUpdateDefinitions={updateDefinitions}
         eventTypeDefs={eventTypeDefinitions}
         onUpdateEventTypeDefs={updateEventTypeDefinitions}
+        onReorderGoals={startGoalReorder}
       />
 
       {/* Reloads both grains on close: the sheet's tabs write either one, and
@@ -233,6 +298,9 @@ function makeStyles(C: ColorPalette) {
     },
     actionBtnTextSwapped: {
       color: C.contactActionBg,
+    },
+    actionBtnDisabled: {
+      opacity: 0.4,
     },
   });
 }

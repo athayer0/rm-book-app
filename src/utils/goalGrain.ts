@@ -1,6 +1,7 @@
 import {
   getWeekKeyByOffset, formatWeekLabel, getMonthKeyByOffset, formatMonthLabel,
 } from './dateUtils';
+import { GoalDefinition } from '../constants/defaultGoals';
 
 /** The two grains a goal is tracked at. Both grids and both sheets are parameterised by this. */
 export type GoalGrain = 'week' | 'month';
@@ -42,6 +43,8 @@ export const GRAIN: Record<GoalGrain, {
   gridLabel: string;
   /** Which of a goal's two independent visibility flags this grain honours. */
   visibilityKey: 'visible' | 'monthlyVisible';
+  /** Which of a goal's two independent position fields this grain honours. */
+  orderKey: 'order' | 'monthlyOrder';
   keyByOffset: (offset: number) => string;
   /** The period nav's own label — the full name, with room for it. */
   navLabel: (periodKey: string) => string;
@@ -55,6 +58,7 @@ export const GRAIN: Record<GoalGrain, {
     graphTabLabel: 'Last 6 Weeks',
     gridLabel: 'Weekly Goals',
     visibilityKey: 'visible',
+    orderKey: 'order',
     keyByOffset: getWeekKeyByOffset,
     navLabel: formatWeekLabel,
     // The axis only needs to say which week a column is, so it carries the start
@@ -68,6 +72,7 @@ export const GRAIN: Record<GoalGrain, {
     graphTabLabel: 'Last 6 Months',
     gridLabel: 'Monthly Goals',
     visibilityKey: 'monthlyVisible',
+    orderKey: 'monthlyOrder',
     keyByOffset: getMonthKeyByOffset,
     navLabel: formatMonthLabel,
     // "August 2026" cut to "Aug". The year goes with it, as it does on the weekly
@@ -76,3 +81,18 @@ export const GRAIN: Record<GoalGrain, {
     summary: { prev: 'Last month', current: 'This month', next: 'Next month' },
   },
 };
+
+/**
+ * A grain's goals, ordered by that grain's own position field — weekly and
+ * monthly read independently even though they're the same definitions, since
+ * dragging a card in one grid says nothing about the other. Falls back to
+ * array position for anything that somehow lacks the field (defensive only;
+ * DEFAULT_GOALS and every goal-creation path populate it).
+ */
+export function sortForGrain(defs: GoalDefinition[], grain: GoalGrain): GoalDefinition[] {
+  const { orderKey } = GRAIN[grain];
+  return defs
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => (a.d[orderKey] ?? a.i) - (b.d[orderKey] ?? b.i))
+    .map(({ d }) => d);
+}
