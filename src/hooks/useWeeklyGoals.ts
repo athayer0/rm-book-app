@@ -161,7 +161,11 @@ export function useWeeklyGoals() {
     await defsState.write(() => defs);
     if (!user) return;
     for (const def of defs) {
-      await enqueueUpsert('goal_definitions', def.id, { ...def, user_id: user.id });
+      // `removed` must be sent explicitly, even when clearing it: an upsert only
+      // updates columns present in the payload, and a restored built-in (spread
+      // from DEFAULT_GOALS, which never carries the key) would otherwise omit
+      // `removed` entirely and leave the server's stale `true` in place forever.
+      await enqueueUpsert('goal_definitions', def.id, { ...def, removed: def.removed ?? null, user_id: user.id });
     }
   }, [defsState, user]);
 

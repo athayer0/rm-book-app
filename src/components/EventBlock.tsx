@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Line } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, renderedEventHeight, hasEndTime, COMPACT_EVENT_HEIGHT, CALENDAR_CHECKBOX_SIZE } from '../utils/eventUtils';
 import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../constants/contactMethods';
@@ -66,6 +67,37 @@ const BLOCK = {
 const AVG_CHAR_WIDTH = 0.55;
 function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * AVG_CHAR_WIDTH;
+}
+
+/**
+ * The failed badge: a filled disc with a "no entry" ring-and-slash cut into
+ * it. Drawn as SVG, geometrically, rather than laying an Ionicons
+ * `ban-outline` glyph over a separately-sized coloured circle — that combo
+ * (still what StatusPicker uses) pairs the font's own glyph metrics against
+ * a circle sized from unrelated arithmetic, and at this component's small
+ * badge sizes any mismatch between the two reads as the ring and the slash
+ * not quite lining up with the disc behind them. Every point here is
+ * computed off the same `cx`/`cy`/ring radius, so the ring and the disc are
+ * concentric by construction and can't drift apart.
+ */
+function FailedBadge({ size, discColor, glyphColor }: { size: number; discColor: string; glyphColor: string }) {
+  const r = size / 2;
+  const strokeWidth = Math.max(1.5, size * 0.1);
+  // Leaves a visible ring of `discColor` around the white ring/slash —
+  // the same "colour showing as a border" look StatusPicker's disc+glyph
+  // combo was going for.
+  const ringRadius = r * 0.62;
+  const offset = ringRadius * Math.SQRT1_2;
+  return (
+    <Svg width={size} height={size}>
+      <Circle cx={r} cy={r} r={r} fill={discColor} />
+      <Circle cx={r} cy={r} r={ringRadius} stroke={glyphColor} strokeWidth={strokeWidth} fill="none" />
+      <Line
+        x1={r - offset} y1={r - offset} x2={r + offset} y2={r + offset}
+        stroke={glyphColor} strokeWidth={strokeWidth} strokeLinecap="round"
+      />
+    </Svg>
+  );
 }
 
 interface Props {
@@ -368,9 +400,7 @@ export function EventBlock({
         {!inSelectMode && effectiveStatus && (
           <View style={[styles.statusWrap, { width: badge }]}>
             {effectiveStatus === 'failed' ? (
-              <View style={{ width: badgeInner + badgeInset, height: badgeInner + badgeInset, borderRadius: (badgeInner + badgeInset) / 2, backgroundColor: statusColor.failed, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="ban-outline" size={badge - 10} color={Colors.white} style={{ transform: [{ scaleX: -1 }] }} />
-              </View>
+              <FailedBadge size={badgeInner + badgeInset} discColor={statusColor.failed} glyphColor={Colors.white} />
             ) : (
               <View style={{ width: badge, height: badge }}>
                 <View style={{ position: 'absolute', width: badgeInner, height: badgeInner, borderRadius: badgeInner / 2, backgroundColor: Colors.card, top: badgeInset, left: badgeInset }} />

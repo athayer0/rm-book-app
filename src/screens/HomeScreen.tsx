@@ -295,7 +295,10 @@ function makeStyles(C: ColorPalette) {
       gap: 6,
       paddingVertical: 12,
       borderRadius: 14,
-      backgroundColor: C.contactActionBg,
+      // Same fill as the recurring-event pill on a calendar block, rather
+      // than contactActionBg — a neutral chip background instead of a
+      // colour-of-the-action wash.
+      backgroundColor: C.infoChipBg,
     },
     actionBtnText: {
       fontSize: 14,

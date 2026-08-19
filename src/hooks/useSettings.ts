@@ -5,6 +5,12 @@ import {
   DEFAULT_SECONDARY_COLOR_DARK,
   DEFAULT_TERTIARY_COLOR_LIGHT,
   DEFAULT_TERTIARY_COLOR_DARK,
+  DEFAULT_STATUS_COMPLETED_LIGHT,
+  DEFAULT_STATUS_COMPLETED_DARK,
+  DEFAULT_STATUS_FAILED_LIGHT,
+  DEFAULT_STATUS_FAILED_DARK,
+  DEFAULT_STATUS_PENDING_LIGHT,
+  DEFAULT_STATUS_PENDING_DARK,
 } from '../constants/colors';
 import { DEFAULT_CONTACT_METHOD } from '../constants/contactMethods';
 import { EventSize, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
@@ -36,6 +42,13 @@ export interface AppSettings {
   /** Drives `control` (checkmarks, switches, active pills/tabs, the FAB, links). */
   tertiaryColorLight: string;
   tertiaryColorDark: string;
+  /** Drive `statusCompleted`/`statusFailed`/`statusPending` — light and dark set independently, same as secondary/tertiary above. */
+  statusCompletedColorLight: string;
+  statusCompletedColorDark: string;
+  statusFailedColorLight: string;
+  statusFailedColorDark: string;
+  statusPendingColorLight: string;
+  statusPendingColorDark: string;
   eventTypeColors: Record<string, string>;
   eventTypeDefaultMinutes: Record<string, number>;
   /** Up to 8, in bubble order — see QuickAddTypesModal. */
@@ -75,6 +88,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,
   tertiaryColorLight: DEFAULT_TERTIARY_COLOR_LIGHT,
   tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
+  statusCompletedColorLight: DEFAULT_STATUS_COMPLETED_LIGHT,
+  statusCompletedColorDark: DEFAULT_STATUS_COMPLETED_DARK,
+  statusFailedColorLight: DEFAULT_STATUS_FAILED_LIGHT,
+  statusFailedColorDark: DEFAULT_STATUS_FAILED_DARK,
+  statusPendingColorLight: DEFAULT_STATUS_PENDING_LIGHT,
+  statusPendingColorDark: DEFAULT_STATUS_PENDING_DARK,
   eventTypeColors: {},
   eventTypeDefaultMinutes: {},
   // Matches the app's shipped quick-add bubbles and their icons (from

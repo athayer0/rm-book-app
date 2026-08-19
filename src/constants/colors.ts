@@ -14,6 +14,16 @@ export const DEFAULT_SECONDARY_COLOR_DARK = '#00B5C8';
 export const DEFAULT_TERTIARY_COLOR_LIGHT = '#1A3A6B';
 export const DEFAULT_TERTIARY_COLOR_DARK = '#8AAFC8';
 
+// Same independent-per-theme treatment as secondary/tertiary above, for the
+// three event-reporting status colours — see the `statusCompleted` etc.
+// tokens below, and `useColors`, which overrides them from these settings.
+export const DEFAULT_STATUS_COMPLETED_LIGHT = '#1A7A40';
+export const DEFAULT_STATUS_COMPLETED_DARK = '#3FB56B';
+export const DEFAULT_STATUS_FAILED_LIGHT = '#B03030';
+export const DEFAULT_STATUS_FAILED_DARK = '#E36A6A';
+export const DEFAULT_STATUS_PENDING_LIGHT = '#E8980E';
+export const DEFAULT_STATUS_PENDING_DARK = '#F5B33C';
+
 export const LightColors = {
   primary: DEFAULT_THEME_COLOR,
   // Ink for anything sitting on `primary`: header titles, the active tab icon.
@@ -92,9 +102,9 @@ export const LightColors = {
   // Event reporting states, shared by the calendar's status badges and the
   // unreported-events shortcut. Centralised because two features have to agree:
   // an amber dot on the home row must mean the same thing as one on a block.
-  statusCompleted: '#1A7A40',
-  statusFailed: '#B03030',
-  statusPending: '#E8980E',
+  statusCompleted: DEFAULT_STATUS_COMPLETED_LIGHT,
+  statusFailed: DEFAULT_STATUS_FAILED_LIGHT,
+  statusPending: DEFAULT_STATUS_PENDING_LIGHT,
   // Dimmed behind the FAB's quick-add stack. Lighter than modalBackdrop: the
   // stack is a menu hanging off a button, not a sheet, so the calendar under it
   // should still read as the thing you are adding to.
@@ -165,9 +175,9 @@ export const DarkColors: typeof LightColors = {
   skeletonBase: '#3A3A3C',
   // Lifted from the light values, which are mid-tones chosen against white and
   // go muddy on a dark card. Hue is preserved so the states stay recognisable.
-  statusCompleted: '#3FB56B',
-  statusFailed: '#E36A6A',
-  statusPending: '#F5B33C',
+  statusCompleted: DEFAULT_STATUS_COMPLETED_DARK,
+  statusFailed: DEFAULT_STATUS_FAILED_DARK,
+  statusPending: DEFAULT_STATUS_PENDING_DARK,
   // Deeper than the light value for the same reason modalBackdrop is: the same
   // alpha that dims a white calendar leaves a near-black one looking untouched.
   fabScrim: 'rgba(0,0,0,0.50)',

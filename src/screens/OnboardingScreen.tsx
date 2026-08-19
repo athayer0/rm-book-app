@@ -4,27 +4,41 @@ import {
   StyleSheet, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
 import { format } from 'date-fns';
+import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useColors } from '../hooks/useColors';
+import * as Haptics from 'expo-haptics';
+import { applyThemeColorOverrides } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
-import type { ColorPalette } from '../constants/colors';
+import { LightColors, DarkColors, type ColorPalette } from '../constants/colors';
 import { DEFAULT_EVENT_TYPES } from '../constants/eventTypeDefaults';
 import { DEFAULT_GOALS } from '../constants/defaultGoals';
 import {
   EVENT_COLOR_SCHEMES, GOAL_COLOR_SCHEMES,
-  matchEventColorScheme, matchGoalColorScheme, schemePreviewColors,
 } from '../constants/colorSchemes';
+import { THEME_COLOR_ROWS, type ThemeColorSettingKey } from '../constants/themeColorRows';
+import {
+  THEME_COLOR_SCHEMES, STATUS_COLOR_SCHEMES,
+  matchThemeColorScheme,
+  type ThemeColorScheme,
+} from '../constants/themeColorSchemes';
 import { useSettings, AppSettings } from '../hooks/useSettings';
 import { useNotificationToggles } from '../hooks/useNotificationToggles';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { CalendarEvent, RecurringRule, eventTypeColor } from '../utils/eventUtils';
-import { addMinutesToTimeString } from '../utils/dateUtils';
-import { lightenColor } from '../utils/colorUtils';
+import { addMinutesToTimeString, getWeekKeyByOffset } from '../utils/dateUtils';
+import { lightenColor, withAlpha } from '../utils/colorUtils';
+import { GRAIN } from '../utils/goalGrain';
 import { GoalIcon } from '../components/GoalIcon';
+import { GoalCard } from '../components/GoalCard';
+import { tickStep } from '../components/GoalGraph';
 import { ImportContactsModal } from '../modals/ImportContactsModal';
+import { PersonCard } from '../components/PersonCard';
+import { PERSON_STATUSES } from '../constants/personStatuses';
+import { milestonesFor } from '../constants/covenantPath';
+import { Person } from '../hooks/usePeople';
 
 interface Props {
   visible: boolean;
@@ -34,18 +48,70 @@ interface Props {
   onFinished: () => void;
 }
 
-// Welcome, then Event Types (which both the goal list and the starter
-// schedule below it read from), then one page per remaining tab in the app's
-// own order (Home, Calendar, People, Settings), then a closing page. Pages
-// are written inline below rather than data-driven, since several of them
-// hold interactive state a generic pages array would only complicate.
+// Welcome, then Colors (primary/secondary/tertiary plus the three status
+// colours — every event type and goal drawn afterward reads its dot/icon
+// tint off whatever's picked here), then Event Types (which both the goal
+// list and the starter schedule below it read from), then two pages for
+// Home — a preview of a goal card and its graph, then the goal picker —
+// then Calendar, then two pages for People — a preview of a person card
+// (a recent convert) and their covenant path, then importing from contacts —
+// then Settings, then a closing page. Pages are written inline below rather
+// than data-driven, since several of them hold interactive state a generic
+// pages array would only complicate.
 //
 // Nothing on any page writes to storage as it's touched. Every switch and pill
 // here only edits local draft state; the whole thing is committed in one pass
 // by commitAndComplete(), which runs on both "Get Started" and "Skip". That
 // makes Skip a shortcut to the end rather than a cancel: whatever was already
 // chosen on earlier pages still takes effect.
-const TOTAL_PAGES = 7;
+const TOTAL_PAGES = 10;
+
+// Shared between the Theme grid's width math below and styles.page/
+// schemeGridRow — kept as named constants rather than two copies of the
+// same literal so the two can't quietly drift apart.
+const PAGE_HORIZONTAL_PADDING = 28;
+const SCHEME_GRID_GAP = 10;
+
+// The Home preview page's graph is a static illustration, not the real
+// GoalGraph (which needs a live PeriodDataReader and has nothing to read from
+// before onboarding has written anything) — six made-up weeks of Personal
+// Study (count/goal): 3/4, 5/5, 4/5, 5/5, 6/6, 7/7, landing on the same
+// count/goal the example GoalCard above it shows. Real week keys still drive
+// the axis labels, so the dates read as genuine even though the counts are
+// invented. EXAMPLE_GOALS varies week to week rather than holding one flat
+// target — real per-week targets do too.
+const EXAMPLE_GOAL_ID = 'personal_study';
+const EXAMPLE_COUNTS = [3, 5, 4, 5, 6, 7];
+const EXAMPLE_GOALS = [4, 5, 5, 5, 6, 7];
+const EXAMPLE_CHART_H = 140;
+// Matches GoalGraph's own LEFT_PAD — needs the same room for a y-axis value label.
+const EXAMPLE_LEFT_PAD = 32;
+const EXAMPLE_RIGHT_PAD = 8;
+const EXAMPLE_TOP_PAD = 20;
+const EXAMPLE_BOTTOM_PAD = 24;
+
+// The People preview page's example — a made-up recent convert rather than
+// anything real, same spirit as EXAMPLE_GOAL_ID above. PersonCard reads
+// nothing else off it, so id/createdAt are just placeholders.
+const EXAMPLE_PERSON: Person = {
+  id: 'example',
+  name: 'John Smith',
+  status: 'Recent Converts',
+  gender: 'male',
+  createdAt: '2024-01-01T00:00:00.000Z',
+};
+// The star that marks someone "Recent Converts" elsewhere in the app, reused
+// here so the path preview reads as belonging to that same status — same
+// choice PersonCovenantPathTab makes for the real thing.
+const EXAMPLE_PATH_COLOR = PERSON_STATUSES['Recent Converts'].color;
+// Fixed rather than read off EXAMPLE_PERSON.gender through milestonesFor()
+// on every render — there's only ever one example person, so there's nothing
+// to recompute.
+const EXAMPLE_MILESTONES = milestonesFor('male');
+// A couple of steps already checked, so the preview reads as an actual
+// convert partway down the path rather than an empty checklist — still
+// fully tappable, see toggleExampleMilestone below.
+const EXAMPLE_MILESTONES_DEFAULT_COMPLETE = ['baptism', 'confirmation'];
 
 type ScheduleKind = 'work' | 'student';
 
@@ -98,10 +164,31 @@ function buildStarterSchedule(entries: StarterEntry[], eventTypeColors: Record<s
   }));
 }
 
+function buildThemeColorDraft(settings: AppSettings): Record<ThemeColorSettingKey, string> {
+  return Object.fromEntries(
+    THEME_COLOR_ROWS.map(row => [row.settingKey, settings[row.settingKey]]),
+  ) as Record<ThemeColorSettingKey, string>;
+}
+
+/**
+ * The three primary/secondary/tertiary dots every scheme chip shows,
+ * including the Event Types page's — EVENT_COLOR_SCHEMES and
+ * GOAL_COLOR_SCHEMES share their ids with THEME_COLOR_SCHEMES (the same
+ * five identities), so this is the one place that look is computed rather
+ * than each picker inventing its own preview.
+ */
+function schemeChipDots(schemeId: string, isDark: boolean): string[] {
+  const scheme = THEME_COLOR_SCHEMES.find(s => s.id === schemeId);
+  if (!scheme) return [];
+  return [
+    scheme.themeColor,
+    isDark ? scheme.secondaryColorDark : scheme.secondaryColorLight,
+    isDark ? scheme.tertiaryColorDark : scheme.tertiaryColorLight,
+  ];
+}
+
 export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
-  const Colors = useColors();
   const isDark = useIsDark();
-  const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { settings, updateSettings } = useSettings();
@@ -123,13 +210,39 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   // what's actually there instead of quietly reverting it.
   const [disabledTypeIds, setDisabledTypeIds] = useState<Set<string>>(new Set());
   const [removedGoalIds, setRemovedGoalIds] = useState<Set<string>>(new Set());
-  // null means "leave built-in colors as they already are" — only set once the
-  // user actually taps a chip, so replaying onboarding never clobbers colors
-  // someone already customized just because a page was scrolled past.
-  const [eventColorSchemeId, setEventColorSchemeId] = useState<string | null>(null);
-  const [goalColorSchemeId, setGoalColorSchemeId] = useState<string | null>(null);
+  // Every THEME_COLOR_ROWS setting, seeded straight from the live value (see
+  // buildThemeColorDraft) and only ever overwritten wholesale by picking a
+  // scheme chip below — there's no per-row editor on this page, so unlike
+  // the event-type/goal drafts there's nothing to preserve by leaving this
+  // null; committing the seeded value back is a no-op if nothing was picked.
+  const [draftThemeColors, setDraftThemeColors] = useState<Record<ThemeColorSettingKey, string>>(() =>
+    buildThemeColorDraft(settings),
+  );
+  // Built off the draft, not off live settings via useColors() — this is
+  // what makes the whole onboarding flow (icon circles, the Next button,
+  // switch tracks, the status-icon preview) repaint itself the instant a
+  // colour scheme is picked, the same way ImportContactsModal's list
+  // updates immediately rather than waiting for commitAndComplete.
+  const Colors = useMemo(
+    () => applyThemeColorOverrides(isDark ? DarkColors : LightColors, isDark, draftThemeColors),
+    [isDark, draftThemeColors],
+  );
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  // Which chip is highlighted in each of the two scheme pickers — derived
+  // from draftThemeColors on open/replay (see the reset effect) and updated
+  // locally on tap so the chip and the preview swatches change together.
+  // Status colors and goal colors aren't pickers of their own — picking a
+  // theme scheme carries its same-id status scheme along (selectThemeScheme
+  // below), and its same-id event scheme and goal scheme along
+  // (draftEventColor/draftGoalColor/commitAndComplete below) — so there's
+  // exactly one choice for a person to make instead of three that could
+  // disagree. null means "leave built-in colors as they already are" —
+  // only set once the user actually taps a chip, so replaying onboarding
+  // never clobbers colors someone already customized just because a page
+  // was scrolled past.
+  const [themeSchemeId, setThemeSchemeId] = useState<string | null>(null);
   const [wantsSchedule, setWantsSchedule] = useState(true);
-  const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('work');
+  const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('student');
   const [draftDailyReview, setDraftDailyReview] = useState(false);
   const [draftEventReminders, setDraftEventReminders] = useState(false);
   const [draftTheme, setDraftTheme] = useState<AppSettings['theme']>('system');
@@ -137,6 +250,17 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
   const [showImport, setShowImport] = useState(false);
   const [completing, setCompleting] = useState(false);
+  // Measured via onLayout rather than derived from useWindowDimensions'
+  // width, since the chart sits inside the page's own padding and the
+  // example card's card padding — same approach as GoalGraph's containerWidth.
+  const [exampleChartWidth, setExampleChartWidth] = useState(0);
+  // The People preview page's covenant-path checklist: purely local, tappable
+  // state for EXAMPLE_PERSON. Unlike every draft above, nothing here ever
+  // reaches commitAndComplete() — there's no real person behind this example
+  // to write progress against, so a tap only ever updates this Set.
+  const [exampleCompletedMilestones, setExampleCompletedMilestones] = useState<Set<string>>(
+    () => new Set(EXAMPLE_MILESTONES_DEFAULT_COMPLETE),
+  );
 
   // Kept mounted only while visible, the cheapest way to guarantee a replay
   // from Settings always starts on page one instead of resuming wherever a
@@ -152,18 +276,12 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
       const activeGoalIds = new Set(definitions.map(d => d.id));
       setRemovedGoalIds(new Set(DEFAULT_GOALS.filter(d => !activeGoalIds.has(d.id)).map(d => d.id)));
 
-      const resolvedEventColors = Object.fromEntries(
-        DEFAULT_EVENT_TYPES.map(d => [d.id, eventTypeColor(d.id, settings.eventTypeColors)]),
-      );
-      setEventColorSchemeId(matchEventColorScheme(resolvedEventColors));
-
-      const resolvedGoalColors = Object.fromEntries(
-        DEFAULT_GOALS.map(d => [d.id, definitions.find(x => x.id === d.id)?.color ?? d.color]),
-      );
-      setGoalColorSchemeId(matchGoalColorScheme(resolvedGoalColors));
+      const themeColorDraft = buildThemeColorDraft(settings);
+      setDraftThemeColors(themeColorDraft);
+      setThemeSchemeId(matchThemeColorScheme(themeColorDraft));
 
       setWantsSchedule(true);
-      setScheduleKind('work');
+      setScheduleKind('student');
 
       setDraftDailyReview(settings.dailyReviewEnabled);
       setDraftEventReminders(settings.eventReminderEnabled);
@@ -172,12 +290,166 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
       setShowImport(false);
       setCompleting(false);
+      setExampleCompletedMilestones(new Set(EXAMPLE_MILESTONES_DEFAULT_COMPLETE));
     }
   }, [visible]);
 
   if (!visible) return null;
 
   const isLast = page === TOTAL_PAGES - 1;
+
+  // Local-only toggle for the People preview page's covenant-path checklist —
+  // see the note on exampleCompletedMilestones above. Never touches
+  // useConvertProgress or any other real storage.
+  function toggleExampleMilestone(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExampleCompletedMilestones(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  // Carries the same-id status scheme along with the theme scheme, so
+  // completed/failed/pending always match whichever look was just picked
+  // instead of being a separate choice — see the note on themeSchemeId above.
+  function selectThemeScheme(scheme: ThemeColorScheme) {
+    setThemeSchemeId(scheme.id);
+    const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    setDraftThemeColors(prev => ({
+      ...prev,
+      themeColor: scheme.themeColor,
+      secondaryColorLight: scheme.secondaryColorLight,
+      secondaryColorDark: scheme.secondaryColorDark,
+      tertiaryColorLight: scheme.tertiaryColorLight,
+      tertiaryColorDark: scheme.tertiaryColorDark,
+      ...(statusScheme ? {
+        statusCompletedColorLight: statusScheme.statusCompletedColorLight,
+        statusCompletedColorDark: statusScheme.statusCompletedColorDark,
+        statusFailedColorLight: statusScheme.statusFailedColorLight,
+        statusFailedColorDark: statusScheme.statusFailedColorDark,
+        statusPendingColorLight: statusScheme.statusPendingColorLight,
+        statusPendingColorDark: statusScheme.statusPendingColorDark,
+      } : {}),
+    }));
+  }
+
+  // The Theme picker on the Colors page: a static 3-then-2 grid rather than
+  // a horizontal scroll, so this is called once per row instead of once for
+  // a single ScrollView's worth of chips. Chips are sized to a fixed
+  // chipWidth (one third of the row, same math for both rows) instead of
+  // flex:1, so the two-chip second row's boxes come out the same width as
+  // the three-chip first row's rather than stretching to fill — the second
+  // row is then centered (schemeGridRowCenter) so the pair reads as sitting
+  // in the middle four of an implied six columns.
+  const chipWidth = (width - PAGE_HORIZONTAL_PADDING * 2 - SCHEME_GRID_GAP * 2) / 3;
+
+  function renderThemeChip(scheme: ThemeColorScheme) {
+    const active = themeSchemeId === scheme.id;
+    const dots = schemeChipDots(scheme.id, isDark);
+    return (
+      <TouchableOpacity
+        key={scheme.id}
+        style={[styles.schemeChip, { width: chipWidth }, active && styles.schemeChipActive]}
+        onPress={() => selectThemeScheme(scheme)}
+      >
+        <View style={styles.schemeDots}>
+          {dots.map((c, i) => (
+            <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
+          ))}
+        </View>
+        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  // The Home preview page's graph, drawn with the same visual grammar as
+  // GoalGraph (dashed y-axis gridlines with value labels, translucent goal
+  // bars, coloured line+dots) but over EXAMPLE_COUNTS rather than a live
+  // PeriodDataReader — see the note on those constants above. `color` follows
+  // draftGoalColor so the preview repaints with whatever scheme was just
+  // picked on the Colors page.
+  function renderExampleGraph(color: string) {
+    const svgW = exampleChartWidth;
+    const svgH = EXAMPLE_TOP_PAD + EXAMPLE_CHART_H + EXAMPLE_BOTTOM_PAD;
+    const drawW = svgW - EXAMPLE_LEFT_PAD - EXAMPLE_RIGHT_PAD;
+    const n = EXAMPLE_COUNTS.length;
+    const colW = drawW / n;
+    const barW = colW * 0.5;
+    // Same two-step scaling as GoalGraph: gridlines walk up to rawMax, then
+    // the plot itself is given 20% headroom above that on top.
+    const rawMax = Math.max(...EXAMPLE_COUNTS, ...EXAMPLE_GOALS, 1);
+    const maxVal = rawMax * 1.2;
+
+    function yFor(v: number) { return EXAMPLE_TOP_PAD + EXAMPLE_CHART_H - (v / maxVal) * EXAMPLE_CHART_H; }
+    function dotX(i: number) { return EXAMPLE_LEFT_PAD + i * colW + colW / 2; }
+    function barX(i: number) { return EXAMPLE_LEFT_PAD + i * colW + (colW - barW) / 2; }
+
+    const step = tickStep(rawMax);
+    const gridLevels: number[] = [];
+    for (let v = step; v <= rawMax; v += step) gridLevels.push(v);
+
+    function goalBarH(goal: number) { return (goal / maxVal) * EXAMPLE_CHART_H; }
+    function goalBarY(goal: number) { return EXAMPLE_TOP_PAD + EXAMPLE_CHART_H - goalBarH(goal); }
+    const linePoints = EXAMPLE_COUNTS.map((v, i) => `${dotX(i)},${yFor(v)}`).join(' ');
+
+    return (
+      <View
+        style={styles.exampleChartContainer}
+        onLayout={e => setExampleChartWidth(e.nativeEvent.layout.width)}
+      >
+        {svgW > 0 && (
+          <Svg width={svgW} height={svgH}>
+            {gridLevels.map((val, gi) => {
+              const y = yFor(val);
+              return (
+                <React.Fragment key={gi}>
+                  <Line
+                    x1={EXAMPLE_LEFT_PAD}
+                    y1={y}
+                    x2={svgW - EXAMPLE_RIGHT_PAD}
+                    y2={y}
+                    stroke={Colors.border}
+                    strokeWidth={1}
+                    strokeDasharray="3,3"
+                  />
+                  <SvgText x={EXAMPLE_LEFT_PAD - 4} y={y + 4} fontSize={9} fill={Colors.textLight} textAnchor="end">
+                    {val}
+                  </SvgText>
+                </React.Fragment>
+              );
+            })}
+            {EXAMPLE_GOALS.map((g, i) => (
+              <Rect key={`bar-${i}`} x={barX(i)} y={goalBarY(g)} width={barW} height={goalBarH(g)} fill={Colors.border} rx={3} />
+            ))}
+            <Polyline points={linePoints} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+            {EXAMPLE_COUNTS.map((v, i) => {
+              const cx = dotX(i);
+              const cy = yFor(v);
+              return (
+                <React.Fragment key={`dot-${i}`}>
+                  <Circle cx={cx} cy={cy} r={5} fill={Colors.card} stroke={color} strokeWidth={2} />
+                  <SvgText x={cx} y={cy - 10} fontSize={10} fill={color} textAnchor="middle" fontWeight="600">{v}</SvgText>
+                </React.Fragment>
+              );
+            })}
+            {EXAMPLE_COUNTS.map((_, i) => (
+              <SvgText
+                key={`x-${i}`}
+                x={dotX(i)}
+                y={EXAMPLE_TOP_PAD + EXAMPLE_CHART_H + 20}
+                fontSize={9}
+                fill={Colors.textSecondary}
+                textAnchor="middle"
+              >
+                {GRAIN.week.axisLabel(getWeekKeyByOffset(i - (EXAMPLE_COUNTS.length - 1)))}
+              </SvgText>
+            ))}
+          </Svg>
+        )}
+      </View>
+    );
+  }
 
   function goTo(index: number) {
     const clamped = Math.max(0, Math.min(TOTAL_PAGES - 1, index));
@@ -207,16 +479,23 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
   // Previews the chosen scheme in the lists below each picker without
   // touching settings/definitions until commitAndComplete — same draft
-  // pattern as every other choice on this screen.
+  // pattern as every other choice on this screen. Linked to themeSchemeId
+  // rather than a picker of its own — see the note on themeSchemeId above.
   function draftEventColor(id: string): string {
-    const scheme = EVENT_COLOR_SCHEMES.find(s => s.id === eventColorSchemeId);
+    const scheme = EVENT_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
     return scheme?.colors[id] ?? eventTypeColor(id, settings.eventTypeColors);
   }
 
+  // Linked to themeSchemeId rather than a picker of its own — see the note
+  // on themeSchemeId above.
   function draftGoalColor(id: string, fallback: string): string {
-    const scheme = GOAL_COLOR_SCHEMES.find(s => s.id === goalColorSchemeId);
+    const scheme = GOAL_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
     return scheme?.colors[id] ?? fallback;
   }
+
+  // The Home preview page's example — see the note on EXAMPLE_GOAL_ID above.
+  const exampleGoalDef = DEFAULT_GOALS.find(d => d.id === EXAMPLE_GOAL_ID) ?? DEFAULT_GOALS[0];
+  const exampleGoalColor = draftGoalColor(exampleGoalDef.id, exampleGoalDef.color);
 
   /**
    * Applies every draft choice in one pass. onDismiss() fires first and
@@ -238,7 +517,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     onDismiss();
 
     try {
-      const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === eventColorSchemeId);
+      const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
       // Merged locally rather than read back from settings after the write
       // below: updateSettings won't have re-rendered this closure yet, and
       // the starter schedule needs the chosen colors immediately, not after
@@ -247,7 +526,20 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
         ? { ...settings.eventTypeColors, ...eventScheme.colors }
         : settings.eventTypeColors;
 
-      const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === goalColorSchemeId);
+      const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
+
+      // Written first and awaited before anything else below: this is what
+      // the header, tab bar, and Home's own useColors() read the instant
+      // they mount behind the dismissing modal. Landing it last (as it used
+      // to) left the header etc. showing the *previous* theme color for
+      // however long the slower writes below — up to nine sequential
+      // addEvent calls among them — took to land.
+      await updateSettings({
+        theme: draftTheme,
+        weekStart: draftWeekStart,
+        ...draftThemeColors,
+        ...(eventScheme ? { eventTypeColors: effectiveEventTypeColors } : {}),
+      });
 
       const typeCustoms = eventTypeDefinitions.filter(d => !d.builtIn);
       const typeBuiltIns = DEFAULT_EVENT_TYPES.map(defaultDef => {
@@ -276,11 +568,6 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
       await toggleDailyReview(draftDailyReview);
       await toggleEventReminders(draftEventReminders);
-      await updateSettings({
-        theme: draftTheme,
-        weekStart: draftWeekStart,
-        ...(eventScheme ? { eventTypeColors: effectiveEventTypeColors } : {}),
-      });
     } finally {
       onFinished();
     }
@@ -310,103 +597,58 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <Text style={styles.title}>Welcome to RM Book</Text>
             <Text style={styles.body}>
               Your companion for the next chapter. Let's take a quick look around: Home for your
-              weekly goals, Calendar to log your days, People for those who matter most, and
+              goals, Calendar to log your days, People for those who matter most, and
               Settings to make it yours.
             </Text>
           </ScrollView>
 
-          {/* Event Types */}
+          {/* Colors */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
-              <Ionicons name="list" size={48} color={Colors.onPrimary} />
+              <Ionicons name="color-palette" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Choose your event types</Text>
-            <Text style={styles.body}>
-              Select the types of events you would like to use in the Calendar page. Each event may
-              also be linked to a goal, so completing that kind of event updates the goal
-              automatically.
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.schemeRow}
-              contentContainerStyle={styles.schemeRowContent}
-            >
-              {EVENT_COLOR_SCHEMES.map(scheme => {
-                const active = eventColorSchemeId === scheme.id;
-                return (
-                  <TouchableOpacity
-                    key={scheme.id}
-                    style={[styles.schemeChip, active && styles.schemeChipActive]}
-                    onPress={() => setEventColorSchemeId(scheme.id)}
-                  >
-                    <View style={styles.schemeDots}>
-                      {schemePreviewColors(scheme.colors).map((c, i) => (
-                        <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
-                      ))}
-                    </View>
-                    <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <View style={styles.card}>
-              {DEFAULT_EVENT_TYPES.map((def, i, arr) => {
-                const color = draftEventColor(def.id);
-                return (
-                  <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
-                    <View style={[styles.typeDot, { backgroundColor: color }]} />
-                    <Text style={styles.goalLabel}>{def.label}</Text>
-                    <Switch
-                      value={!disabledTypeIds.has(def.id)}
-                      onValueChange={() => toggleEventType(def.id)}
-                      trackColor={{ true: Colors.control }}
-                      thumbColor={Colors.white}
-                    />
-                  </View>
-                );
-              })}
+            <Text style={styles.title}>Choose your app theme</Text>
+
+            <View style={styles.schemeGrid}>
+              <View style={styles.schemeGridRow}>
+                {THEME_COLOR_SCHEMES.slice(0, 3).map(renderThemeChip)}
+              </View>
+              <View style={[styles.schemeGridRow, styles.schemeGridRowCenter]}>
+                {THEME_COLOR_SCHEMES.slice(3).map(renderThemeChip)}
+              </View>
             </View>
-            <Text style={styles.footnote}>
-              Add, remove, or link event types to a goal anytime from Settings → Event Types.
-            </Text>
+
           </ScrollView>
 
-          {/* Home, weekly goals */}
+          {/* Home, preview of a goal card and its graph */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
               <Ionicons name="home" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Home: your weekly goals</Text>
+            <Text style={styles.title}>Home: your goals</Text>
             <Text style={styles.body}>
-              Select the goals you would like to track. View and personalize your weekly and
-              monthly goals from the Home page. Progress graphs can be seen and future goals can
-              be set from there as well.
+              Track weekly and monthly goals right from Home. Here's Personal Study, six weeks in.
             </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.schemeRow}
-              contentContainerStyle={styles.schemeRowContent}
-            >
-              {GOAL_COLOR_SCHEMES.map(scheme => {
-                const active = goalColorSchemeId === scheme.id;
-                return (
-                  <TouchableOpacity
-                    key={scheme.id}
-                    style={[styles.schemeChip, active && styles.schemeChipActive]}
-                    onPress={() => setGoalColorSchemeId(scheme.id)}
-                  >
-                    <View style={styles.schemeDots}>
-                      {schemePreviewColors(scheme.colors).map((c, i) => (
-                        <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
-                      ))}
-                    </View>
-                    <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            <View style={styles.exampleCardWrap}>
+              <GoalCard
+                definition={{ ...exampleGoalDef, color: exampleGoalColor }}
+                count={EXAMPLE_COUNTS[EXAMPLE_COUNTS.length - 1]}
+                goal={EXAMPLE_GOALS[EXAMPLE_GOALS.length - 1]}
+              />
+            </View>
+            {renderExampleGraph(exampleGoalColor)}
+          </ScrollView>
+
+          {/* Home, choose which goals to track */}
+          <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="trending-up" size={44} color={Colors.onPrimary} />
+            </View>
+            <Text style={styles.title}>Choose your goals</Text>
+            <Text style={styles.body}>
+              Select the goals you would like to track. Add, edit, or remove goals anytime from
+              Home → Edit Goals.
+            </Text>
             <View style={styles.card}>
               {DEFAULT_GOALS.map((def, i, arr) => {
                 const color = draftGoalColor(def.id, def.color);
@@ -426,9 +668,6 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 );
               })}
             </View>
-            <Text style={styles.footnote}>
-              Add, remove, or link goals to an event type anytime from Home → Edit Goals.
-            </Text>
           </ScrollView>
 
           {/* Calendar, starter schedule */}
@@ -457,7 +696,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               </View>
               {wantsSchedule && (
                 <View style={[styles.scheduleKindRow, styles.rowLast]}>
-                  {(['work', 'student'] as const).map(kind => (
+                  {(['student', 'work'] as const).map(kind => (
                     <TouchableOpacity
                       key={kind}
                       style={[styles.pill, scheduleKind === kind && styles.pillActive]}
@@ -471,23 +710,103 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 </View>
               )}
             </View>
-            {wantsSchedule && (
-              <Text style={styles.footnote}>
-                Add, edit, delete, and report events anytime from the Calendar page.
-              </Text>
-            )}
           </ScrollView>
 
-          {/* People, import contacts */}
+          {/* Event Types */}
+          <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="list" size={48} color={Colors.onPrimary} />
+            </View>
+            <Text style={styles.title}>Choose your event types</Text>
+            <Text style={styles.body}>
+              Select the types of events that you would like to use on the Calendar page.
+            </Text>
+            <View style={styles.card}>
+              {DEFAULT_EVENT_TYPES.map((def, i, arr) => {
+                const color = draftEventColor(def.id);
+                return (
+                  <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
+                    <View style={[styles.typeDot, { backgroundColor: color }]} />
+                    <Text style={styles.goalLabel}>{def.label}</Text>
+                    <Switch
+                      value={!disabledTypeIds.has(def.id)}
+                      onValueChange={() => toggleEventType(def.id)}
+                      trackColor={{ true: Colors.control }}
+                      thumbColor={Colors.white}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={styles.footnote}>
+              Add, remove, or link event types to a goal anytime from Settings → Event Types.
+            </Text>
+          </ScrollView>
+
+          {/* People, preview of a person card and their covenant path */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={44} color={Colors.onPrimary} />
             </View>
             <Text style={styles.title}>People: those who matter most</Text>
             <Text style={styles.body}>
-              Save contact info and track everything from potential dates to recent converts and
-              their progress on the covenant path. View someone's timeline to see what
-              events they've been a part of.
+              Save contact info on the People page. There you can find people like John, a recent
+              convert, and view his progress on the covenant path.
+            </Text>
+            <View style={styles.card}>
+              <PersonCard person={EXAMPLE_PERSON} onPress={() => {}} />
+            </View>
+            <View style={styles.pathSummary}>
+              <View style={styles.pathProgressTrack}>
+                <View
+                  style={[
+                    styles.pathProgressFill,
+                    { width: `${(exampleCompletedMilestones.size / EXAMPLE_MILESTONES.length) * 100}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.pathProgressLabel}>
+                {exampleCompletedMilestones.size}/{EXAMPLE_MILESTONES.length} complete
+              </Text>
+            </View>
+            <View style={styles.card}>
+              {EXAMPLE_MILESTONES.map((m, i, arr) => {
+                const complete = exampleCompletedMilestones.has(m.id);
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.pathRow, i === arr.length - 1 && styles.rowLast]}
+                    onPress={() => toggleExampleMilestone(m.id)}
+                    activeOpacity={0.7}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: complete }}
+                    accessibilityLabel={m.label}
+                  >
+                    <GoalIcon
+                      icon={m.icon}
+                      iconFamily={m.iconFamily}
+                      size={18}
+                      color={complete ? EXAMPLE_PATH_COLOR : Colors.textLight}
+                    />
+                    <Text style={[styles.pathLabel, complete && styles.pathLabelDone]}>{m.label}</Text>
+                    <View style={[styles.pathCheckbox, complete && styles.pathCheckboxChecked]}>
+                      {complete && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {/* People, import contacts */}
+          <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="download" size={44} color={Colors.onPrimary} />
+            </View>
+            <Text style={styles.title}>Bring in your contacts</Text>
+            <Text style={styles.body}>
+              Already have everyone in your phone? Import names, numbers, and addresses straight
+              from your contacts instead of typing them one by one.
             </Text>
             <TouchableOpacity style={styles.importCard} onPress={() => setShowImport(true)} activeOpacity={0.8}>
               <View style={styles.importIconWrap}>
@@ -495,7 +814,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               </View>
               <View style={styles.toggleTextGroup}>
                 <Text style={styles.toggleLabel}>Import from Contacts</Text>
-                <Text style={styles.toggleHint}>Pull names and numbers in from your phone.</Text>
+                <Text style={styles.toggleHint}>Pull names, numbers, and addresses in from your phone.</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={Colors.textLight} />
             </TouchableOpacity>
@@ -649,7 +968,7 @@ function makeStyles(C: ColorPalette) {
       flexGrow: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 28,
+      paddingHorizontal: PAGE_HORIZONTAL_PADDING,
       paddingVertical: 24,
     },
     heroImage: {
@@ -703,6 +1022,70 @@ function makeStyles(C: ColorPalette) {
       shadowRadius: 6,
       elevation: 2,
     },
+    // Sized to match one cell of the real two-column GoalGrid, so the
+    // preview reads as an actual card rather than a stretched full-width one.
+    exampleCardWrap: {
+      width: '50%',
+      marginTop: 24,
+    },
+    exampleChartContainer: {
+      width: '100%',
+      backgroundColor: C.card,
+      borderRadius: 20,
+      padding: 8,
+      marginTop: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    // The covenant-path preview's progress bar, between the person card and
+    // the milestone list — same layout as PersonCovenantPathTab's own summary.
+    pathSummary: {
+      width: '100%',
+      marginTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    pathProgressTrack: {
+      flex: 1,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: withAlpha(EXAMPLE_PATH_COLOR, 0.16),
+      overflow: 'hidden',
+    },
+    pathProgressFill: {
+      height: '100%',
+      borderRadius: 3,
+      backgroundColor: EXAMPLE_PATH_COLOR,
+    },
+    pathProgressLabel: { fontSize: 12, fontWeight: '600', color: C.textSecondary },
+    pathRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
+    pathLabel: { flex: 1, fontSize: 15, color: C.text },
+    pathLabelDone: { color: EXAMPLE_PATH_COLOR, fontWeight: '600' },
+    pathCheckbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.5,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pathCheckboxChecked: {
+      backgroundColor: EXAMPLE_PATH_COLOR,
+      borderColor: EXAMPLE_PATH_COLOR,
+    },
     goalRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -728,8 +1111,6 @@ function makeStyles(C: ColorPalette) {
       marginRight: 12,
     },
     goalLabel: { flex: 1, fontSize: 14, color: C.text },
-    schemeRow: { width: '100%', flexGrow: 0, marginTop: 24 },
-    schemeRowContent: { gap: 10, paddingHorizontal: 2 },
     schemeChip: {
       alignItems: 'center',
       paddingVertical: 10,
@@ -749,6 +1130,15 @@ function makeStyles(C: ColorPalette) {
     },
     schemeChipText: { fontSize: 12, fontWeight: '600', color: C.textSecondary, marginTop: 6 },
     schemeChipTextActive: { color: C.white },
+    // The Theme picker's static 3-then-2 grid, in place of a horizontal
+    // scroll — there's no overflow to fade, so each row just wraps evenly.
+    // Chips are a fixed width (see chipWidth in the component) rather than
+    // flex:1, so the two-chip second row can't stretch wider than the
+    // three-chip first row; schemeGridRowCenter centers that shorter row
+    // instead of letting it hug the left edge.
+    schemeGrid: { width: '100%', marginTop: 24, gap: SCHEME_GRID_GAP },
+    schemeGridRow: { flexDirection: 'row', gap: SCHEME_GRID_GAP },
+    schemeGridRowCenter: { justifyContent: 'center' },
     toggleRow: {
       flexDirection: 'row',
       alignItems: 'center',

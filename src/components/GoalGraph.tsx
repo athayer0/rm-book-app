@@ -43,8 +43,10 @@ const MAX_GRID_LINES = 10;
 // Walks a 1–2–5–10 sequence and takes the first step that fits the axis inside
 // MAX_GRID_LINES: ones up to 10, twos to 20, fives to 50, and so on. Taking
 // fractions of the max instead is what used to skip labels — a quarter of 5
-// rounds to 1 and half rounds to 3, so 2 never gets a line.
-function tickStep(max: number): number {
+// rounds to 1 and half rounds to 3, so 2 never gets a line. Exported so
+// OnboardingScreen's static example graph can share the exact same axis
+// scaling instead of a second copy that could drift from it.
+export function tickStep(max: number): number {
   for (let pow = 0; pow < 12; pow++) {
     for (const m of [1, 2, 5]) {
       const step = m * 10 ** pow;

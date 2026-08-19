@@ -112,14 +112,14 @@ function makeStyles(C: ColorPalette) {
     },
     count: {
       fontSize: 20,
-      fontWeight: '700',
+      fontWeight: '600',
     },
     countCompact: {
       fontSize: 15,
     },
     goal: {
       fontSize: 20,
-      color: C.textLight,
+      color: C.textSecondary,
       fontWeight: '500',
     },
     goalCompact: {

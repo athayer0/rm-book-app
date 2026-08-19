@@ -42,8 +42,8 @@ FEATURES
 [x] make tapping on goals take you to their edit menu
 [x] repeating events move all or move one
 [x] event notifs by type
+[x] add more personalization to onboarding (different event and goal color schemes)
 
-[ ] add more personalization to onboarding (different event and goal color schemes)
 [ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [ ] add spanish portuguese french etc
 [ ] streak?

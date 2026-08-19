@@ -4,6 +4,7 @@ import {
   StyleSheet, TextInput, Keyboard, Platform, Animated, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
@@ -172,6 +173,7 @@ export function GoalPeriodList({
 
   // Steps a field without opening the keyboard; an empty box counts as 0.
   function stepValue(field: 'actual' | 'goal', delta: number) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEditingRow(prev => {
       if (!prev) return prev;
       const key = field === 'actual' ? 'actualValue' : 'goalValue';

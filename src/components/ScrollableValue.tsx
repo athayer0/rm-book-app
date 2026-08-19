@@ -1,9 +1,40 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, LayoutChangeEvent,
-  StyleProp, TextStyle, ViewStyle,
+  NativeScrollEvent, NativeSyntheticEvent, StyleProp, TextStyle, ViewStyle,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+
+/**
+ * Tracks a horizontal ScrollView's viewport/content/offset just far enough
+ * to say which edge(s) still have more to scroll to — the state `EdgeFade`
+ * needs to know whether it should be showing at all. Shared by
+ * `ScrollableValue` below and by anything else that overlays `EdgeFade` on
+ * its own horizontal ScrollView (the onboarding colour-scheme pickers,
+ * for instance).
+ */
+export function useHorizontalEdgeFade() {
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  const [offset, setOffset] = useState(0);
+
+  // A pixel of slack: the two widths are measured independently and can land a
+  // hair apart on content that actually fits.
+  const overflowing = content > viewport + 1;
+  const moreLeft = overflowing && offset > 1;
+  const moreRight = overflowing && offset < content - viewport - 1;
+
+  return {
+    moreLeft,
+    moreRight,
+    scrollProps: {
+      onLayout: (e: LayoutChangeEvent) => setViewport(e.nativeEvent.layout.width),
+      onContentSizeChange: (w: number) => setContent(w),
+      onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => setOffset(e.nativeEvent.contentOffset.x),
+      scrollEventThrottle: 16,
+    },
+  };
+}
 
 /** How wide the fade at the edge of an overflowing value runs. */
 const FADE_WIDTH = 32;
@@ -66,15 +97,7 @@ interface Props {
  * part that identifies the person. A fade marks whichever side still has more.
  */
 export function ScrollableValue({ value, textStyle, style, fadeColor }: Props) {
-  const [viewport, setViewport] = useState(0);
-  const [content, setContent] = useState(0);
-  const [offset, setOffset] = useState(0);
-
-  // A pixel of slack: the two widths are measured independently and can land a
-  // hair apart on text that actually fits.
-  const overflowing = content > viewport + 1;
-  const moreLeft = overflowing && offset > 1;
-  const moreRight = overflowing && offset < content - viewport - 1;
+  const { moreLeft, moreRight, scrollProps } = useHorizontalEdgeFade();
 
   return (
     <View style={style}>
@@ -86,10 +109,7 @@ export function ScrollableValue({ value, textStyle, style, fadeColor }: Props) {
         showsHorizontalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
-        scrollEventThrottle={16}
-        onLayout={(e: LayoutChangeEvent) => setViewport(e.nativeEvent.layout.width)}
-        onContentSizeChange={w => setContent(w)}
-        onScroll={e => setOffset(e.nativeEvent.contentOffset.x)}
+        {...scrollProps}
       >
         <Text style={textStyle}>{value}</Text>
       </ScrollView>

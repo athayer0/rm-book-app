@@ -7,11 +7,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import {
-  EventColors, EventTypeConfig, EventTypeLabels, DEFAULT_THEME_COLOR,
-  DEFAULT_SECONDARY_COLOR_LIGHT, DEFAULT_SECONDARY_COLOR_DARK,
-  DEFAULT_TERTIARY_COLOR_LIGHT, DEFAULT_TERTIARY_COLOR_DARK,
-} from '../constants/colors';
+import { EventColors, EventTypeConfig, EventTypeLabels, DEFAULT_THEME_COLOR } from '../constants/colors';
+import { THEME_COLOR_ROWS, type ThemeColorRowKey } from '../constants/themeColorRows';
 import { EventSizes, EVENT_SIZE_OPTIONS, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
 import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
@@ -92,34 +89,6 @@ type DropdownKey =
  * under your finger. Both still close from the row that opened them.
  */
 const IN_FLOW_DROPDOWNS: DropdownKey[] = ['colors', 'dailyReviewTime'];
-
-type ThemeColorRowKey = 'primary' | 'secondaryLight' | 'secondaryDark' | 'tertiaryLight' | 'tertiaryDark';
-type ThemeColorSettingKey =
-  | 'themeColor' | 'secondaryColorLight' | 'secondaryColorDark'
-  | 'tertiaryColorLight' | 'tertiaryColorDark';
-
-// Primary repaints headers/tabs/now-line. Secondary drives `accent` (Save,
-// Done, EDIT, goal counts). Tertiary drives `control` (checkmarks, switches,
-// active pills/tabs, the FAB, "add a thing" links). Light/dark variants of
-// secondary and tertiary are independent settings — no auto dark-mode lift —
-// so each needs its own entry. `mode` is undefined for primary (it applies to
-// both themes at once) and 'light'/'dark' for the rest, so the settings
-// screen can only surface the variant that's actually in effect right now —
-// editing the dark accent while looking at the light theme would be editing
-// a colour you can't see change.
-const THEME_COLOR_ROWS: {
-  key: ThemeColorRowKey;
-  label: string;
-  settingKey: ThemeColorSettingKey;
-  defaultValue: string;
-  mode?: 'light' | 'dark';
-}[] = [
-  { key: 'primary', label: 'Primary Color', settingKey: 'themeColor', defaultValue: DEFAULT_THEME_COLOR },
-  { key: 'secondaryLight', label: 'Secondary Color (Light)', settingKey: 'secondaryColorLight', defaultValue: DEFAULT_SECONDARY_COLOR_LIGHT, mode: 'light' },
-  { key: 'secondaryDark', label: 'Secondary Color (Dark)', settingKey: 'secondaryColorDark', defaultValue: DEFAULT_SECONDARY_COLOR_DARK, mode: 'dark' },
-  { key: 'tertiaryLight', label: 'Tertiary Color (Light)', settingKey: 'tertiaryColorLight', defaultValue: DEFAULT_TERTIARY_COLOR_LIGHT, mode: 'light' },
-  { key: 'tertiaryDark', label: 'Tertiary Color (Dark)', settingKey: 'tertiaryColorDark', defaultValue: DEFAULT_TERTIARY_COLOR_DARK, mode: 'dark' },
-];
 
 export function SettingsScreen() {
   const Colors = useColors();
@@ -244,10 +213,21 @@ export function SettingsScreen() {
   }
 
   function handleResetWeek() {
-    Alert.alert('Reset Week', 'This will clear all goal counts and targets for the current week. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: resetAll },
-    ]);
+    Alert.alert(
+      'Reset Week',
+      'This will clear all goal counts and targets for the current week, and restore the built-in Goals (labels, icons, colors, links, targets) to their original values. Custom Goals will not be affected.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetAll();
+            resetBuiltInDefinitions();
+          },
+        },
+      ],
+    );
   }
 
   // Per-type editing lives in EventTypesModal's edit sheet, one type at a
@@ -461,7 +441,8 @@ export function SettingsScreen() {
         </View>
 
         {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives.
-            Collapsed behind one summary row (dot strip previews all five),
+            Collapsed behind one summary row (dot strip previews every
+            currently-visible one),
             expanding into the same indented dropdown-item list Schedule
             Hours and Contact Method use. Each item still opens its own
             picker panel underneath, exactly as before. */}
@@ -1147,7 +1128,7 @@ function makeStyles(C: ColorPalette) {
     // Fixed width so the labels line up despite the glyphs differing in width.
     methodIcon: { width: 24, alignItems: 'center', marginRight: 6 },
     // Theme Colors summary row — a small dot per colour, so the collapsed
-    // row still previews all five without expanding.
+    // row still previews each one without expanding.
     dotPreviewRow: { flexDirection: 'row', marginRight: 4 },
     dotPreview: {
       width: 10,
