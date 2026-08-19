@@ -32,7 +32,7 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
   const { unreported, report, statusOf } = useUnreported();
-  const { updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
+  const { updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const today = new Date();
 
@@ -52,8 +52,11 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
     return [...byDate.entries()];
   }, [unreported]);
 
-  async function handleSave(eventData: Omit<CalendarEvent, 'id'>) {
-    if (editing) await updateEvent(editing.id, eventData);
+  async function handleSave(eventData: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future') {
+    if (!editing) return;
+    if (scope === 'single') await updateOccurrence(editing.id, editing.date, eventData);
+    else if (scope === 'future') await updateFromDate(editing.id, editing.date, eventData);
+    else await updateEvent(editing.id, eventData);
   }
 
   return (

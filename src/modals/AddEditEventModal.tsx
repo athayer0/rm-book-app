@@ -45,7 +45,10 @@ interface Props {
   settings: AppSettings;
   currentStatus?: EventStatus;
   onStatusChange?: (status: EventStatus | undefined) => void;
-  onSave: (event: Omit<CalendarEvent, 'id'>) => Promise<void>;
+  /** `scope` is set only when saving an edit to a recurring event's series row —
+   *  'single' carves off just this occurrence, 'future' splits the series at it.
+   *  Absent for a non-recurring event or a brand-new one, where there's nothing to scope. */
+  onSave: (event: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future') => Promise<void>;
   /** 'single' drops just occurrenceDate; 'future' ends the series before it. */
   onDelete?: (id: string, occurrenceDate: string, mode: 'single' | 'future') => void;
   onClose: () => void;
@@ -438,10 +441,34 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     };
   }
 
-  async function handleSave() {
+  /**
+   * A recurring event's fields belong to the whole series, so saving one always
+   * asks which occurrences the edit applies to before anything is written —
+   * the same question, and the same two answers, handleDelete already asks.
+   * A non-recurring event or a brand-new one has no series to scope, so it
+   * saves straight through.
+   */
+  function handleSave() {
+    if (!event || !event.recurring) {
+      commitSave();
+      return;
+    }
+    Alert.alert(
+      'Recurring Event',
+      'This event is recurring. What would you like to update?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'This event only', onPress: () => commitSave('single') },
+        { text: 'This and all future', onPress: () => commitSave('future') },
+      ],
+      { cancelable: true }
+    );
+  }
+
+  async function commitSave(scope?: 'single' | 'future') {
     setError('');
     try {
-      await onSave(buildEventData());
+      await onSave(buildEventData(), scope);
       // Otherwise a picker left open (Start Time, End Time) is still open
       // underneath when Edit reopens the form, since switching to 'view'
       // doesn't tear the form down.

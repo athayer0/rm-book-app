@@ -42,7 +42,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   // the slot's time has to survive the intermediary popup, since nothing else
   // carries it forward.
   const [pendingTapTime, setPendingTapTime] = useState<string | null>(null);
-  const { getForDate, addEvent, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
+  const { getForDate, addEvent, updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { settings } = useSettings();
   const { byId: eventTypeById } = useEventTypeDefinitions();
   const { getStatus, report } = useEventReport();
@@ -63,7 +63,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   // screen may have changed. The same snapshot also drives the extra ghost
   // blocks during the drag, so the whole group visibly moves together.
   const groupDragOriginalRef = useRef<Map<string, {
-    date: string; startTime: string; endTime: string; hasEnd: boolean;
+    date: string; startTime: string; endTime: string; hasEnd: boolean; recurring: boolean;
     title: string; color: string; topOffset: number; height: number;
   }> | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -242,9 +242,11 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     setShowEventModal(true);
   }
 
-  async function handleSaveEvent(eventData: Omit<CalendarEvent, 'id'>) {
+  async function handleSaveEvent(eventData: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future') {
     if (editingEvent) {
-      await updateEvent(editingEvent.id, eventData);
+      if (scope === 'single') await updateOccurrence(editingEvent.id, editingEvent.date, eventData);
+      else if (scope === 'future') await updateFromDate(editingEvent.id, editingEvent.date, eventData);
+      else await updateEvent(editingEvent.id, eventData);
     } else {
       await addEvent(eventData);
     }
@@ -261,7 +263,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
       for (const id of selectedEventIds) {
         const ev = events.find(e => e.id === id);
         if (ev) map.set(id, {
-          date: ev.date, startTime: ev.startTime, endTime: ev.endTime, hasEnd: hasEndTime(ev),
+          date: ev.date, startTime: ev.startTime, endTime: ev.endTime, hasEnd: hasEndTime(ev), recurring: ev.recurring,
           title: ev.title, color: ev.color,
           topOffset: eventTopOffset(ev.startTime, settings.gridStartHour, SLOT_HEIGHT),
           height: renderedEventHeight(ev, SLOT_HEIGHT),
@@ -293,6 +295,39 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     return formatTime(Math.floor(clamped / 60), clamped % 60);
   }
 
+  type PendingMove = { id: string; origDate: string; recurring: boolean; changes: Partial<CalendarEvent> };
+
+  // A recurring row's date/time is the whole series' anchor, not one
+  // occurrence's own — so a drag on one has to ask which occurrences it moves
+  // before anything is written, the same question and the same two answers
+  // handleDelete already asks. Cancelling leaves the series untouched: nothing
+  // below writes anything until a scope is picked.
+  function applyMove(move: PendingMove, scope?: 'single' | 'future') {
+    if (!move.recurring || !scope) {
+      updateEvent(move.id, move.changes);
+      return;
+    }
+    if (scope === 'single') updateOccurrence(move.id, move.origDate, move.changes);
+    else updateFromDate(move.id, move.origDate, move.changes);
+  }
+
+  function commitMoves(moves: PendingMove[]) {
+    if (!moves.some(m => m.recurring)) {
+      moves.forEach(m => applyMove(m));
+      return;
+    }
+    Alert.alert(
+      'Recurring Event',
+      'This event is recurring. Move just this occurrence, or this and every occurrence after it?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'This event only', onPress: () => moves.forEach(m => applyMove(m, 'single')) },
+        { text: 'This and all future', onPress: () => moves.forEach(m => applyMove(m, 'future')) },
+      ],
+      { cancelable: true }
+    );
+  }
+
   function handleDragDrop(absoluteY: number, gridTopY: number, scrollOffset: number) {
     frozenEventsRef.current = null;
     frozenDateRef.current = null;
@@ -315,7 +350,13 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
       const durationMins = Math.max(endMins > startMins ? endMins - startMins : endMins + 1440 - startMins, 15);
       newEnd = addMinutesToTimeString(newStart, durationMins);
     }
-    updateEvent(dragEvent.id, { startTime: newStart, endTime: newEnd, date: dateStr });
+
+    // Every event the drop touches, keyed by its own pre-drag date — the
+    // anchor plus, for a group drag, the rest of the selection replaying the
+    // anchor's move off each event's own snapshot.
+    const moves: PendingMove[] = [
+      { id: dragEvent.id, origDate: dragEvent.date, recurring: dragEvent.recurring, changes: { startTime: newStart, endTime: newEnd, date: dateStr } },
+    ];
 
     // The rest of the group replays the anchor's own move — same day offset,
     // same minute offset — off each event's pre-drag date/time, preserving its
@@ -334,10 +375,12 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
         const siblingStart = minutesToClampedTime(origStartMins + deltaMinutes);
         const siblingEnd = orig.hasEnd ? minutesToClampedTime(timeToMinutes(siblingStart) + durationMins) : siblingStart;
         const siblingDate = format(addDays(parseISO(orig.date), deltaDays), 'yyyy-MM-dd');
-        updateEvent(id, { date: siblingDate, startTime: siblingStart, endTime: siblingEnd });
+        moves.push({ id, origDate: orig.date, recurring: orig.recurring, changes: { date: siblingDate, startTime: siblingStart, endTime: siblingEnd } });
       }
     }
+
     endDrag();
+    commitMoves(moves);
   }
 
   // The grid draws one drop-target shadow per selected event, not just for the

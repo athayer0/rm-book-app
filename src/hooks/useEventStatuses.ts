@@ -93,5 +93,91 @@ export function useEventStatuses() {
     [user],
   );
 
-  return { statuses, getStatus, setStatus, planStatusMove, syncStatusMove, reload };
+  /**
+   * What the map becomes when a single occurrence's status moves onto a
+   * different id — computed, not written. Used when a recurring edit scoped to
+   * "this event only" carves an occurrence into its own standalone row: the new
+   * row has a different id (and possibly a different date, if the edit moved
+   * it), and a status recorded against the old id::date pair would otherwise
+   * strand there, reading as pending again.
+   *
+   * Returns null when there is nothing to carry, same as planStatusMove.
+   */
+  const planStatusCarve = useCallback(
+    (fromId: string, fromDate: string, toId: string, toDate: string): { next: EventStatusMap; status: EventStatus } | null => {
+      const fromKey = statusKey(fromId, fromDate);
+      const status = current.current[fromKey];
+      if (status === undefined) return null;
+
+      const next = { ...current.current };
+      delete next[fromKey];
+      next[statusKey(toId, toDate)] = status;
+      return { next, status };
+    },
+    [current],
+  );
+
+  /** Propagate a carve that has already been written locally. Same tombstone
+   * reasoning as syncStatusMove. */
+  const syncStatusCarve = useCallback(
+    async (fromId: string, fromDate: string, toId: string, toDate: string, status: EventStatus) => {
+      if (!user) return;
+      await enqueueDelete('event_statuses', `${fromId}|${fromDate}`, {
+        user_id: user.id, event_id: fromId, occurrence_date: fromDate,
+      });
+      await enqueueUpsert('event_statuses', `${toId}|${toDate}`, {
+        user_id: user.id, event_id: toId, occurrence_date: toDate, status,
+      });
+    },
+    [user],
+  );
+
+  /**
+   * What the map becomes when every occurrence at or after `fromDateInclusive`
+   * moves off `fromId` onto `toId` — computed, not written. Used when a
+   * recurring edit scoped to "this and future" splits a series in two: the new
+   * row picks up every date from the split point on, and any of those already
+   * had a status recorded against the old id.
+   *
+   * Returns null when there is nothing to carry.
+   */
+  const planStatusBulkCarve = useCallback(
+    (fromId: string, toId: string, fromDateInclusive: string): { next: EventStatusMap; moved: { date: string; status: EventStatus }[] } | null => {
+      const prefix = `${fromId}::`;
+      const moved: { date: string; status: EventStatus }[] = [];
+      const next = { ...current.current };
+      for (const [key, status] of Object.entries(current.current)) {
+        if (!key.startsWith(prefix)) continue;
+        const date = key.slice(prefix.length);
+        if (date < fromDateInclusive) continue;
+        delete next[key];
+        next[statusKey(toId, date)] = status;
+        moved.push({ date, status });
+      }
+      return moved.length ? { next, moved } : null;
+    },
+    [current],
+  );
+
+  /** Propagate a bulk carve that has already been written locally. */
+  const syncStatusBulkCarve = useCallback(
+    async (fromId: string, toId: string, moved: { date: string; status: EventStatus }[]) => {
+      if (!user) return;
+      for (const { date, status } of moved) {
+        await enqueueDelete('event_statuses', `${fromId}|${date}`, {
+          user_id: user.id, event_id: fromId, occurrence_date: date,
+        });
+        await enqueueUpsert('event_statuses', `${toId}|${date}`, {
+          user_id: user.id, event_id: toId, occurrence_date: date, status,
+        });
+      }
+    },
+    [user],
+  );
+
+  return {
+    statuses, getStatus, setStatus, planStatusMove, syncStatusMove,
+    planStatusCarve, syncStatusCarve, planStatusBulkCarve, syncStatusBulkCarve,
+    reload,
+  };
 }

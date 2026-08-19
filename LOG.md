@@ -39,12 +39,15 @@ FEATURES
 [x] ui overhaul (cleaner dropdowns that don't blend into the backround, different icon library?)
 [x] update onboarding with new event and goal system changes
 
-[ ] new events and goals end up at bottom, sort by color order (or alphabetical) instead
+[x] new events and goals end up at bottom, add ability to sort by holding down and moving around
+[ ] make tapping on goals take you to their edit menu
+[ ] move onboarded flag from asyncStorage to supabase
+[ ] add more personalization to onboarding (different event and goal color schemes)
 [ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [ ] individual event notifs
-[ ] repeating events move all or move one
-[ ] move onboarded flag from asyncStorage to supabase
+[x] repeating events move all or move one
 [ ] add spanish portuguese french etc
+[ ] streak?
 
 BUGS
 [ ] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)

@@ -49,7 +49,11 @@ export async function detachPersonFromEvents(personId: string, userId?: string):
 export function useCalendarEvents() {
   const { user } = useAuth();
   const { value: events, current, write, reload } = useStoredState<CalendarEvent[]>(CALENDAR_EVENTS_KEY, EMPTY);
-  const { planStatusMove, syncStatusMove } = useEventStatuses();
+  const {
+    planStatusMove, syncStatusMove,
+    planStatusCarve, syncStatusCarve,
+    planStatusBulkCarve, syncStatusBulkCarve,
+  } = useEventStatuses();
 
   // Persist locally, then queue a remote upsert for the given event when signed in.
   const persist = useCallback(async (update: (current: CalendarEvent[]) => CalendarEvent[], changedId: string) => {
@@ -140,6 +144,112 @@ export function useCalendarEvents() {
     await persist(prev => prev.map(e => e.id === id ? { ...e, recurringUntil } : e), id);
   }, [current, persist, deleteEvent]);
 
+  /**
+   * Edit a single occurrence of a recurring series, leaving the rest of the
+   * series untouched. An edit scoped to "this event only" is, functionally,
+   * "exclude this date from the series and add a fresh standalone event with
+   * whatever changed" — the same carve deleteOccurrence does, minus the delete.
+   *
+   * `changes` merges over the series row the way updateEvent's do, so a caller
+   * can pass just the fields that moved (a drag) or the whole form (the editor)
+   * alike. Any status already recorded for this occurrence follows to the new
+   * row so it doesn't read as pending again.
+   */
+  const updateOccurrence = useCallback(async (id: string, occurrenceDate: string, changes: Partial<CalendarEvent>) => {
+    const row = current.current.find(e => e.id === id);
+    if (!row) return;
+    if (!row.recurring) return updateEvent(id, changes);
+
+    const carved: Omit<CalendarEvent, 'id'> = {
+      ...row,
+      ...changes,
+      date: changes.date ?? occurrenceDate,
+      recurring: false,
+      recurringRule: undefined,
+      recurringUntil: undefined,
+      recurringDays: undefined,
+      excludedDates: undefined,
+    };
+    const newEvent = { ...carved, id: generateId() };
+    const excludedDates = [...(row.excludedDates ?? []), occurrenceDate];
+    const nextEvents = current.current
+      .map(e => e.id === id ? { ...e, excludedDates } : e)
+      .concat(newEvent);
+
+    const statusMove = planStatusCarve(id, occurrenceDate, newEvent.id, newEvent.date);
+
+    if (statusMove) {
+      await multiSet([
+        [CALENDAR_EVENTS_KEY, nextEvents],
+        [EVENT_STATUSES_KEY, statusMove.next],
+      ]);
+    } else {
+      await write(() => nextEvents);
+    }
+
+    if (user) {
+      const updatedRow = nextEvents.find(e => e.id === id);
+      if (updatedRow) await enqueueUpsert('calendar_events', updatedRow.id, { ...updatedRow, user_id: user.id });
+      await enqueueUpsert('calendar_events', newEvent.id, { ...newEvent, user_id: user.id });
+      if (statusMove) await syncStatusCarve(id, occurrenceDate, newEvent.id, newEvent.date, statusMove.status);
+    }
+    return newEvent;
+  }, [current, write, user, updateEvent, planStatusCarve, syncStatusCarve]);
+
+  /**
+   * Edit a recurring series from occurrenceDate onward, leaving earlier
+   * occurrences alone. Ends the series the day before occurrenceDate — the
+   * same cutoff deleteFromDate uses — and starts a fresh row there carrying
+   * `changes`, since a mid-series edit (a new time, a new title) has no
+   * existing row it could live on without also rewriting the past.
+   *
+   * Cutting at or before the first occurrence is really editing the whole
+   * series, so it falls through to updateEvent — the same reasoning
+   * deleteFromDate uses to fall through to deleteEvent.
+   *
+   * Any excluded dates on or after occurrenceDate (occurrences deleted
+   * individually before this edit) carry forward to the new row; a date
+   * someone already removed from the series shouldn't reappear because the
+   * rest of the series changed.
+   */
+  const updateFromDate = useCallback(async (id: string, occurrenceDate: string, changes: Partial<CalendarEvent>) => {
+    const row = current.current.find(e => e.id === id);
+    if (!row) return;
+    if (!row.recurring || row.date >= occurrenceDate) return updateEvent(id, changes);
+
+    const recurringUntil = format(subDays(parseISO(occurrenceDate), 1), 'yyyy-MM-dd');
+    const carriedExcluded = (row.excludedDates ?? []).filter(d => d >= occurrenceDate);
+    const newRowData: Omit<CalendarEvent, 'id'> = {
+      ...row,
+      ...changes,
+      date: changes.date ?? occurrenceDate,
+      excludedDates: carriedExcluded.length ? carriedExcluded : undefined,
+    };
+    const newEvent = { ...newRowData, id: generateId() };
+    const nextEvents = current.current
+      .map(e => e.id === id ? { ...e, recurringUntil } : e)
+      .concat(newEvent);
+
+    const statusMove = planStatusBulkCarve(id, newEvent.id, occurrenceDate);
+
+    if (statusMove) {
+      await multiSet([
+        [CALENDAR_EVENTS_KEY, nextEvents],
+        [EVENT_STATUSES_KEY, statusMove.next],
+      ]);
+    } else {
+      await write(() => nextEvents);
+    }
+
+    if (user) {
+      const updatedRow = nextEvents.find(e => e.id === id);
+      if (updatedRow) await enqueueUpsert('calendar_events', updatedRow.id, { ...updatedRow, user_id: user.id });
+      await enqueueUpsert('calendar_events', newEvent.id, { ...newEvent, user_id: user.id });
+      if (statusMove) await syncStatusBulkCarve(id, newEvent.id, statusMove.moved);
+    }
+    return newEvent;
+  }, [current, write, user, updateEvent, planStatusBulkCarve, syncStatusBulkCarve]);
+
   const getForDate = useCallback((dateStr: string) => {
     return getEventsForDate(events, dateStr);
   }, [events]);
@@ -166,5 +276,9 @@ export function useCalendarEvents() {
     }
   }, [current, write, user]);
 
-  return { events, addEvent, updateEvent, deleteEvent, deleteOccurrence, deleteFromDate, getForDate, deleteAllEvents, deleteEventsOfType, reload };
+  return {
+    events, addEvent, updateEvent, updateOccurrence, updateFromDate,
+    deleteEvent, deleteOccurrence, deleteFromDate,
+    getForDate, deleteAllEvents, deleteEventsOfType, reload,
+  };
 }

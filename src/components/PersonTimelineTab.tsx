@@ -51,7 +51,7 @@ export function PersonTimelineTab({ personId }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
-  const { events, updateEvent, deleteOccurrence, deleteFromDate } = useCalendarEvents();
+  const { events, updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { getStatus, report } = useEventReport();
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
 
@@ -79,8 +79,11 @@ export function PersonTimelineTab({ personId }: Props) {
   const total = groups.reduce((sum, group) => sum + group.occurrences.length, 0);
   const today = new Date();
 
-  async function handleSave(eventData: Omit<CalendarEvent, 'id'>) {
-    if (editing) await updateEvent(editing.id, eventData);
+  async function handleSave(eventData: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future') {
+    if (!editing) return;
+    if (scope === 'single') await updateOccurrence(editing.id, editing.date, eventData);
+    else if (scope === 'future') await updateFromDate(editing.id, editing.date, eventData);
+    else await updateEvent(editing.id, eventData);
   }
 
   return (
