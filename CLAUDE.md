@@ -17,7 +17,7 @@ Supabase credentials are required as env vars: `EXPO_PUBLIC_SUPABASE_URL` and `E
 
 ## LOG.md
 
-`LOG.md` is the owner's own planning file — **never edit it.** Read it for context, but do not check off, reword, or trim an item even after implementing it. Say in your reply what's now done and leave the file alone.
+`LOG.md` is the owner's own planning file — **never edit it.** Read it for context, but do not check off, reword, or trim an item even after implementing it. Say in your reply what's now done and leave the file alone. It's fine to include it in a commit when it shows as modified — those are the owner's own manual edits, so committing it is just carrying them along, not editing them.
 
 ## Architecture
 
