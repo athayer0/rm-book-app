@@ -38,14 +38,14 @@ FEATURES
 [x] increase range of red line and time text wherein the hour markers disappear
 [x] ui overhaul (cleaner dropdowns that don't blend into the backround, different icon library?)
 [x] update onboarding with new event and goal system changes
-
 [x] new events and goals end up at bottom, add ability to sort by holding down and moving around
-[ ] make tapping on goals take you to their edit menu
+[x] make tapping on goals take you to their edit menu
+[x] repeating events move all or move one
+
 [ ] move onboarded flag from asyncStorage to supabase
 [ ] add more personalization to onboarding (different event and goal color schemes)
 [ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [ ] individual event notifs
-[x] repeating events move all or move one
 [ ] add spanish portuguese french etc
 [ ] streak?
 
