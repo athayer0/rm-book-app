@@ -41,10 +41,10 @@ FEATURES
 [x] new events and goals end up at bottom, add ability to sort by holding down and moving around
 [x] make tapping on goals take you to their edit menu
 [x] repeating events move all or move one
+[x] event notifs by type
 
 [ ] add more personalization to onboarding (different event and goal color schemes)
 [ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
-[ ] individual event notifs
 [ ] add spanish portuguese french etc
 [ ] streak?
 

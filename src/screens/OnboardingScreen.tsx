@@ -11,6 +11,10 @@ import { useIsDark } from '../hooks/useIsDark';
 import type { ColorPalette } from '../constants/colors';
 import { DEFAULT_EVENT_TYPES } from '../constants/eventTypeDefaults';
 import { DEFAULT_GOALS } from '../constants/defaultGoals';
+import {
+  EVENT_COLOR_SCHEMES, GOAL_COLOR_SCHEMES,
+  matchEventColorScheme, matchGoalColorScheme, schemePreviewColors,
+} from '../constants/colorSchemes';
 import { useSettings, AppSettings } from '../hooks/useSettings';
 import { useNotificationToggles } from '../hooks/useNotificationToggles';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
@@ -119,6 +123,11 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   // what's actually there instead of quietly reverting it.
   const [disabledTypeIds, setDisabledTypeIds] = useState<Set<string>>(new Set());
   const [removedGoalIds, setRemovedGoalIds] = useState<Set<string>>(new Set());
+  // null means "leave built-in colors as they already are" — only set once the
+  // user actually taps a chip, so replaying onboarding never clobbers colors
+  // someone already customized just because a page was scrolled past.
+  const [eventColorSchemeId, setEventColorSchemeId] = useState<string | null>(null);
+  const [goalColorSchemeId, setGoalColorSchemeId] = useState<string | null>(null);
   const [wantsSchedule, setWantsSchedule] = useState(true);
   const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('work');
   const [draftDailyReview, setDraftDailyReview] = useState(false);
@@ -142,6 +151,16 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
       const activeGoalIds = new Set(definitions.map(d => d.id));
       setRemovedGoalIds(new Set(DEFAULT_GOALS.filter(d => !activeGoalIds.has(d.id)).map(d => d.id)));
+
+      const resolvedEventColors = Object.fromEntries(
+        DEFAULT_EVENT_TYPES.map(d => [d.id, eventTypeColor(d.id, settings.eventTypeColors)]),
+      );
+      setEventColorSchemeId(matchEventColorScheme(resolvedEventColors));
+
+      const resolvedGoalColors = Object.fromEntries(
+        DEFAULT_GOALS.map(d => [d.id, definitions.find(x => x.id === d.id)?.color ?? d.color]),
+      );
+      setGoalColorSchemeId(matchGoalColorScheme(resolvedGoalColors));
 
       setWantsSchedule(true);
       setScheduleKind('work');
@@ -186,6 +205,19 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     });
   }
 
+  // Previews the chosen scheme in the lists below each picker without
+  // touching settings/definitions until commitAndComplete — same draft
+  // pattern as every other choice on this screen.
+  function draftEventColor(id: string): string {
+    const scheme = EVENT_COLOR_SCHEMES.find(s => s.id === eventColorSchemeId);
+    return scheme?.colors[id] ?? eventTypeColor(id, settings.eventTypeColors);
+  }
+
+  function draftGoalColor(id: string, fallback: string): string {
+    const scheme = GOAL_COLOR_SCHEMES.find(s => s.id === goalColorSchemeId);
+    return scheme?.colors[id] ?? fallback;
+  }
+
   /**
    * Applies every draft choice in one pass. onDismiss() fires first and
    * synchronously, so the modal closes onto Home immediately rather than
@@ -206,6 +238,17 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     onDismiss();
 
     try {
+      const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === eventColorSchemeId);
+      // Merged locally rather than read back from settings after the write
+      // below: updateSettings won't have re-rendered this closure yet, and
+      // the starter schedule needs the chosen colors immediately, not after
+      // a round trip.
+      const effectiveEventTypeColors = eventScheme
+        ? { ...settings.eventTypeColors, ...eventScheme.colors }
+        : settings.eventTypeColors;
+
+      const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === goalColorSchemeId);
+
       const typeCustoms = eventTypeDefinitions.filter(d => !d.builtIn);
       const typeBuiltIns = DEFAULT_EVENT_TYPES.map(defaultDef => {
         const live = eventTypeDefinitions.find(d => d.id === defaultDef.id) ?? defaultDef;
@@ -216,21 +259,28 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
       const goalCustoms = definitions.filter(d => !d.builtIn);
       const goalBuiltIns = DEFAULT_GOALS.map(defaultDef => {
         const live = definitions.find(d => d.id === defaultDef.id) ?? defaultDef;
-        return removedGoalIds.has(defaultDef.id) ? { ...live, removed: true } : live;
+        const withColor = goalScheme?.colors[defaultDef.id]
+          ? { ...live, color: goalScheme.colors[defaultDef.id] }
+          : live;
+        return removedGoalIds.has(defaultDef.id) ? { ...withColor, removed: true } : withColor;
       });
       await updateDefinitions([...goalBuiltIns, ...goalCustoms]);
 
       if (wantsSchedule) {
         const activeTypeIds = new Set(DEFAULT_EVENT_TYPES.filter(d => !disabledTypeIds.has(d.id)).map(d => d.id));
         const entries = starterEntries(scheduleKind).filter(e => activeTypeIds.has(e.type));
-        for (const draft of buildStarterSchedule(entries, settings.eventTypeColors)) {
+        for (const draft of buildStarterSchedule(entries, effectiveEventTypeColors)) {
           await addEvent(draft);
         }
       }
 
       await toggleDailyReview(draftDailyReview);
       await toggleEventReminders(draftEventReminders);
-      await updateSettings({ theme: draftTheme, weekStart: draftWeekStart });
+      await updateSettings({
+        theme: draftTheme,
+        weekStart: draftWeekStart,
+        ...(eventScheme ? { eventTypeColors: effectiveEventTypeColors } : {}),
+      });
     } finally {
       onFinished();
     }
@@ -276,9 +326,33 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               also be linked to a goal, so completing that kind of event updates the goal
               automatically.
             </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.schemeRow}
+              contentContainerStyle={styles.schemeRowContent}
+            >
+              {EVENT_COLOR_SCHEMES.map(scheme => {
+                const active = eventColorSchemeId === scheme.id;
+                return (
+                  <TouchableOpacity
+                    key={scheme.id}
+                    style={[styles.schemeChip, active && styles.schemeChipActive]}
+                    onPress={() => setEventColorSchemeId(scheme.id)}
+                  >
+                    <View style={styles.schemeDots}>
+                      {schemePreviewColors(scheme.colors).map((c, i) => (
+                        <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
+                      ))}
+                    </View>
+                    <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
             <View style={styles.card}>
               {DEFAULT_EVENT_TYPES.map((def, i, arr) => {
-                const color = eventTypeColor(def.id, settings.eventTypeColors);
+                const color = draftEventColor(def.id);
                 return (
                   <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
                     <View style={[styles.typeDot, { backgroundColor: color }]} />
@@ -309,21 +383,48 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               monthly goals from the Home page. Progress graphs can be seen and future goals can
               be set from there as well.
             </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.schemeRow}
+              contentContainerStyle={styles.schemeRowContent}
+            >
+              {GOAL_COLOR_SCHEMES.map(scheme => {
+                const active = goalColorSchemeId === scheme.id;
+                return (
+                  <TouchableOpacity
+                    key={scheme.id}
+                    style={[styles.schemeChip, active && styles.schemeChipActive]}
+                    onPress={() => setGoalColorSchemeId(scheme.id)}
+                  >
+                    <View style={styles.schemeDots}>
+                      {schemePreviewColors(scheme.colors).map((c, i) => (
+                        <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
+                      ))}
+                    </View>
+                    <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
             <View style={styles.card}>
-              {DEFAULT_GOALS.map((def, i, arr) => (
-                <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
-                  <View style={[styles.goalIconWrap, { backgroundColor: isDark ? def.color : def.color + '20' }]}>
-                    <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(def.color) : def.color} />
+              {DEFAULT_GOALS.map((def, i, arr) => {
+                const color = draftGoalColor(def.id, def.color);
+                return (
+                  <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
+                    <View style={[styles.goalIconWrap, { backgroundColor: isDark ? color : color + '20' }]}>
+                      <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(color) : color} />
+                    </View>
+                    <Text style={styles.goalLabel}>{def.label}</Text>
+                    <Switch
+                      value={!removedGoalIds.has(def.id)}
+                      onValueChange={() => toggleGoal(def.id)}
+                      trackColor={{ true: Colors.control }}
+                      thumbColor={Colors.white}
+                    />
                   </View>
-                  <Text style={styles.goalLabel}>{def.label}</Text>
-                  <Switch
-                    value={!removedGoalIds.has(def.id)}
-                    onValueChange={() => toggleGoal(def.id)}
-                    trackColor={{ true: Colors.control }}
-                    thumbColor={Colors.white}
-                  />
-                </View>
-              ))}
+                );
+              })}
             </View>
             <Text style={styles.footnote}>
               Add, remove, or link goals to an event type anytime from Home → Edit Goals.
@@ -627,6 +728,27 @@ function makeStyles(C: ColorPalette) {
       marginRight: 12,
     },
     goalLabel: { flex: 1, fontSize: 14, color: C.text },
+    schemeRow: { width: '100%', flexGrow: 0, marginTop: 24 },
+    schemeRowContent: { gap: 10, paddingHorizontal: 2 },
+    schemeChip: {
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderRadius: 14,
+      backgroundColor: C.contactActionBg,
+    },
+    schemeChipActive: { backgroundColor: C.control },
+    schemeDots: { flexDirection: 'row' },
+    schemeDot: {
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      marginHorizontal: 2,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    schemeChipText: { fontSize: 12, fontWeight: '600', color: C.textSecondary, marginTop: 6 },
+    schemeChipTextActive: { color: C.white },
     toggleRow: {
       flexDirection: 'row',
       alignItems: 'center',
