@@ -143,7 +143,7 @@ export const BUILTIN_GOAL_LINKS: Record<string, {
     goalSplitTime: DEFAULT_GOAL_SPLIT_TIME,
   },
   temple: { goalId: 'temple_attendance', goalMode: 'count' },
-  church: { goalId: 'church_hours', goalMode: 'hours' },
+  church: { goalId: 'church_hours', goalMode: 'count' },
   service: { goalId: 'service_hours', goalMode: 'hours' },
   scripture: { goalId: 'personal_study', goalMode: 'count' },
   exercise: { goalId: 'times_exercised', goalMode: 'count' },

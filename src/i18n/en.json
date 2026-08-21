@@ -330,8 +330,8 @@
     "personal_study": "Personal Study",
     "total_dates": "Total Dates",
     "service_hours": "Service Hours",
-    "church_hours": "Church Hours",
-    "temple_attendance": "Temple Trips",
+    "church_hours": "Church Attendance",
+    "temple_attendance": "Temple Attendance",
     "selectGoal": "Select goal",
     "none": "None",
     "untitled": "Untitled Goal"

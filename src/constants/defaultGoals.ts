@@ -144,6 +144,10 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
   },
   {
     id: 'church_hours',
+    // Displays as "Church Attendance" via the goals.church_hours translation —
+    // this label is kept as the original shipped text (rather than renamed to
+    // match) so goalDisplayLabel's equality check still recognizes an
+    // already-synced, never-renamed copy of this goal as unrenamed.
     label: 'Church Hours',
     icon: 'church',
     iconFamily: 'MaterialCommunityIcons',
@@ -156,6 +160,10 @@ export const DEFAULT_GOALS: GoalDefinition[] = [
   },
   {
     id: 'temple_attendance',
+    // Displays as "Temple Attendance" via the goals.temple_attendance
+    // translation — kept as the original shipped text for the same reason as
+    // church_hours above: it's what goalDisplayLabel's equality check needs to
+    // still recognize an already-synced, never-renamed copy as unrenamed.
     label: 'Temple Trips',
     icon: 'church',
     iconFamily: 'MaterialCommunityIcons',

@@ -239,9 +239,10 @@ export function renderedEventHeight(event: CalendarEvent, slotHeight: number = D
 /**
  * An event's length in whole hours, floored at one.
  *
- * The rounding is what the hour-counting goals report, so church and service
- * share it rather than each doing its own arithmetic: a 40-minute block is worth
- * an hour to both, and neither can end up worth zero.
+ * The rounding is what hour-counting goals report — service is the one built-in
+ * left on it after church moved to a per-attendance count, but any type linked
+ * with goalMode 'hours' goes through the same arithmetic: a 40-minute block is
+ * worth an hour, and it can never end up worth zero.
  */
 function durationHours(event: CalendarEvent): number {
   const mins = Math.max(0, timeToMinutes(event.endTime) - timeToMinutes(event.startTime));
@@ -379,9 +380,9 @@ export function findUnreportedOccurrences(
  * offset. Recomputed rather than maintained as a running count because far more
  * than the status toggle invalidates such a count — moving an event to another
  * week, deleting it, changing its type, shifting an event across its type's
- * morning/evening cutoff, or editing
- * a church event's duration all change what the total should be, and none of
- * those operations can be expected to know a cached number exists.
+ * morning/evening cutoff, or editing a service event's duration all change what
+ * the total should be, and none of those operations can be expected to know a
+ * cached number exists.
  *
  * Takes the week's dates rather than a week key so this stays free of dateUtils;
  * the caller owns the week-boundary question.

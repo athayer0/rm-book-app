@@ -280,9 +280,9 @@ export const EventTypeIcons: Record<string, { icon: string; iconFamily?: string 
   date:      { icon: 'heart' },
   contact:   { icon: 'chatbubble-ellipses' },
   work:      { icon: 'briefcase' },
-  // The same chapel as `church`, and deliberately: the Church Hours and Temple
-  // Attendance goals already share it, so a temple drawn as anything else here
-  // would be the odd one out against the goal it feeds.
+  // The same chapel as `church`, and deliberately: the Church Attendance and
+  // Temple Attendance goals already share it, so a temple drawn as anything
+  // else here would be the odd one out against the goal it feeds.
   temple:    { icon: 'church', iconFamily: 'MaterialCommunityIcons' },
   school:    { icon: 'school' },
   service:   { icon: 'hand-heart', iconFamily: 'MaterialCommunityIcons' },
