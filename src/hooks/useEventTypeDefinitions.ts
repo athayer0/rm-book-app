@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, createContext, useContext } from 'react';
 import {
   BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, DEFAULT_EVENT_TYPES, EventTypeDefinition,
 } from '../constants/eventTypeDefaults';
@@ -57,7 +57,41 @@ function mergeWithDefaults(storedDefs: EventTypeDefinition[]): EventTypeDefiniti
   return [...builtIns, ...customs].filter(d => !d.removed);
 }
 
-export function useEventTypeDefinitions() {
+type EventTypeDefinitionsContextValue = {
+  definitions: EventTypeDefinition[];
+  byId: Record<string, EventTypeDefinition>;
+  customLinks: CustomTypeLinks;
+  updateDefinitions: (defs: EventTypeDefinition[]) => Promise<void>;
+  resetBuiltInDefinitions: () => Promise<void>;
+  reload: () => Promise<void>;
+};
+
+// Same shape mergeWithDefaults(EMPTY_DEFS) would produce, so a consumer that
+// somehow renders outside the provider still sees built-ins with their
+// reportStyle/goal links intact rather than the bare, unreportable shape
+// mergeWithDefaults only skips for defsState's own not-yet-loaded value.
+const DEFAULT_DEFINITIONS = mergeWithDefaults(EMPTY_DEFS);
+const DEFAULT_BY_ID = Object.fromEntries(DEFAULT_DEFINITIONS.map(d => [d.id, d]));
+
+export const EventTypeDefinitionsContext = createContext<EventTypeDefinitionsContextValue>({
+  definitions: DEFAULT_DEFINITIONS,
+  byId: DEFAULT_BY_ID,
+  customLinks: {},
+  updateDefinitions: async () => {},
+  resetBuiltInDefinitions: async () => {},
+  reload: async () => {},
+});
+
+/**
+ * The real implementation, held once by EventTypeDefinitionsProvider in
+ * App.tsx. Every screen and every EventBlock reads the same already-loaded
+ * value via useEventTypeDefinitions() below, rather than each mounting its
+ * own useStoredState — a per-instance load meant a fresh EventBlock (every
+ * one that a day swipe creates, since DayPager's fixed page slots re-key
+ * their children on every date change) started from the empty defaults for
+ * a beat, showing no status badge until its own storage read resolved.
+ */
+export function useEventTypeDefinitionsState(): EventTypeDefinitionsContextValue {
   const { user } = useAuth();
   const defsState = useStoredState<EventTypeDefinition[]>(EVENT_TYPE_DEFINITIONS_KEY, EMPTY_DEFS);
 
@@ -66,7 +100,7 @@ export function useEventTypeDefinitions() {
   // order without sorting its own copy. Falls back to array position for
   // anything that somehow lacks `order` — defensive only, since DEFAULT_EVENT_TYPES
   // and every type-creation path populate it.
-  const merged = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_EVENT_TYPES;
+  const merged = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_DEFINITIONS;
   const definitions = merged
     .map((d, i) => ({ d, i }))
     .sort((a, b) => (a.d.order ?? a.i) - (b.d.order ?? b.i))
@@ -123,4 +157,8 @@ export function useEventTypeDefinitions() {
   }, [defsState]);
 
   return { definitions, byId, customLinks, updateDefinitions, resetBuiltInDefinitions, reload };
+}
+
+export function useEventTypeDefinitions(): EventTypeDefinitionsContextValue {
+  return useContext(EventTypeDefinitionsContext);
 }

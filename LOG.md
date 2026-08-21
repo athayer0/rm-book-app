@@ -43,14 +43,14 @@ FEATURES
 [x] repeating events move all or move one
 [x] event notifs by type
 [x] add more personalization to onboarding (different event and goal color schemes)
+[x] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 
-[ ] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [ ] add spanish portuguese french etc
 [ ] streak?
 
 BUGS
-[ ] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
-[ ] swiping time spacing calendar bug?
+[x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
+[ ] swiping time spacing calendar bug? idk what causes it, if its an expo issue or a problem w the code
 [ ] use the app for a day and find bugs
 
 DEPLOYMENT TASKS

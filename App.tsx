@@ -13,6 +13,7 @@ import { supabase } from './src/lib/supabase';
 import { drainQueue, pullAll, startAutoDrain } from './src/lib/sync';
 import { peekQueue } from './src/lib/syncQueue';
 import { SettingsContext, useSettings, useSettingsState } from './src/hooks/useSettings';
+import { EventTypeDefinitionsContext, useEventTypeDefinitionsState } from './src/hooks/useEventTypeDefinitions';
 import { OnboardingContext, useOnboardingState } from './src/hooks/useOnboarding';
 import { useCalendarEvents } from './src/hooks/useCalendarEvents';
 import {
@@ -242,6 +243,11 @@ function SettingsProvider({ children }: { children: React.ReactNode }) {
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
+function EventTypeDefinitionsProvider({ children }: { children: React.ReactNode }) {
+  const value = useEventTypeDefinitionsState();
+  return <EventTypeDefinitionsContext.Provider value={value}>{children}</EventTypeDefinitionsContext.Provider>;
+}
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -249,7 +255,9 @@ export default function App() {
         <StatusBar style="light" />
         <AuthProvider>
           <SettingsProvider>
-            <AppRoot />
+            <EventTypeDefinitionsProvider>
+              <AppRoot />
+            </EventTypeDefinitionsProvider>
           </SettingsProvider>
         </AuthProvider>
       </SafeAreaProvider>
