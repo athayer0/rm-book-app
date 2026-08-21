@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
@@ -18,13 +19,14 @@ import { EditGoalsModal } from '../modals/EditGoalsModal';
 import { GoalsModal } from '../modals/GoalsModal';
 import { GoalGraphModal } from '../modals/GoalGraphModal';
 import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
-import { GoalGrain } from '../utils/goalGrain';
+import { GoalGrain, GRAIN } from '../utils/goalGrain';
 import { useUnreported } from '../hooks/useUnreported';
 import { useOnboardingFinishing } from '../hooks/useOnboarding';
 
 export function HomeScreen({ navigation, route }: any) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const systemScheme = useColorScheme();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
@@ -122,7 +124,7 @@ export function HomeScreen({ navigation, route }: any) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Home</Text>
+        <Text style={styles.headerTitle}>{t('home.title')}</Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -136,8 +138,8 @@ export function HomeScreen({ navigation, route }: any) {
                 the first heading only — there is one goal editor for both grains. */}
             <View style={styles.card}>
               <SectionHeader
-                title={reorderActive ? `Weekly Goals (${weekTaps.length}/${weekVisibleCount})` : 'Weekly Goals'}
-                actionLabel={reorderActive ? (reorderComplete ? 'Done' : 'Cancel') : 'EDIT'}
+                title={reorderActive ? t('home.gridReorderTitle', { title: t(GRAIN.week.gridLabelKey), tapped: weekTaps.length, total: weekVisibleCount }) : t(GRAIN.week.gridLabelKey)}
+                actionLabel={reorderActive ? (reorderComplete ? t('common.done') : t('common.cancel')) : t('home.editAction')}
                 onAction={reorderActive
                   ? (reorderComplete ? commitGoalReorder : cancelGoalReorder)
                   : () => { setEditGoalId(null); setEditVisible(true); }}
@@ -154,7 +156,7 @@ export function HomeScreen({ navigation, route }: any) {
               />
 
               <SectionHeader
-                title={reorderActive ? `Monthly Goals (${monthTaps.length}/${monthVisibleCount})` : 'Monthly Goals'}
+                title={reorderActive ? t('home.gridReorderTitle', { title: t(GRAIN.month.gridLabelKey), tapped: monthTaps.length, total: monthVisibleCount }) : t(GRAIN.month.gridLabelKey)}
                 tightTop
               />
               <GoalGrid
@@ -179,7 +181,7 @@ export function HomeScreen({ navigation, route }: any) {
                   activeOpacity={0.75}
                 >
                   <Ionicons name="list-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
-                  <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Goals</Text>
+                  <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>{t('home.goals')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, isDark && styles.actionBtnSwapped, reorderActive && styles.actionBtnDisabled]}
@@ -188,7 +190,7 @@ export function HomeScreen({ navigation, route }: any) {
                   activeOpacity={0.75}
                 >
                   <Ionicons name="stats-chart-outline" size={17} color={isDark ? Colors.contactActionBg : Colors.control} />
-                  <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>Progress</Text>
+                  <Text style={[styles.actionBtnText, isDark && styles.actionBtnTextSwapped]}>{t('home.progress')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

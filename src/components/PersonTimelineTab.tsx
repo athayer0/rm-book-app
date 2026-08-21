@@ -2,9 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO, addDays, subDays } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
+import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useEventReport } from '../hooks/useEventReport';
 import { CalendarEvent, getEventsForDate } from '../utils/eventUtils';
@@ -28,11 +31,11 @@ interface Props {
 }
 
 /** "Today" and "Yesterday" beat a date for the two days carrying most of the traffic. */
-function dayLabel(dateStr: string, today: Date): string {
-  if (dateStr === format(today, 'yyyy-MM-dd')) return 'Today';
-  if (dateStr === format(subDays(today, 1), 'yyyy-MM-dd')) return 'Yesterday';
-  if (dateStr === format(addDays(today, 1), 'yyyy-MM-dd')) return 'Tomorrow';
-  return format(parseISO(dateStr), 'EEEE, MMM d, yyyy');
+function dayLabel(dateStr: string, today: Date, t: TFunction, language: 'en' | 'es'): string {
+  if (dateStr === format(today, 'yyyy-MM-dd')) return t('personTimeline.today');
+  if (dateStr === format(subDays(today, 1), 'yyyy-MM-dd')) return t('personTimeline.yesterday');
+  if (dateStr === format(addDays(today, 1), 'yyyy-MM-dd')) return t('personTimeline.tomorrow');
+  return format(parseISO(dateStr), datePattern('weekdayMonthDayYear', language), { locale: dateFnsLocale(language) });
 }
 
 /**
@@ -50,6 +53,7 @@ function dayLabel(dateStr: string, today: Date): string {
 export function PersonTimelineTab({ personId }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { events, updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate } = useCalendarEvents();
   const { getStatus, report } = useEventReport();
@@ -98,15 +102,15 @@ export function PersonTimelineTab({ personId }: Props) {
         {total === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="calendar-outline" size={48} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>No events yet</Text>
+            <Text style={styles.emptyTitle}>{t('personTimeline.noEventsYet')}</Text>
             <Text style={styles.emptyText}>
-              Events show up here once you add this person to one.
+              {t('personTimeline.emptyHint')}
             </Text>
           </View>
         ) : (
           groups.map(group => (
             <View key={group.dateStr} style={styles.group}>
-              <Text style={styles.groupHeader}>{dayLabel(group.dateStr, today)}</Text>
+              <Text style={styles.groupHeader}>{dayLabel(group.dateStr, today, t, settings.language)}</Text>
 
               {group.occurrences.map(occurrence => (
                 <View key={`${occurrence.id}::${occurrence.date}`} style={styles.blockRow}>

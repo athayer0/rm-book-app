@@ -5,7 +5,8 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUtils';
 import { EventBlock } from './EventBlock';
-import { formatTime } from '../utils/dateUtils';
+import { formatTime, periodLabel } from '../utils/dateUtils';
+import { useSettings } from '../hooks/useSettings';
 import { Svg, Polygon } from 'react-native-svg';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
 
@@ -69,15 +70,16 @@ interface Props {
   bounceEnabled?: boolean;
 }
 
-function gridHourLabel(hour: number): string {
-  if (hour === 0 || hour === 24) return '12 AM';
-  if (hour === 12) return '12 PM';
-  return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+function gridHourLabel(hour: number, language: 'en' | 'es'): string {
+  if (hour === 0 || hour === 24) return `12 ${periodLabel('AM', language)}`;
+  if (hour === 12) return `12 ${periodLabel('PM', language)}`;
+  return hour < 12 ? `${hour} ${periodLabel('AM', language)}` : `${hour - 12} ${periodLabel('PM', language)}`;
 }
 
 export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect, bounceEnabled = true }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
 
   const SLOT_HEIGHT = slotHeight;
   const DRAG_SLOT_HEIGHT = slotHeight / 2;
@@ -214,11 +216,17 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   const nowM = currentMinutes % 60;
   const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
   const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
-  const HIDE_NEAR_PX = 5;
-  // nowLabel (the red current-time text) sits above the line itself — see its
-  // `top: -15` in makeStyles — so a marker can sit close to the label without
-  // being close to the line. Hiding must check proximity to both.
+  // One continuous hide zone measured from the line itself, rather than two
+  // separate radii (one around the line, one around the label's top) — the
+  // label has height, so two 5px radii left a gap between them where an hour
+  // mark could sit right through the middle of the label text without either
+  // one catching it. nowLabel sits `top: -15` relative to the line (see
+  // makeStyles), so that plus a margin is how far above the line a mark has
+  // to clear; below the line it's just the margin.
+  const HIDE_MARGIN_PX = 5;
   const NOW_LABEL_TOP_OFFSET = 15;
+  const HIDE_ABOVE_PX = NOW_LABEL_TOP_OFFSET + HIDE_MARGIN_PX;
+  const HIDE_BELOW_PX = HIDE_MARGIN_PX;
   const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
   function handleSlotTap(locationY: number) {
@@ -253,16 +261,18 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
           <Pressable style={[styles.timeCol, { height: totalHeight + GRID_TOP_OFFSET }]} onPress={(e) => handleSlotTap(e.nativeEvent.locationY)}>
             {HOURS.map((hour, i) => {
               const hourLineY = i * SLOT_HEIGHT * 2;
-              const nearLine = Math.abs(timeIndicatorY - hourLineY) <= HIDE_NEAR_PX;
-              const nearLabel = Math.abs((timeIndicatorY - NOW_LABEL_TOP_OFFSET) - hourLineY) <= HIDE_NEAR_PX;
-              const nearIndicator = showTimeIndicator && (nearLine || nearLabel);
+              // Positive once the hour mark sits below the now-line.
+              const distanceBelowLine = hourLineY - timeIndicatorY;
+              const nearIndicator = showTimeIndicator
+                && distanceBelowLine >= -HIDE_ABOVE_PX
+                && distanceBelowLine <= HIDE_BELOW_PX;
               return (
                 <View
                   key={hour}
                   style={[styles.hourLabel, { top: GRID_TOP_OFFSET + hourLineY - HOUR_LABEL_HEIGHT / 2 }]}
                 >
                   <Text style={[styles.hourText, nearIndicator && { opacity: 0 }]}>
-                    {gridHourLabel(hour)}
+                    {gridHourLabel(hour, settings.language)}
                   </Text>
                 </View>
               );

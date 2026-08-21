@@ -1,4 +1,5 @@
 import { getISOWeek, getISOWeekYear, format, addWeeks, addMonths, addDays, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { dateFnsLocale, datePattern } from './dateFnsLocale';
 
 export function getWeekKey(date: Date = new Date()): string {
   const year = getISOWeekYear(date);
@@ -31,9 +32,11 @@ export function getWeekDates(weekKey: string): string[] {
   return Array.from({ length: 7 }, (_, i) => format(addDays(monday, i), 'yyyy-MM-dd'));
 }
 
-export function formatWeekLabel(weekKey: string): string {
+export function formatWeekLabel(weekKey: string, language: 'en' | 'es' = 'en'): string {
   const dates = getWeekDates(weekKey);
-  return `${format(parseISO(dates[0]), 'MMM d')} – ${format(parseISO(dates[6]), 'MMM d')}`;
+  const locale = dateFnsLocale(language);
+  const pattern = datePattern('monthDay', language);
+  return `${format(parseISO(dates[0]), pattern, { locale })} – ${format(parseISO(dates[6]), pattern, { locale })}`;
 }
 
 export function formatTime(hour: number, minute: number): string {
@@ -41,6 +44,24 @@ export function formatTime(hour: number, minute: number): string {
   const m = String(minute).padStart(2, '0');
   const ampm = hour < 12 ? 'AM' : 'PM';
   return `${h}:${m} ${ampm}`;
+}
+
+/**
+ * "AM"/"PM" as Spanish actually writes it — lowercase with periods, not the
+ * English capitals. Display only: every stored time and everything
+ * `parseTimeString` reads stays in the canonical "9:05 AM" form regardless of
+ * language, so this never touches the value itself, only what's drawn on
+ * screen right before it's drawn.
+ */
+export function periodLabel(period: 'AM' | 'PM', language: 'en' | 'es'): string {
+  if (language !== 'es') return period;
+  return period === 'AM' ? 'a. m.' : 'p. m.';
+}
+
+/** A "9:05 AM"-form time string with its AM/PM localized for display — see periodLabel. */
+export function localizeTime(timeStr: string, language: 'en' | 'es'): string {
+  if (language !== 'es') return timeStr;
+  return timeStr.replace('AM', 'a. m.').replace('PM', 'p. m.');
 }
 
 export function parseTimeString(timeStr: string): { hour: number; minute: number } {
@@ -62,6 +83,21 @@ export function parseTimeString(timeStr: string): { hour: number; minute: number
  * being viewed — the caller supplies the date separately, and rolling the clock
  * would not roll that with it.
  */
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/** Single-letter weekday initial — `day` is JS's 0=Sunday convention. */
+export function weekdayInitial(day: number, t: (key: string) => string): string {
+  return t(`calendar.weekdayInitial.${WEEKDAY_KEYS[day]}`);
+}
+
+/** Two-letter weekday headers for a month grid, in the order `weekStart` puts them. */
+export function weekdayShortLabels(weekStart: 'monday' | 'sunday', t: (key: string) => string): string[] {
+  const order: ('mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun')[] = weekStart === 'monday'
+    ? ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+    : ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  return order.map(day => t(`calendar.weekdayShort.${day}`));
+}
+
 export function nextHalfHour(now: Date = new Date()): string {
   const elapsed = now.getHours() * 60 + now.getMinutes() + (now.getSeconds() > 0 ? 1 : 0);
   const mark = Math.min(Math.ceil(elapsed / 30) * 30, 23 * 60 + 30);
@@ -96,9 +132,9 @@ export function getMonthDates(monthKey: string): string[] {
     .map(d => format(d, 'yyyy-MM-dd'));
 }
 
-export function formatMonthLabel(monthKey: string): string {
+export function formatMonthLabel(monthKey: string, language: 'en' | 'es' = 'en'): string {
   const [year, month] = monthKey.split('-').map(Number);
-  return format(new Date(year, month - 1, 1), 'MMMM yyyy');
+  return format(new Date(year, month - 1, 1), 'MMMM yyyy', { locale: dateFnsLocale(language) });
 }
 
 export function addMinutesToTimeString(timeStr: string, minutes: number): string {

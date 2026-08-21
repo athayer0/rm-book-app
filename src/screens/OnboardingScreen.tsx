@@ -8,6 +8,8 @@ import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { applyThemeColorOverrides } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { LightColors, DarkColors, type ColorPalette } from '../constants/colors';
@@ -142,20 +144,20 @@ interface StarterEntry {
  * routine the person is opting into indefinitely, not a series with a known
  * last occurrence.
  */
-function starterEntries(kind: ScheduleKind): StarterEntry[] {
-  const work: StarterEntry = { title: 'Work', type: 'work', startTime: '9:00 AM', minutes: 8 * 60, recurringRule: 'weekly', recurringDays: [1, 2, 3, 4, 5] };
-  const school: StarterEntry = { title: 'School', type: 'school', startTime: '8:00 AM', minutes: 7 * 60, recurringRule: 'weekly', recurringDays: [1, 2, 3, 4, 5] };
+function starterEntries(kind: ScheduleKind, t: TFunction): StarterEntry[] {
+  const work: StarterEntry = { title: t('onboarding.starter.work'), type: 'work', startTime: '9:00 AM', minutes: 8 * 60, recurringRule: 'weekly', recurringDays: [1, 2, 3, 4, 5] };
+  const school: StarterEntry = { title: t('onboarding.starter.school'), type: 'school', startTime: '8:00 AM', minutes: 7 * 60, recurringRule: 'weekly', recurringDays: [1, 2, 3, 4, 5] };
 
   return [
-    { title: 'Morning Prayer', type: 'prayer', startTime: '6:30 AM', minutes: 15, recurringRule: 'daily' },
-    { title: 'Scripture Study', type: 'scripture', startTime: '7:00 AM', minutes: 30, recurringRule: 'daily' },
-    { title: 'Breakfast', type: 'meal', startTime: '7:30 AM', minutes: 30, recurringRule: 'daily' },
+    { title: t('onboarding.starter.morningPrayer'), type: 'prayer', startTime: '6:30 AM', minutes: 15, recurringRule: 'daily' },
+    { title: t('onboarding.starter.scriptureStudy'), type: 'scripture', startTime: '7:00 AM', minutes: 30, recurringRule: 'daily' },
+    { title: t('onboarding.starter.breakfast'), type: 'meal', startTime: '7:30 AM', minutes: 30, recurringRule: 'daily' },
     kind === 'work' ? work : school,
-    { title: 'Lunch', type: 'meal', startTime: '12:00 PM', minutes: 30, recurringRule: 'daily' },
-    { title: 'Exercise', type: 'exercise', startTime: '5:30 PM', minutes: 30, recurringRule: 'daily' },
-    { title: 'Dinner', type: 'meal', startTime: '6:30 PM', minutes: 30, recurringRule: 'daily' },
-    { title: 'Nightly Prayer', type: 'prayer', startTime: '10:00 PM', minutes: 15, recurringRule: 'daily' },
-    { title: 'Church', type: 'church', startTime: '9:00 AM', minutes: 120, recurringRule: 'weekly', recurringDays: [0] },
+    { title: t('onboarding.starter.lunch'), type: 'meal', startTime: '12:00 PM', minutes: 30, recurringRule: 'daily' },
+    { title: t('onboarding.starter.exercise'), type: 'exercise', startTime: '5:30 PM', minutes: 30, recurringRule: 'daily' },
+    { title: t('onboarding.starter.dinner'), type: 'meal', startTime: '6:30 PM', minutes: 30, recurringRule: 'daily' },
+    { title: t('onboarding.starter.nightlyPrayer'), type: 'prayer', startTime: '10:00 PM', minutes: 15, recurringRule: 'daily' },
+    { title: t('onboarding.starter.church'), type: 'church', startTime: '9:00 AM', minutes: 120, recurringRule: 'weekly', recurringDays: [0] },
   ];
 }
 
@@ -201,6 +203,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   const isDark = useIsDark();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { settings, updateSettings } = useSettings();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
   const { definitions, updateDefinitions } = useWeeklyGoals();
@@ -436,7 +439,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
           ))}
         </View>
-        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}</Text>
       </TouchableOpacity>
     );
   }
@@ -467,7 +470,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
           ))}
         </View>
-        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}</Text>
       </TouchableOpacity>
     );
   }
@@ -494,7 +497,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
           ))}
         </View>
-        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}</Text>
       </TouchableOpacity>
     );
   }
@@ -579,7 +582,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 fill={Colors.textSecondary}
                 textAnchor="middle"
               >
-                {GRAIN.week.axisLabel(getWeekKeyByOffset(i - (EXAMPLE_COUNTS.length - 1)))}
+                {GRAIN.week.axisLabel(getWeekKeyByOffset(i - (EXAMPLE_COUNTS.length - 1)), settings.language)}
               </SvgText>
             ))}
           </Svg>
@@ -694,7 +697,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
       if (wantsSchedule) {
         const activeTypeIds = new Set(DEFAULT_EVENT_TYPES.filter(d => !disabledTypeIds.has(d.id)).map(d => d.id));
-        const entries = starterEntries(scheduleKind).filter(e => activeTypeIds.has(e.type));
+        const entries = starterEntries(scheduleKind, t).filter(e => activeTypeIds.has(e.type));
         for (const draft of buildStarterSchedule(entries, effectiveEventTypeColors)) {
           await addEvent(draft);
         }
@@ -712,7 +715,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
       <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
         {!isLast && (
           <TouchableOpacity style={[styles.skip, { top: insets.top + 12 }]} onPress={commitAndComplete} hitSlop={12}>
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
         )}
 
@@ -728,11 +731,9 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
           {/* Welcome */}
           <ScrollView style={{ width }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} bounces={false}>
             <Image source={require('../../assets/icon.png')} style={styles.heroImage} />
-            <Text style={styles.title}>Welcome to RM Book</Text>
+            <Text style={styles.title}>{t('onboarding.welcome.title')}</Text>
             <Text style={styles.body}>
-              Your companion for the next chapter. Let's take a quick look around: Home for your
-              goals, Calendar to log your days, People for those who matter most, and
-              Settings to make it yours.
+              {t('onboarding.welcome.body')}
             </Text>
           </ScrollView>
 
@@ -741,7 +742,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="color-palette" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Choose your app theme</Text>
+            <Text style={styles.title}>{t('onboarding.colors.title')}</Text>
 
             <View style={styles.schemeGrid}>
               <View style={styles.schemeGridRow}>
@@ -759,9 +760,9 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="home" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Home: your goals</Text>
+            <Text style={styles.title}>{t('onboarding.home.title')}</Text>
             <Text style={styles.body}>
-              Track weekly and monthly goals right from Home. Here's Personal Study, six weeks in.
+              {t('onboarding.home.body')}
             </Text>
             <View style={styles.exampleCardWrap}>
               <GoalCard
@@ -778,10 +779,9 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="trending-up" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Choose your goals</Text>
+            <Text style={styles.title}>{t('onboarding.goals.title')}</Text>
             <Text style={styles.body}>
-              Select the goals you would like to track. Add, edit, or remove goals anytime from
-              Home → Edit Goals.
+              {t('onboarding.goals.body')}
             </Text>
             <ScrollView
               ref={goalSchemeRowRef}
@@ -800,7 +800,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                     <View style={[styles.goalIconWrap, { backgroundColor: isDark ? color : color + '20' }]}>
                       <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={16} color={isDark ? lightenColor(color) : color} />
                     </View>
-                    <Text style={styles.goalLabel}>{def.label}</Text>
+                    <Text style={styles.goalLabel}>{t(`goals.${def.id}`, { defaultValue: def.label })}</Text>
                     <Switch
                       value={!removedGoalIds.has(def.id)}
                       onValueChange={() => toggleGoal(def.id)}
@@ -818,17 +818,15 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="calendar" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Calendar: log your days</Text>
+            <Text style={styles.title}>{t('onboarding.calendar.title')}</Text>
             <Text style={styles.body}>
-              Enjoy the familiar feel of scheduling out and reporting on your days on the
-              Calendar page. You can start with a ready-made schedule below, or build your own
-              from scratch.
+              {t('onboarding.calendar.body')}
             </Text>
             <View style={styles.card}>
               <View style={[styles.toggleRow, !wantsSchedule && styles.rowLast]}>
                 <View style={styles.toggleTextGroup}>
-                  <Text style={styles.toggleLabel}>Starter Schedule</Text>
-                  <Text style={styles.toggleHint}>Prayer, study, meals, exercise, and Sunday church, repeating.</Text>
+                  <Text style={styles.toggleLabel}>{t('onboarding.calendar.starterSchedule')}</Text>
+                  <Text style={styles.toggleHint}>{t('onboarding.calendar.starterScheduleHint')}</Text>
                 </View>
                 <Switch
                   value={wantsSchedule}
@@ -846,7 +844,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                       onPress={() => setScheduleKind(kind)}
                     >
                       <Text style={[styles.pillText, scheduleKind === kind && styles.pillTextActive]}>
-                        {kind === 'work' ? "I work" : "I'm a student"}
+                        {kind === 'work' ? t('onboarding.calendar.iWork') : t('onboarding.calendar.imAStudent')}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -860,9 +858,9 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="list" size={48} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Choose your event types</Text>
+            <Text style={styles.title}>{t('onboarding.eventTypes.title')}</Text>
             <Text style={styles.body}>
-              Select the types of events that you would like to use on the Calendar page.
+              {t('onboarding.eventTypes.body')}
             </Text>
             <ScrollView
               ref={eventSchemeRowRef}
@@ -879,7 +877,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 return (
                   <View key={def.id} style={[styles.goalRow, i === arr.length - 1 && styles.rowLast]}>
                     <View style={[styles.typeDot, { backgroundColor: color }]} />
-                    <Text style={styles.goalLabel}>{def.label}</Text>
+                    <Text style={styles.goalLabel}>{t(`eventTypes.${def.id}`, { defaultValue: def.label })}</Text>
                     <Switch
                       value={!disabledTypeIds.has(def.id)}
                       onValueChange={() => toggleEventType(def.id)}
@@ -891,7 +889,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               })}
             </View>
             <Text style={styles.footnote}>
-              Add, remove, or link event types to a goal anytime from Settings → Event Types.
+              {t('onboarding.eventTypes.footnote')}
             </Text>
           </ScrollView>
 
@@ -900,10 +898,9 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>People: those who matter most</Text>
+            <Text style={styles.title}>{t('onboarding.people.title')}</Text>
             <Text style={styles.body}>
-              Save contact info on the People page. There you can find people like John, a recent
-              convert, and view his progress on the covenant path.
+              {t('onboarding.people.body')}
             </Text>
             <View style={styles.card}>
               <PersonCard person={EXAMPLE_PERSON} onPress={() => {}} />
@@ -918,7 +915,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 />
               </View>
               <Text style={styles.pathProgressLabel}>
-                {exampleCompletedMilestones.size}/{EXAMPLE_MILESTONES.length} complete
+                {t('covenantPathTab.completeCount', { completed: exampleCompletedMilestones.size, total: EXAMPLE_MILESTONES.length })}
               </Text>
             </View>
             <View style={styles.card}>
@@ -932,7 +929,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                     activeOpacity={0.7}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: complete }}
-                    accessibilityLabel={m.label}
+                    accessibilityLabel={t(`covenantPath.${m.id}`, { defaultValue: m.label })}
                   >
                     <GoalIcon
                       icon={m.icon}
@@ -940,7 +937,9 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                       size={18}
                       color={complete ? EXAMPLE_PATH_COLOR : Colors.textLight}
                     />
-                    <Text style={[styles.pathLabel, complete && styles.pathLabelDone]}>{m.label}</Text>
+                    <Text style={[styles.pathLabel, complete && styles.pathLabelDone]}>
+                      {t(`covenantPath.${m.id}`, { defaultValue: m.label })}
+                    </Text>
                     <View style={[styles.pathCheckbox, complete && styles.pathCheckboxChecked]}>
                       {complete && <Ionicons name="checkmark" size={14} color={Colors.white} />}
                     </View>
@@ -955,23 +954,22 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="download" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Bring in your contacts</Text>
+            <Text style={styles.title}>{t('onboarding.contacts.title')}</Text>
             <Text style={styles.body}>
-              Already have everyone in your phone? Import names, numbers, and addresses straight
-              from your contacts instead of typing them one by one.
+              {t('onboarding.contacts.body')}
             </Text>
             <TouchableOpacity style={styles.importCard} onPress={() => setShowImport(true)} activeOpacity={0.8}>
               <View style={styles.importIconWrap}>
                 <Ionicons name="download-outline" size={22} color={Colors.onPrimary} />
               </View>
               <View style={styles.toggleTextGroup}>
-                <Text style={styles.toggleLabel}>Import from Contacts</Text>
-                <Text style={styles.toggleHint}>Pull names, numbers, and addresses in from your phone.</Text>
+                <Text style={styles.toggleLabel}>{t('onboarding.contacts.importFromContacts')}</Text>
+                <Text style={styles.toggleHint}>{t('onboarding.contacts.importHint')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={Colors.textLight} />
             </TouchableOpacity>
             <Text style={styles.footnote}>
-              You can also add, edit, or remove people manually at any time.
+              {t('onboarding.contacts.footnote')}
             </Text>
           </ScrollView>
 
@@ -980,16 +978,15 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="settings" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Settings: make it yours</Text>
+            <Text style={styles.title}>{t('onboarding.settings.title')}</Text>
             <Text style={styles.body}>
-              Choose your preferences now, or leave the defaults. Everything here and more can be
-              personalized anytime from the Settings page.
+              {t('onboarding.settings.body')}
             </Text>
             <View style={styles.card}>
               <View style={styles.toggleRow}>
                 <View style={styles.toggleTextGroup}>
-                  <Text style={styles.toggleLabel}>Daily Review</Text>
-                  <Text style={styles.toggleHint}>A nightly nudge to report today's events.</Text>
+                  <Text style={styles.toggleLabel}>{t('onboarding.settings.dailyReview')}</Text>
+                  <Text style={styles.toggleHint}>{t('onboarding.settings.dailyReviewHint')}</Text>
                 </View>
                 <Switch
                   value={draftDailyReview}
@@ -1000,8 +997,8 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               </View>
               <View style={[styles.toggleRow, styles.rowLast]}>
                 <View style={styles.toggleTextGroup}>
-                  <Text style={styles.toggleLabel}>Event Reminders</Text>
-                  <Text style={styles.toggleHint}>A heads-up shortly before each event starts.</Text>
+                  <Text style={styles.toggleLabel}>{t('onboarding.settings.eventReminders')}</Text>
+                  <Text style={styles.toggleHint}>{t('onboarding.settings.eventRemindersHint')}</Text>
                 </View>
                 <Switch
                   value={draftEventReminders}
@@ -1013,7 +1010,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             </View>
             <View style={styles.card}>
               <View style={styles.prefRow}>
-                <Text style={styles.toggleLabel}>Theme</Text>
+                <Text style={styles.toggleLabel}>{t('onboarding.settings.theme')}</Text>
                 <View style={styles.prefPills}>
                   {(['light', 'dark', 'system'] as const).map(theme => (
                     <TouchableOpacity
@@ -1022,14 +1019,14 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                       onPress={() => setDraftTheme(theme)}
                     >
                       <Text style={[styles.pillTextSmall, draftTheme === theme && styles.pillTextActive]}>
-                        {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                        {t(`settings.theme.${theme}`)}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
               <View style={[styles.prefRow, styles.rowLast]}>
-                <Text style={styles.toggleLabel}>Week Start</Text>
+                <Text style={styles.toggleLabel}>{t('onboarding.settings.weekStart')}</Text>
                 <View style={styles.prefPills}>
                   {(['sunday', 'monday'] as const).map(day => (
                     <TouchableOpacity
@@ -1038,7 +1035,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                       onPress={() => setDraftWeekStart(day)}
                     >
                       <Text style={[styles.pillTextSmall, draftWeekStart === day && styles.pillTextActive]}>
-                        {day.charAt(0).toUpperCase() + day.slice(1)}
+                        {t(`calendar.weekdayFull.${day}`)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1052,11 +1049,11 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <View style={styles.iconCircle}>
               <Ionicons name="checkmark" size={44} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.title}>You're all set</Text>
+            <Text style={styles.title}>{t('onboarding.ready.title')}</Text>
             <Text style={styles.scripture}>
-              "But be ye doers of the word, and not hearers only."
+              {t('settingsScreen.scriptureQuote')}
             </Text>
-            <Text style={styles.scriptureRef}>James 1:22</Text>
+            <Text style={styles.scriptureRef}>{t('onboarding.ready.scriptureRef')}</Text>
           </ScrollView>
         </ScrollView>
 
@@ -1079,7 +1076,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               onPress={() => (isLast ? commitAndComplete() : goTo(page + 1))}
               disabled={completing}
             >
-              <Text style={styles.nextButtonText}>{isLast ? 'Get Started' : 'Next'}</Text>
+              <Text style={styles.nextButtonText}>{isLast ? t('onboarding.getStarted') : t('onboarding.next')}</Text>
               {!isLast && <Ionicons name="chevron-forward" size={18} color={Colors.onPrimary} style={{ marginLeft: 2 }} />}
             </TouchableOpacity>
           </View>

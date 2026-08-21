@@ -2,14 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Alert, View, Text, TextInput, TouchableOpacity, Pressable, ScrollView, StyleSheet,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, DEFAULT_GOAL_COLOR } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { DEFAULT_GOAL_SPLIT_TIME, EventTypeDefinition } from '../constants/eventTypeDefaults';
-import { GoalDefinition } from '../constants/defaultGoals';
+import { DEFAULT_GOAL_SPLIT_TIME, EventTypeDefinition, eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
+import { localizeTime } from '../utils/dateUtils';
+import { GoalDefinition, goalDisplayLabel } from '../constants/defaultGoals';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
@@ -19,9 +21,6 @@ import { DropdownMenu, DropdownItem, MenuScrollView, Collapsible } from '../comp
 import { useSettings } from '../hooks/useSettings';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { eventTypeColor, eventTypeDefaultMinutes } from '../utils/eventUtils';
-
-/** What a type is called in the picker and the header while its name is blank. */
-const UNTITLED = 'Untitled Event Type';
 
 const DEFAULT_TYPE_MINUTES = 30;
 
@@ -49,13 +48,6 @@ type CountChoice = 'count' | 'hours' | 'quantity' | 'dayNight';
 
 const COUNT_CHOICES: CountChoice[] = ['count', 'hours', 'quantity', 'dayNight'];
 
-const COUNT_CHOICE_LABEL: Record<CountChoice, string> = {
-  count: 'Completion',
-  hours: 'Hours',
-  quantity: 'Quantity',
-  dayNight: 'Day/Night',
-};
-
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -80,6 +72,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { settings, updateSettings } = useSettings();
   const { events, deleteEventsOfType } = useCalendarEvents();
 
@@ -130,7 +123,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
     // A blank name is allowed while typing; nothing nameless is allowed to
     // persist, since the picker would then have a row you can't read.
     onUpdateDefinitions(localDefs.map(d => (
-      d.removed || d.label.trim() ? d : { ...d, label: UNTITLED }
+      d.removed || d.label.trim() ? d : { ...d, label: t('eventTypesModal.untitled') }
     )));
     // Only when something actually moved — these two start out as the very
     // objects settings holds, so an untouched visit writes nothing rather than
@@ -157,7 +150,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   }
 
   function label(def: EventTypeDefinition): string {
-    return def.label.trim() || UNTITLED;
+    return def.label.trim() ? eventTypeDisplayLabel(def, t) : t('eventTypesModal.untitled');
   }
 
   /**
@@ -214,12 +207,12 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
 
     if (typeInUse(id)) {
       Alert.alert(
-        'Delete Event Type',
-        `There ${usage === 1 ? 'is' : 'are'} still ${usage} event${usage === 1 ? '' : 's'} of "${name}" in your calendar. Would you like to delete them all and delete the event type?`,
+        t('eventTypesModal.deleteEventTypeTitle'),
+        t('eventTypesModal.deleteEventTypeBody', { count: usage, name }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Delete All',
+            text: t('eventTypesModal.deleteAll'),
             style: 'destructive',
             onPress: async () => {
               await deleteEventsOfType(id);
@@ -234,12 +227,12 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
     }
 
     Alert.alert(
-      `Delete "${name}"?`,
-      'This cannot be undone.',
+      t('editGoals.deleteGoalTitle', { name }),
+      t('editGoals.cannotBeUndone'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             selectNeighbourOf(id);
@@ -309,7 +302,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={8}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Event Types</Text>
+        <Text style={styles.headerTitle}>{t('eventTypesModal.title')}</Text>
         <View style={styles.closeBtn} />
       </View>
 
@@ -331,7 +324,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
         {/* Which type every field below belongs to. Its own group, lifted over
             the cards that follow while its menu is out. */}
         <View style={elevatedMenu === 'type' && styles.groupFloating}>
-          <Text style={styles.sectionLabel}>EVENT TYPE</Text>
+          <Text style={styles.sectionLabel}>{t('eventTypesModal.eventTypeSectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedMenu === 'type' && styles.fieldRowOpen]}>
               <TouchableOpacity
@@ -341,7 +334,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
               >
                 {selected && <View style={[styles.rowDot, { backgroundColor: color }]} />}
                 <Text style={[styles.rowTitle, !selected && styles.rowTitleEmpty]} numberOfLines={1}>
-                  {selected ? label(selected) : 'No event types'}
+                  {selected ? label(selected) : t('eventTypesModal.noEventTypes')}
                 </Text>
                 <Ionicons
                   name={openMenu === 'type' ? 'chevron-up' : 'chevron-down'}
@@ -385,7 +378,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
             <View style={(elevatedMenu === 'goal' || elevatedMenu === 'lateGoal') && styles.groupFloating}>
               <View style={[styles.card, { marginTop: 18 }]}>
                 <View style={styles.section}>
-                  <Text style={styles.fieldLabel}>Name</Text>
+                  <Text style={styles.fieldLabel}>{t('editGoals.name')}</Text>
                   <View style={styles.nameRow}>
                     <View style={styles.nameField}>
                       <TextInput
@@ -393,7 +386,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                         value={selected.label}
                         onChangeText={text => patchType(selected.id, { label: text })}
                         onFocus={() => setOpenMenu(null)}
-                        placeholder="Event type name..."
+                        placeholder={t('eventTypesModal.eventTypeNamePlaceholder')}
                         placeholderTextColor={Colors.textLight}
                         returnKeyType="done"
                       />
@@ -408,7 +401,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                       onPress={handleDeletePress}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       accessibilityRole="button"
-                      accessibilityLabel="Delete event type"
+                      accessibilityLabel={t('eventTypesModal.deleteEventTypeA11y')}
                     >
                       <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
                     </TouchableOpacity>
@@ -420,7 +413,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                   onPress={() => { setOpenMenu(null); setColorSheetOpen(true); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.rowLabel}>Color</Text>
+                  <Text style={styles.rowLabel}>{t('editGoals.color')}</Text>
                   <View style={[styles.rowDot, { marginRight: 0, backgroundColor: color }]} />
                   <Ionicons name="chevron-forward" size={16} color={Colors.textLight} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
@@ -440,7 +433,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     {/* Renamed while the type is a pair, because "Linked Goal"
                         and "Evening Goal" as a pair of labels says nothing about
                         which of the two this one is. */}
-                    <Text style={styles.rowLabel}>{isDayNight ? 'Morning Goal' : 'Linked Goal'}</Text>
+                    <Text style={styles.rowLabel}>{t(isDayNight ? 'eventTypesModal.morningGoal' : 'eventTypesModal.linkedGoal')}</Text>
                     {/* The goal's own icon in its own colour, the way the grid
                         and the goal editor draw it — a bare dot said which
                         colour it was and nothing about which goal. */}
@@ -449,7 +442,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                         <GoalIcon icon={linkedGoal.icon} iconFamily={linkedGoal.iconFamily} size={15} color={iconTint(linkedGoal.color)} />
                       </View>
                     )}
-                    <Text style={styles.rowValue}>{linkedGoal?.label ?? 'None'}</Text>
+                    <Text style={styles.rowValue}>{linkedGoal ? goalDisplayLabel(linkedGoal, t) : t('goals.none')}</Text>
                     <Ionicons
                       name={openMenu === 'goal' ? 'chevron-up' : 'chevron-down'}
                       size={16}
@@ -466,7 +459,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                       maxRows={GOAL_MENU_ROWS}
                     >
                       <DropdownItem
-                        label="None"
+                        label={t('goals.none')}
                         selected={!selected.goalId}
                         showSeparator={earlyGoals.length > 0}
                         onPress={() => {
@@ -483,7 +476,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                       {earlyGoals.map((g, i, arr) => (
                         <DropdownItem
                           key={g.id}
-                          label={g.label}
+                          label={goalDisplayLabel(g, t)}
                           selected={selected.goalId === g.id}
                           showSeparator={i < arr.length - 1}
                           leading={<GoalIcon icon={g.icon} iconFamily={g.iconFamily} size={17} color={iconTint(g.color)} />}
@@ -513,13 +506,13 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                       onPress={() => toggleMenu('lateGoal')}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.rowLabel}>Evening Goal</Text>
+                      <Text style={styles.rowLabel}>{t('eventTypesModal.eveningGoal')}</Text>
                       {lateGoal && (
                         <View style={[styles.goalIcon, { backgroundColor: isDark ? lateGoal.color : lateGoal.color + '20' }]}>
                           <GoalIcon icon={lateGoal.icon} iconFamily={lateGoal.iconFamily} size={15} color={iconTint(lateGoal.color)} />
                         </View>
                       )}
-                      <Text style={styles.rowValue}>{lateGoal?.label ?? 'None'}</Text>
+                      <Text style={styles.rowValue}>{lateGoal ? goalDisplayLabel(lateGoal, t) : t('goals.none')}</Text>
                       <Ionicons
                         name={openMenu === 'lateGoal' ? 'chevron-up' : 'chevron-down'}
                         size={16}
@@ -535,7 +528,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                         maxRows={GOAL_MENU_ROWS}
                       >
                         <DropdownItem
-                          label="None"
+                          label={t('goals.none')}
                           selected={!selected.lateGoalId}
                           showSeparator={lateGoals.length > 0}
                           onPress={() => {
@@ -550,7 +543,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                         {lateGoals.map((g, i, arr) => (
                           <DropdownItem
                             key={g.id}
-                            label={g.label}
+                            label={goalDisplayLabel(g, t)}
                             selected={selected.lateGoalId === g.id}
                             showSeparator={i < arr.length - 1}
                             leading={<GoalIcon icon={g.icon} iconFamily={g.iconFamily} size={17} color={iconTint(g.color)} />}
@@ -581,8 +574,8 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                       onPress={toggleCutoff}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.rowLabel}>Switches At</Text>
-                      <Text style={styles.rowValue}>{splitTime}</Text>
+                      <Text style={styles.rowLabel}>{t('eventTypesModal.switchesAt')}</Text>
+                      <Text style={styles.rowValue}>{localizeTime(splitTime, settings.language)}</Text>
                       <Ionicons
                         name={cutoffOpen ? 'chevron-up' : 'chevron-down'}
                         size={16}
@@ -600,8 +593,15 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     </Collapsible>
                     <Text style={styles.rowHint}>
                       {lateGoal
-                        ? `Completions before ${splitTime} count toward ${linkedGoal?.label || 'the morning goal'}, and from ${splitTime} on toward ${lateGoal.label || 'the evening goal'}.`
-                        : `Every completion counts toward ${linkedGoal?.label || 'the morning goal'} until an evening goal is picked.`}
+                        ? t('eventTypesModal.splitHintWithEvening', {
+                          time: localizeTime(splitTime, settings.language),
+                          morning: linkedGoal?.label ? goalDisplayLabel(linkedGoal, t) : t('eventTypesModal.theMorningGoal'),
+                          evening: lateGoal.label ? goalDisplayLabel(lateGoal, t) : t('eventTypesModal.theEveningGoal'),
+                        })
+                        : t('eventTypesModal.splitHintNoEvening', {
+                          time: localizeTime(splitTime, settings.language),
+                          morning: linkedGoal?.label ? goalDisplayLabel(linkedGoal, t) : t('eventTypesModal.theMorningGoal'),
+                        })}
                     </Text>
                   </>
                 )}
@@ -611,7 +611,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     type carrying an Evening Goal row it will never use. */}
                 {!!selected.goalId && (
                   <View style={styles.section}>
-                    <Text style={styles.fieldLabel}>Goal Count Type</Text>
+                    <Text style={styles.fieldLabel}>{t('eventTypesModal.goalCountType')}</Text>
                     <View style={styles.segmentTrack}>
                       {COUNT_CHOICES.map(choice => (
                         <TouchableOpacity
@@ -628,7 +628,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                             ]}
                             numberOfLines={1}
                           >
-                            {COUNT_CHOICE_LABEL[choice]}
+                            {t(`eventTypesModal.countChoice.${choice}`)}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -641,7 +641,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     status control at all. Linking separately decides whether that
                     status also feeds a goal. */}
                 <View style={[styles.section, minutes === null && styles.sectionLast]}>
-                  <Text style={styles.fieldLabel}>Status Type</Text>
+                  <Text style={styles.fieldLabel}>{t('eventTypesModal.statusType')}</Text>
                   <View style={styles.segmentTrack}>
                     {(['checkbox', 'status', 'none'] as const).map(style => (
                       <TouchableOpacity
@@ -651,7 +651,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                         activeOpacity={0.75}
                       >
                         <Text style={[styles.segmentText, reportStyle === style && styles.segmentTextActive]}>
-                          {style === 'checkbox' ? 'Checkbox' : style === 'status' ? 'Status' : 'None'}
+                          {t(`eventTypesModal.statusTypeOption.${style}`)}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -660,7 +660,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
 
                 {minutes !== null && (
                   <View style={[styles.section, styles.sectionLast]}>
-                    <Text style={styles.fieldLabel}>Default Duration</Text>
+                    <Text style={styles.fieldLabel}>{t('eventTypesModal.defaultDuration')}</Text>
                     <DurationSlider
                       minutes={minutes}
                       onChange={next => setLocalMinutes(prev => ({ ...prev, [selected.id]: next }))}
@@ -672,7 +672,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
 
           </>
         ) : (
-          <Text style={styles.emptyHint}>Add an event type to start scheduling one.</Text>
+          <Text style={styles.emptyHint}>{t('eventTypesModal.emptyHint')}</Text>
         )}
 
         {/* The only thing under the card now that deleting has moved up beside
@@ -680,7 +680,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
             what's already selected. */}
         <TouchableOpacity onPress={addType} style={styles.addBtn} activeOpacity={0.85}>
           <Ionicons name="add" size={18} color={Colors.white} />
-          <Text style={styles.addBtnText}>Add an Event Type</Text>
+          <Text style={styles.addBtnText}>{t('eventTypesModal.addAnEventType')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />

@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -16,6 +17,7 @@ import type { ColorPalette } from '../constants/colors';
 export function AuthScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +26,7 @@ export function AuthScreen() {
 
   const handleSubmit = async () => {
     if (!email || !password) {
-      Alert.alert('Please enter your email and password.');
+      Alert.alert(t('auth.enterEmailPassword'));
       return;
     }
     setLoading(true);
@@ -37,9 +39,9 @@ export function AuthScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t('auth.errorTitle'), error.message);
     } else if (mode === 'signup') {
-      Alert.alert('Check your email for a confirmation link.');
+      Alert.alert(t('auth.checkEmailConfirmation'));
     }
   };
 
@@ -50,12 +52,12 @@ export function AuthScreen() {
     >
       <Text style={styles.title}>RM Book</Text>
       <Text style={styles.subtitle}>
-        {mode === 'signin' ? 'Sign in to your account' : 'Create an account'}
+        {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
       </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t('auth.email')}
         placeholderTextColor={Colors.textLight}
         autoCapitalize="none"
         keyboardType="email-address"
@@ -64,7 +66,7 @@ export function AuthScreen() {
       />
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder={t('auth.password')}
         placeholderTextColor={Colors.textLight}
         secureTextEntry
         value={password}
@@ -80,7 +82,7 @@ export function AuthScreen() {
           <ActivityIndicator color={Colors.onPrimary} />
         ) : (
           <Text style={styles.buttonText}>
-            {mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {mode === 'signin' ? t('auth.signIn') : t('auth.createAccount')}
           </Text>
         )}
       </TouchableOpacity>
@@ -90,8 +92,8 @@ export function AuthScreen() {
       >
         <Text style={styles.toggle}>
           {mode === 'signin'
-            ? "Don't have an account? Sign up"
-            : 'Already have an account? Sign in'}
+            ? t('auth.needAccount')
+            : t('auth.haveAccount')}
         </Text>
       </TouchableOpacity>
     </KeyboardAvoidingView>

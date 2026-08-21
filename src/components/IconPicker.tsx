@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { BottomSheet } from './BottomSheet';
@@ -142,6 +143,7 @@ export function IconPickerSheet({
 }: SheetProps) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const [draft, setDraft] = useState<IconOption>({ name: icon, family: iconFamily });
 
@@ -154,7 +156,7 @@ export function IconPickerSheet({
   return (
     <BottomSheet
       visible={visible}
-      title={title ?? 'Icon'}
+      title={title ?? t('iconPicker.title')}
       height={SHEET_HEIGHT}
       onCancel={onCancel}
       onDone={() => onDone(draft)}

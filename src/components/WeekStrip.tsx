@@ -4,6 +4,8 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
+import { useSettings } from '../hooks/useSettings';
+import { dateFnsLocale } from '../utils/dateFnsLocale';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -17,6 +19,8 @@ interface Props {
 export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
+  const locale = dateFnsLocale(settings.language);
 
   const weekStartsOn = weekStart === 'monday' ? 1 : 0;
 
@@ -97,7 +101,7 @@ export function WeekStrip({ selectedDate, weekStart, onSelectDate, onSwipeWeek }
                   isSelected && styles.dayNameSelected,
                 ]}
               >
-                {format(day, 'EEE').slice(0, 2).toUpperCase()}
+                {format(day, 'EEE', { locale }).slice(0, 2).toUpperCase()}
               </Text>
               <Text
                 style={[

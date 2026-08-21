@@ -4,9 +4,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO, subDays } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
+import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useUnreported } from '../hooks/useUnreported';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
@@ -21,15 +24,16 @@ interface Props {
 }
 
 /** "Today" and "Yesterday" beat a date for the two days carrying most of the backlog. */
-function dayLabel(dateStr: string, today: Date): string {
-  if (dateStr === format(today, 'yyyy-MM-dd')) return 'Today';
-  if (dateStr === format(subDays(today, 1), 'yyyy-MM-dd')) return 'Yesterday';
-  return format(parseISO(dateStr), 'EEEE, MMM d');
+function dayLabel(dateStr: string, today: Date, t: TFunction, language: 'en' | 'es'): string {
+  if (dateStr === format(today, 'yyyy-MM-dd')) return t('personTimeline.today');
+  if (dateStr === format(subDays(today, 1), 'yyyy-MM-dd')) return t('personTimeline.yesterday');
+  return format(parseISO(dateStr), datePattern('weekdayMonthDay', language), { locale: dateFnsLocale(language) });
 }
 
 export function UnreportedEventsModal({ visible, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { unreported, report, statusOf } = useUnreported();
   const { updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate } = useCalendarEvents();
@@ -66,11 +70,11 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
         <View style={styles.headerLabels}>
-          <Text style={styles.headerTitle}>Unreported Events</Text>
+          <Text style={styles.headerTitle}>{t('unreportedEvents.title')}</Text>
           <Text style={styles.headerCount}>
             {unreported.length === 0
-              ? 'All caught up'
-              : `${unreported.length} waiting · last 30 days`}
+              ? t('unreportedEvents.allCaughtUp')
+              : t('unreportedEvents.waiting', { count: unreported.length })}
           </Text>
         </View>
       </View>
@@ -79,15 +83,15 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
         {unreported.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="checkmark-circle" size={48} color={Colors.statusCompleted} />
-            <Text style={styles.emptyText}>Nothing to report</Text>
+            <Text style={styles.emptyText}>{t('unreportedEvents.nothingToReport')}</Text>
             <Text style={styles.emptyHint}>
-              Events show up here once their start time has passed.
+              {t('unreportedEvents.emptyHint')}
             </Text>
           </View>
         ) : (
           groups.map(([dateStr, occurrences]) => (
             <View key={dateStr} style={styles.group}>
-              <Text style={styles.groupHeader}>{dayLabel(dateStr, today)}</Text>
+              <Text style={styles.groupHeader}>{dayLabel(dateStr, today, t, settings.language)}</Text>
 
               {occurrences.map(occurrence => (
                 <View key={`${occurrence.id}::${occurrence.date}`} style={styles.blockRow}>

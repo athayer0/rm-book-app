@@ -7,6 +7,8 @@ import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, rendere
 import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../constants/contactMethods';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
+import { useSettings } from '../hooks/useSettings';
+import { localizeTime } from '../utils/dateUtils';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
@@ -173,6 +175,7 @@ export function EventBlock({
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
   const { byId: eventTypeById } = useEventTypeDefinitions();
 
   const statusColor: Record<EventStatus, string> = {
@@ -326,10 +329,15 @@ export function EventBlock({
   // event, or a contact logged without an end, has just the one time to show. A
   // title that doesn't even fit on one line has already claimed the whole row —
   // there's nothing left to spare a time into.
-  const bothLabel = `${event.startTime} – ${event.endTime}`;
+  // Localized before either the width math or the render below — "a.m."/"p.m."
+  // isn't the same length as "AM"/"PM", so the fit check has to measure
+  // whatever's actually going to be drawn, not the stored English form.
+  const displayStart = localizeTime(event.startTime, settings.language);
+  const displayEnd = localizeTime(event.endTime, settings.language);
+  const bothLabel = `${displayStart} – ${displayEnd}`;
   const timeLabel = !titleFitsOneLine ? null
     : hasEndTime(event) && spare >= textWidth(bothLabel, fontSize) ? bothLabel
-    : spare >= textWidth(event.startTime, fontSize) ? event.startTime
+    : spare >= textWidth(displayStart, fontSize) ? displayStart
     : null;
 
   // A title that doesn't fit on one line wraps word-by-word (splitting an

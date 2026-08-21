@@ -1,4 +1,5 @@
 import { Alert, Linking } from 'react-native';
+import type { TFunction } from 'i18next';
 
 // A tel: URI only carries dialable characters — the formatting a user types
 // (spaces, dashes, parens) is dropped rather than percent-encoded.
@@ -90,23 +91,23 @@ async function tryOpen(url: string): Promise<boolean> {
   }
 }
 
-export async function callNumber(phone: string | null | undefined): Promise<void> {
+export async function callNumber(phone: string | null | undefined, t: TFunction): Promise<void> {
   const dialable = toDialable(phone);
   if (!dialable) return;
   await open(
     `tel:${dialable}`,
-    'Can’t place the call',
-    'This device has no app that can dial phone numbers.',
+    t('phoneUtils.cantPlaceCallTitle'),
+    t('phoneUtils.cantPlaceCallBody'),
   );
 }
 
-export async function messageNumber(phone: string | null | undefined): Promise<void> {
+export async function messageNumber(phone: string | null | undefined, t: TFunction): Promise<void> {
   const dialable = toDialable(phone);
   if (!dialable) return;
   await open(
     `sms:${dialable}`,
-    'Can’t start a message',
-    'This device has no app that can send text messages.',
+    t('phoneUtils.cantStartMessageTitle'),
+    t('phoneUtils.cantStartMessageBody'),
   );
 }
 
@@ -116,13 +117,14 @@ export async function messageNumber(phone: string | null | undefined): Promise<v
 export async function openWhatsApp(
   phone: string | null | undefined,
   defaultCountryCode: string | null | undefined,
+  t: TFunction,
 ): Promise<void> {
   const number = toWhatsAppNumber(phone, defaultCountryCode);
   if (!number) return;
   await open(
     `https://wa.me/${number}`,
-    'Can’t open WhatsApp',
-    'Nothing on this device could open the WhatsApp link.',
+    t('phoneUtils.cantOpenWhatsappTitle'),
+    t('phoneUtils.cantOpenWhatsappBody'),
   );
 }
 
@@ -138,13 +140,13 @@ export async function openWhatsApp(
  * LSApplicationQueriesSchemes, so it would skip the app link on a device that
  * has Messenger right there.
  */
-export async function openMessenger(link: string | null | undefined): Promise<void> {
+export async function openMessenger(link: string | null | undefined, t: TFunction): Promise<void> {
   const handle = toMessengerHandle(link);
   if (!handle) return;
   if (/^\d+$/.test(handle) && await tryOpen(`fb-messenger://user-thread/${handle}`)) return;
   await open(
     `https://m.me/${handle}`,
-    'Can’t open Messenger',
-    'Nothing on this device could open the Messenger link.',
+    t('phoneUtils.cantOpenMessengerTitle'),
+    t('phoneUtils.cantOpenMessengerBody'),
   );
 }

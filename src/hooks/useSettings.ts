@@ -34,6 +34,7 @@ export interface QuickAddType {
 export interface AppSettings {
   weekStart: 'sunday' | 'monday';
   theme: 'light' | 'dark' | 'system';
+  language: 'en' | 'es';
   /** Drives `primary` — the header band and everything else tinted with it. */
   themeColor: string;
   /** Drives `accent` (Save/Done/EDIT, goal counts) — light and dark set independently. */
@@ -83,6 +84,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   weekStart: 'monday',
   theme: 'light',
+  language: 'en',
   themeColor: DEFAULT_THEME_COLOR,
   secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
   secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,

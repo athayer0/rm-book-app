@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { SheetModal } from '../components/SheetModal';
@@ -11,6 +12,7 @@ import { GoalIcon } from '../components/GoalIcon';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { useSettings } from '../hooks/useSettings';
 import { eventTypeColor } from '../utils/eventUtils';
+import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 
 export const MAX_QUICK_ADD_TYPES = 8;
 // Room for IconPicker's full grid — a wrapping page of every icon on offer,
@@ -31,6 +33,7 @@ interface Props {
 export function QuickAddTypesModal({ visible, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { definitions } = useEventTypeDefinitions();
   const { settings, updateSettings } = useSettings();
 
@@ -58,7 +61,8 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
   }
 
   const editingEntry = editingId ? selected.find(q => q.id === editingId) : undefined;
-  const editingLabel = editingId ? definitions.find(d => d.id === editingId)?.label ?? '' : '';
+  const editingDef = editingId ? definitions.find(d => d.id === editingId) : undefined;
+  const editingLabel = editingDef ? eventTypeDisplayLabel(editingDef, t) : '';
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
@@ -66,7 +70,7 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
         <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={8}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quick Add</Text>
+        <Text style={styles.headerTitle}>{t('quickAddTypes.title')}</Text>
         <View style={styles.closeBtn} />
       </View>
 
@@ -79,8 +83,8 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
       >
         <Text style={styles.hint}>
           {atLimit
-            ? `Maximum of ${MAX_QUICK_ADD_TYPES} reached — remove one to add another.`
-            : `Choose up to ${MAX_QUICK_ADD_TYPES} types to show as quick-add bubbles on the calendar's + button.`}
+            ? t('quickAddTypes.maxReached', { max: MAX_QUICK_ADD_TYPES })
+            : t('quickAddTypes.chooseUpTo', { max: MAX_QUICK_ADD_TYPES })}
         </Text>
 
         <View style={styles.list}>
@@ -99,7 +103,7 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
                   style={[styles.label, disabled && styles.labelMuted]}
                   numberOfLines={1}
                 >
-                  {def.label}
+                  {eventTypeDisplayLabel(def, t)}
                 </Text>
                 {isSelected && (
                   <TouchableOpacity

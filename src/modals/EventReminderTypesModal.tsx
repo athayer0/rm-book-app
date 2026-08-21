@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { SheetModal } from '../components/SheetModal';
@@ -8,6 +9,7 @@ import { StatusCheckbox } from '../components/StatusCheckbox';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { useSettings } from '../hooks/useSettings';
 import { eventTypeColor } from '../utils/eventUtils';
+import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 
 const CHECKBOX_SIZE = 20;
 
@@ -25,6 +27,7 @@ interface Props {
 export function EventReminderTypesModal({ visible, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { definitions } = useEventTypeDefinitions();
   const { settings, updateSettings } = useSettings();
 
@@ -44,7 +47,7 @@ export function EventReminderTypesModal({ visible, onClose }: Props) {
         <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={8}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reminder Types</Text>
+        <Text style={styles.headerTitle}>{t('eventReminderTypes.title')}</Text>
         <View style={styles.closeBtn} />
       </View>
 
@@ -55,7 +58,7 @@ export function EventReminderTypesModal({ visible, onClose }: Props) {
         bounces={false}
         overScrollMode="never"
       >
-        <Text style={styles.hint}>Choose which event types send a reminder notification.</Text>
+        <Text style={styles.hint}>{t('eventReminderTypes.hint')}</Text>
 
         <View style={styles.list}>
           <View style={styles.listClip}>
@@ -69,7 +72,7 @@ export function EventReminderTypesModal({ visible, onClose }: Props) {
                   hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
                 >
                   <View style={[styles.dot, { backgroundColor: eventTypeColor(def.id, settings.eventTypeColors) }]} />
-                  <Text style={styles.label} numberOfLines={1}>{def.label}</Text>
+                  <Text style={styles.label} numberOfLines={1}>{eventTypeDisplayLabel(def, t)}</Text>
                   <StatusCheckbox checked={isSelected} size={CHECKBOX_SIZE} color={Colors.control} />
                 </TouchableOpacity>
               );

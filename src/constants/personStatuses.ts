@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 export type StatusShape = 'circle' | 'dot' | 'star' | 'diamond';
 
 export interface StatusConfig {
@@ -74,8 +76,16 @@ const STATUS_SINGULAR_DISPLAY: Record<string, string> = {
   'Friends': 'Friend',
 };
 
-export function statusDisplayName(status: string): string {
-  return STATUS_SINGULAR_DISPLAY[status] ?? status;
+export function statusDisplayName(status: string, t: TFunction): string {
+  const singular = STATUS_SINGULAR_DISPLAY[status];
+  return singular
+    ? t(`personStatusesSingular.${status}`, { defaultValue: singular })
+    : t(`personStatuses.${status}`, { defaultValue: status });
+}
+
+/** The heading a STATUS_GROUPS entry displays under — falls back to the raw name for anything not in PERSON_STATUSES' fixed set. */
+export function statusGroupLabel(groupName: string, t: TFunction): string {
+  return t(`personStatusGroups.${groupName}`, { defaultValue: groupName });
 }
 
 /**

@@ -1,0 +1,671 @@
+{
+  "colorSchemes": {
+    "classic": "Classic",
+    "marine": "Marine",
+    "wildflower": "Wildflower",
+    "sunset": "Sunset",
+    "amazon": "Amazon"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "getStarted": "Get Started",
+    "welcome": {
+      "title": "Welcome to RM Book",
+      "body": "Your companion for the next chapter. Let's take a quick look around: Home for your goals, Calendar to log your days, People for those who matter most, and Settings to make it yours."
+    },
+    "colors": {
+      "title": "Choose your app theme"
+    },
+    "home": {
+      "title": "Home: your goals",
+      "body": "Track weekly and monthly goals right from Home. Here's Personal Study, six weeks in."
+    },
+    "goals": {
+      "title": "Choose your goals",
+      "body": "Select the goals you would like to track. Add, edit, or remove goals anytime from Home → Edit Goals."
+    },
+    "calendar": {
+      "title": "Calendar: log your days",
+      "body": "Enjoy the familiar feel of scheduling out and reporting on your days on the Calendar page. You can start with a ready-made schedule below, or build your own from scratch.",
+      "starterSchedule": "Starter Schedule",
+      "starterScheduleHint": "Prayer, study, meals, exercise, and Sunday church, repeating.",
+      "iWork": "I work",
+      "imAStudent": "I'm a student"
+    },
+    "eventTypes": {
+      "title": "Choose your event types",
+      "body": "Select the types of events that you would like to use on the Calendar page.",
+      "footnote": "Add, remove, or link event types to a goal anytime from Settings → Event Types."
+    },
+    "people": {
+      "title": "People: those who matter most",
+      "body": "Save contact info on the People page. There you can find people like John, a recent convert, and view his progress on the covenant path."
+    },
+    "contacts": {
+      "title": "Bring in your contacts",
+      "body": "Already have everyone in your phone? Import names, numbers, and addresses straight from your contacts instead of typing them one by one.",
+      "importFromContacts": "Import from Contacts",
+      "importHint": "Pull names, numbers, and addresses in from your phone.",
+      "footnote": "You can also add, edit, or remove people manually at any time."
+    },
+    "settings": {
+      "title": "Settings: make it yours",
+      "body": "Choose your preferences now, or leave the defaults. Everything here and more can be personalized anytime from the Settings page.",
+      "dailyReview": "Daily Review",
+      "dailyReviewHint": "A nightly nudge to report today's events.",
+      "eventReminders": "Event Reminders",
+      "eventRemindersHint": "A heads-up shortly before each event starts.",
+      "theme": "Theme",
+      "weekStart": "Week Start"
+    },
+    "ready": {
+      "title": "You're all set",
+      "scriptureRef": "James 1:22"
+    },
+    "starter": {
+      "morningPrayer": "Morning Prayer",
+      "scriptureStudy": "Scripture Study",
+      "breakfast": "Breakfast",
+      "lunch": "Lunch",
+      "exercise": "Exercise",
+      "dinner": "Dinner",
+      "nightlyPrayer": "Nightly Prayer",
+      "church": "Church",
+      "work": "Work",
+      "school": "School"
+    }
+  },
+  "iconPicker": {
+    "title": "Icon"
+  },
+  "colorPicker": {
+    "colorTitle": "Color",
+    "default": "Default",
+    "tab": {
+      "grid": "Grid",
+      "spectrum": "Spectrum"
+    }
+  },
+  "importContacts": {
+    "title": "Import Contacts",
+    "adding": "Adding…",
+    "import": "Import",
+    "introTitle": "Import people you choose",
+    "introBody": "Next, your phone will ask which contacts to share with this app. Sharing just one or two people is completely fine — sharing more is entirely optional, and there's nothing to share at all if you'd rather add people by hand.",
+    "chooseContactsToShare": "Choose Contacts to Share",
+    "notNow": "Not Now",
+    "searchPlaceholder": "Search contacts...",
+    "loadingContacts": "Loading contacts…",
+    "accessDeniedTitle": "Contacts access denied",
+    "accessDeniedBody": "Allow access in Settings to import people from your phone — you'll still choose exactly who gets added, nothing happens automatically.",
+    "openSettings": "Open Settings",
+    "couldntLoadTitle": "Couldn't load contacts",
+    "couldntLoadBody": "Something went wrong reading your contacts.",
+    "tryAgain": "Try Again",
+    "onlySomeShared": "Only some contacts shared.",
+    "manageSettings": "Manage Settings",
+    "noContactsSharedYet": "No contacts shared yet",
+    "optionalSharingHint": "That's completely fine — sharing contacts is optional. Choose just the people you'd like to import, or skip this entirely.",
+    "chooseContacts": "Choose Contacts",
+    "added": "Added"
+  },
+  "unreportedRow": {
+    "nothingWaiting": "Nothing waiting to be reported",
+    "eventsWaiting_one": "{{count}} event waiting to be reported",
+    "eventsWaiting_other": "{{count}} events waiting to be reported"
+  },
+  "unreportedEvents": {
+    "title": "Unreported Events",
+    "allCaughtUp": "All caught up",
+    "waiting": "{{count}} waiting · last 30 days",
+    "nothingToReport": "Nothing to report",
+    "emptyHint": "Events show up here once their start time has passed."
+  },
+  "personTimeline": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "noEventsYet": "No events yet",
+    "emptyHint": "Events show up here once you add this person to one."
+  },
+  "notifications": {
+    "dailyReviewTitle": "Daily Review",
+    "dailyReviewBody": "It's time to report on today's events.",
+    "startingNow": "Starting now.",
+    "startsInOneHour": "Starts in 1 hour.",
+    "startsInMinutes": "Starts in {{count}} minutes."
+  },
+  "notificationToggles": {
+    "disabledTitle": "Notifications Disabled",
+    "dailyReviewBody": "Enable notifications for RM Book in your device settings to use the daily review reminder.",
+    "eventRemindersBody": "Enable notifications for RM Book in your device settings to use event reminders."
+  },
+  "phoneUtils": {
+    "cantPlaceCallTitle": "Can’t place the call",
+    "cantPlaceCallBody": "This device has no app that can dial phone numbers.",
+    "cantStartMessageTitle": "Can’t start a message",
+    "cantStartMessageBody": "This device has no app that can send text messages.",
+    "cantOpenWhatsappTitle": "Can’t open WhatsApp",
+    "cantOpenWhatsappBody": "Nothing on this device could open the WhatsApp link.",
+    "cantOpenMessengerTitle": "Can’t open Messenger",
+    "cantOpenMessengerBody": "Nothing on this device could open the Messenger link."
+  },
+  "mapUtils": {
+    "cantOpenMapsTitle": "Can’t open Maps",
+    "cantOpenMapsBody": "Nothing on this device could open the address."
+  },
+  "auth": {
+    "enterEmailPassword": "Please enter your email and password.",
+    "errorTitle": "Error",
+    "checkEmailConfirmation": "Check your email for a confirmation link.",
+    "signInSubtitle": "Sign in to your account",
+    "signUpSubtitle": "Create an account",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "createAccount": "Create Account",
+    "needAccount": "Don't have an account? Sign up",
+    "haveAccount": "Already have an account? Sign in"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "done": "Done",
+    "add": "Add",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "ok": "OK",
+    "remove": "Remove",
+    "confirm": "Confirm",
+    "reset": "Reset",
+    "search": "Search",
+    "loading": "Loading..."
+  },
+  "settings": {
+    "theme": {
+      "sectionTitle": "THEME",
+      "label": "Mode",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "sectionTitle": "LANGUAGE",
+      "label": "Language",
+      "english": "English",
+      "spanish": "Español"
+    }
+  },
+  "contactMethods": {
+    "in_person": "In Person",
+    "phone": "Phone Call",
+    "text": "Text",
+    "whatsapp": "WhatsApp",
+    "messenger": "Messenger",
+    "video": "Video Call",
+    "other": "Other",
+    "field": {
+      "dateType": "Date Type",
+      "contactMethod": "Contact Method"
+    }
+  },
+  "personStatuses": {
+    "Eternal Companion": "Eternal Companion",
+    "Recent Converts": "Recent Converts",
+    "Family": "Family",
+    "Members": "Members",
+    "Mission Leaders": "Mission Leaders",
+    "Mission Friends": "Mission Friends",
+    "Friends": "Friends",
+    "Relationship": "Relationship",
+    "1+ Dates": "1+ Dates",
+    "Potential Dates": "Potential Dates",
+    "Not Interested": "Not Interested",
+    "Do Not Contact": "Do Not Contact",
+    "Other": "Other"
+  },
+  "personStatusesSingular": {
+    "Recent Converts": "Recent Convert",
+    "Potential Dates": "Potential Date",
+    "Members": "Member",
+    "Mission Leaders": "Mission Leader",
+    "Mission Friends": "Mission Friend",
+    "Friends": "Friend"
+  },
+  "personStatusGroups": {
+    "Church": "Church",
+    "Friends & Family": "Friends & Family",
+    "Dating": "Dating"
+  },
+  "calendar": {
+    "weekdayShort": {
+      "mon": "Mo",
+      "tue": "Tu",
+      "wed": "We",
+      "thu": "Th",
+      "fri": "Fr",
+      "sat": "Sa",
+      "sun": "Su"
+    },
+    "deleteEventsTitle": "Delete Events",
+    "deleteEventsBody_one": "Delete {{count}} selected event?",
+    "deleteEventsBody_other": "Delete {{count}} selected events?",
+    "recurringEventTitle": "Recurring Event",
+    "recurringMoveBody": "This event is recurring. Move just this occurrence, or this and every occurrence after it?",
+    "thisEventOnly": "This event only",
+    "thisAndAllFuture": "This and all future",
+    "deleteSelectedEvents": "Delete selected events",
+    "selectEvents": "Select Events",
+    "weekdayAbbrev": {
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat"
+    },
+    "weekdayInitial": {
+      "sun": "S",
+      "mon": "M",
+      "tue": "T",
+      "wed": "W",
+      "thu": "T",
+      "fri": "F",
+      "sat": "S"
+    },
+    "weekdayFull": {
+      "sunday": "Sunday",
+      "monday": "Monday"
+    }
+  },
+  "eventStatus": {
+    "pending": "Pending",
+    "completed": "Completed",
+    "failed": "Failed"
+  },
+  "eventDetail": {
+    "title": "Title",
+    "backup": "Backup",
+    "deleteEvent": "Delete event",
+    "status": "Status",
+    "notCompleted": "Not completed",
+    "quantity": "Quantity",
+    "units": "Units",
+    "optional": "optional",
+    "eventType": "Event Type",
+    "when": "When",
+    "until": "until {{date}}",
+    "people": "People",
+    "unknownPerson": "Unknown person",
+    "everyDay": "Every day",
+    "everyMonth": "Every month",
+    "everyWeekOn": "Every week on {{days}}"
+  },
+  "eventTypes": {
+    "church": "Church",
+    "travel": "Travel",
+    "meal": "Meal",
+    "activity": "Activity",
+    "date": "Date",
+    "contact": "Contact",
+    "work": "Work",
+    "temple": "Temple",
+    "school": "School",
+    "service": "Service",
+    "prayer": "Prayer",
+    "scripture": "Scripture Study",
+    "task": "Task",
+    "exercise": "Exercise",
+    "other": "Other"
+  },
+  "goals": {
+    "morning_prayer": "Morning Prayers",
+    "nightly_prayer": "Nightly Prayers",
+    "times_exercised": "Times Exercised",
+    "personal_study": "Personal Study",
+    "total_dates": "Total Dates",
+    "service_hours": "Service Hours",
+    "church_hours": "Church Hours",
+    "temple_attendance": "Temple Trips",
+    "selectGoal": "Select goal",
+    "none": "None",
+    "untitled": "Untitled Goal"
+  },
+  "editGoals": {
+    "title": "Edit Goals",
+    "goalSectionTitle": "GOAL",
+    "noGoals": "No goals",
+    "name": "Name",
+    "goalNamePlaceholder": "Goal name...",
+    "deleteGoal": "Delete goal",
+    "icon": "Icon",
+    "color": "Color",
+    "goalPeriod": "Goal Period",
+    "period": {
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "both": "Both"
+    },
+    "periodLimitHint": "Each grid shows at most {{max}} goals — move another goal off it first.",
+    "linkedEventType": "Linked Event Type",
+    "linkedEventTypeEvening": "{{type}} (evening)",
+    "emptyHint": "Add a goal to start tracking one.",
+    "addAGoal": "Add a Goal",
+    "maxGoalsPerGrid": "Maximum of {{max}} goals per grid",
+    "reorderGoals": "Reorder Goals",
+    "anEventType": "an event type",
+    "linkedToEventTypeTitle": "Linked to an Event Type",
+    "linkedToEventTypeBody": "\"{{goal}}\" is linked to {{type}}. Set its Linked Event Type to None, then delete this goal.",
+    "deleteGoalTitle": "Delete \"{{name}}\"?",
+    "cannotBeUndone": "This cannot be undone."
+  },
+  "covenantPath": {
+    "baptism": "Baptism",
+    "confirmation": "Confirmation",
+    "aaronic_priesthood": "Aaronic Priesthood",
+    "patriarchal_blessing": "Patriarchal Blessing",
+    "melchizedek_priesthood": "Melchizedek Priesthood",
+    "endowment": "Endowment",
+    "sealing": "Sealing"
+  },
+  "reminders": {
+    "atStartTime": "At start time",
+    "oneHour": "1 hour",
+    "minutes": "{{count}} min"
+  },
+  "people": {
+    "title": "People",
+    "deleteSelected": "Delete Selected",
+    "exitSelectMode": "Exit Select Mode",
+    "selectPeople": "Select People",
+    "setType": "Set Type",
+    "importFromContacts": "Import from Contacts",
+    "filterAll": "All",
+    "searchPlaceholder": "Search people...",
+    "noMatches": "No matches",
+    "noPeopleYet": "No people yet",
+    "tryDifferentSearch": "Try a different search or filter",
+    "tapToAdd": "Tap + to add someone you're tracking",
+    "deletePeopleTitle": "Delete People",
+    "deletePeopleBody_one": "Delete {{count}} selected person?",
+    "deletePeopleBody_other": "Delete {{count}} selected people?"
+  },
+  "personFields": {
+    "name": "Name",
+    "status": "Status",
+    "phone": "Phone",
+    "whatsapp": "WhatsApp",
+    "messenger": "Messenger",
+    "address": "Address",
+    "notes": "Notes"
+  },
+  "personDetail": {
+    "unnamed": "Unnamed",
+    "deletePerson": "Delete person",
+    "messageWithName": "Message {{name}}",
+    "messageThisNumber": "Message this number",
+    "callWithName": "Call {{name}}",
+    "callThisNumber": "Call this number",
+    "whatsappWithName": "WhatsApp {{name}}",
+    "openInWhatsapp": "Open in WhatsApp",
+    "messageOnMessengerWithName": "Message {{name}} on Messenger",
+    "openInMessenger": "Open in Messenger",
+    "openAddressWithName": "Open {{name}}’s address in Maps",
+    "openThisAddress": "Open this address in Maps"
+  },
+  "addEditPerson": {
+    "personTitle": "Person",
+    "editPersonTitle": "Edit Person",
+    "addPersonTitle": "Add Person",
+    "tabs": {
+      "details": "Details",
+      "timeline": "Timeline",
+      "covenant": "Path"
+    },
+    "fullNamePlaceholder": "Full name",
+    "phonePlaceholder": "Phone number",
+    "removeWhatsapp": "Remove WhatsApp",
+    "whatsappPlaceholder": "WhatsApp number",
+    "removeMessenger": "Remove Messenger",
+    "messengerPlaceholder": "Profile link or username",
+    "messengerHintBounce": "Opens through m.me, which may bounce via the browser. Saving their profile.php?id=… link instead jumps straight into Messenger.",
+    "messengerHintShareLink": "That’s a share link — only Facebook can expand it. Open it in a browser, then copy the facebook.com/… address it lands on.",
+    "messengerHintUnrecognized": "Couldn’t read a profile out of that. Paste their facebook.com or m.me link, or just their username.",
+    "addContactMethod": "Add contact method",
+    "removeAddress": "Remove address",
+    "addressPlaceholder": "Street, city, state",
+    "addAddress": "Add address",
+    "notesPlaceholder": "Notes about this person...",
+    "deletePersonTitle": "Delete Person",
+    "deletePersonBody": "Delete {{name}}? Their events stay, without them attached.",
+    "thisPerson": "this person"
+  },
+  "addEditEvent": {
+    "quantitySaveFailed": "Failed to save quantity. Please try again.",
+    "unitsSaveFailed": "Failed to save units. Please try again.",
+    "deleteEventTitle": "Delete Event",
+    "deleteEventBody": "Are you sure you want to delete this event?",
+    "deleteRecurringTitle": "Delete Recurring Event",
+    "deleteRecurringBody": "This event is recurring. What would you like to delete?",
+    "recurringUpdateBody": "This event is recurring. What would you like to update?",
+    "eventSaveFailed": "Failed to save event. Please try again.",
+    "eventTitle": "Event",
+    "eventTitlePlaceholder": "Event title",
+    "editEventTitle": "Edit Event",
+    "newEventTitle": "New Event",
+    "date": "Date",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "addEndTime": "Add end time",
+    "removeEndTime": "Remove end time",
+    "removePerson": "Remove {{name}}",
+    "addPerson": "Add Person",
+    "backupEvent": "Backup Event",
+    "recurring": "Recurring",
+    "frequency": "Frequency",
+    "frequencyOption": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
+    },
+    "ends": "Ends",
+    "addNotesPlaceholder": "Add notes..."
+  },
+  "home": {
+    "title": "Home",
+    "goals": "Goals",
+    "progress": "Progress",
+    "gridReorderTitle": "{{title}} ({{tapped}}/{{total}})",
+    "editAction": "EDIT"
+  },
+  "goalsModal": {
+    "title": "Goals"
+  },
+  "goalGraphModal": {
+    "title": "Goal Graph"
+  },
+  "eventSizes": {
+    "sm": "Small",
+    "md": "Medium",
+    "lg": "Large",
+    "xl": "Extra Large"
+  },
+  "themeColorRows": {
+    "primary": "Primary Color",
+    "secondaryLight": "Secondary Color (Light)",
+    "secondaryDark": "Secondary Color (Dark)",
+    "tertiaryLight": "Tertiary Color (Light)",
+    "tertiaryDark": "Tertiary Color (Dark)",
+    "statusCompletedLight": "Completed Status Color (Light)",
+    "statusCompletedDark": "Completed Status Color (Dark)",
+    "statusFailedLight": "Failed Status Color (Light)",
+    "statusFailedDark": "Failed Status Color (Dark)",
+    "statusPendingLight": "Pending Status Color (Light)",
+    "statusPendingDark": "Pending Status Color (Dark)"
+  },
+  "settingsScreen": {
+    "title": "Settings",
+    "customize": "Customize",
+    "reorder": "Reorder",
+    "resetToDefault": "Reset to Default",
+    "notifications": "Notifications",
+    "time": "Time",
+    "defaultContactMethod": "DEFAULT CONTACT METHOD",
+    "preferredMapsApp": "PREFERRED MAPS APP",
+    "account": "ACCOUNT",
+    "signOutTitle": "Sign Out",
+    "signOutBody": "Are you sure you want to sign out?",
+    "about": "ABOUT",
+    "appName": "App Name",
+    "version": "Version",
+    "replayOnboarding": "Replay Onboarding",
+    "scriptureQuote": "\"But be ye doers of the word, and not hearers only.\"",
+    "scriptureRef": "— James 1:22",
+    "signedOutLocalDataKeptTitle": "Signed out — local data kept",
+    "signedOutLocalDataKeptBody_one": "{{count}} change could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
+    "signedOutLocalDataKeptBody_other": "{{count}} changes could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
+    "resetWeekTitle": "Reset Week",
+    "resetWeekBody": "This will clear all goal counts and targets for the current week, and restore the built-in Goals (labels, icons, colors, links, targets) to their original values. Custom Goals will not be affected.",
+    "resetEventColorsTitle": "Reset Event Colors",
+    "resetEventColorsBody_one": "1 event type will go back to its original color. This cannot be undone.",
+    "resetEventColorsBody_other": "{{count}} event types will go back to their original colors. This cannot be undone.",
+    "resetDurationsTitle": "Reset Default Durations",
+    "resetDurationsBody_one": "1 event type will go back to its original duration. This cannot be undone.",
+    "resetDurationsBody_other": "{{count}} event types will go back to their original durations. This cannot be undone.",
+    "resetEventTypesTitle": "Reset Event Types",
+    "customEventTypesCount": "{{count}} custom event types",
+    "resetEventTypesInUseBody_one": "There is still {{count}} event using {{using}} that would be removed. Would you like to delete it and reset event types anyway?",
+    "resetEventTypesInUseBody_other": "There are still {{count}} events using {{using}} that would be removed. Would you like to delete them and reset event types anyway?",
+    "deleteAllAndReset": "Delete All & Reset",
+    "resetEventTypesBodyWithCustoms_one": "Built-in event types will be restored to their original values, and {{count}} custom event type will be removed. This cannot be undone.",
+    "resetEventTypesBodyWithCustoms_other": "Built-in event types will be restored to their original values, and {{count}} custom event types will be removed. This cannot be undone.",
+    "resetEventTypesBody": "Built-in event types will be restored to their original values. This cannot be undone.",
+    "resetQuickAddTitle": "Reset Event Bubble +",
+    "resetQuickAddBody": "This will restore the default quick-add types and icons. This cannot be undone.",
+    "themeColors": {
+      "sectionTitle": "THEME COLORS",
+      "customizeColors": "Customize Colors"
+    },
+    "eventSize": {
+      "sectionTitle": "EVENT SIZE",
+      "size": "Size"
+    },
+    "eventTypes": {
+      "sectionTitle": "EVENT TYPES",
+      "resetColors": "Reset Colors to Default",
+      "resetDurations": "Reset Default Durations to Default",
+      "resetEventTypes": "Reset Event Types to Default"
+    },
+    "eventBubble": {
+      "sectionTitle": "EVENT BUBBLE +"
+    },
+    "dailyReview": {
+      "sectionTitle": "DAILY REVIEW"
+    },
+    "eventReminders": {
+      "sectionTitle": "EVENT REMINDERS",
+      "timeBefore": "Time Before",
+      "types": "Types",
+      "allTypes": "All Types",
+      "typesOfTotal": "{{count}} of {{total}}"
+    },
+    "weekStart": {
+      "sectionTitle": "WEEK START"
+    },
+    "scheduleHours": {
+      "sectionTitle": "SCHEDULE HOURS"
+    },
+    "countryCode": {
+      "sectionTitle": "DEFAULT COUNTRY CODE",
+      "footnote": "Used for WhatsApp numbers saved without a + code."
+    }
+  },
+  "eventReminderTypes": {
+    "title": "Reminder Types",
+    "hint": "Choose which event types send a reminder notification."
+  },
+  "reorderEventTypes": {
+    "title": "Reorder",
+    "hint": "Hold and drag a type to change where it appears everywhere event types are listed."
+  },
+  "quickAddTypes": {
+    "title": "Quick Add",
+    "maxReached": "Maximum of {{max}} reached — remove one to add another.",
+    "chooseUpTo": "Choose up to {{max}} types to show as quick-add bubbles on the calendar's + button."
+  },
+  "goalPeriodList": {
+    "setGoals": "Set goals",
+    "actual": "Actual",
+    "goal": "Goal"
+  },
+  "goalGrain": {
+    "week": {
+      "tabLabel": "Weekly",
+      "graphTabLabel": "Last 6 Weeks",
+      "gridLabel": "Weekly Goals",
+      "summary": { "prev": "Last week", "current": "This week", "next": "Next week" }
+    },
+    "month": {
+      "tabLabel": "Monthly",
+      "graphTabLabel": "Last 6 Months",
+      "gridLabel": "Monthly Goals",
+      "summary": { "prev": "Last month", "current": "This month", "next": "Next month" }
+    }
+  },
+  "eventTypesModal": {
+    "untitled": "Untitled Event Type",
+    "deleteEventTypeTitle": "Delete Event Type",
+    "deleteEventTypeBody_one": "There is still {{count}} event of \"{{name}}\" in your calendar. Would you like to delete them all and delete the event type?",
+    "deleteEventTypeBody_other": "There are still {{count}} events of \"{{name}}\" in your calendar. Would you like to delete them all and delete the event type?",
+    "deleteAll": "Delete All",
+    "title": "Event Types",
+    "eventTypeSectionTitle": "EVENT TYPE",
+    "noEventTypes": "No event types",
+    "eventTypeNamePlaceholder": "Event type name...",
+    "deleteEventTypeA11y": "Delete event type",
+    "morningGoal": "Morning Goal",
+    "linkedGoal": "Linked Goal",
+    "eveningGoal": "Evening Goal",
+    "switchesAt": "Switches At",
+    "theMorningGoal": "the morning goal",
+    "theEveningGoal": "the evening goal",
+    "splitHintWithEvening": "Completions before {{time}} count toward {{morning}}, and from {{time}} on toward {{evening}}.",
+    "splitHintNoEvening": "Every completion counts toward {{morning}} until an evening goal is picked.",
+    "goalCountType": "Goal Count Type",
+    "countChoice": {
+      "count": "Completion",
+      "hours": "Hours",
+      "quantity": "Quantity",
+      "dayNight": "Day/Night"
+    },
+    "statusType": "Status Type",
+    "statusTypeOption": {
+      "checkbox": "Checkbox",
+      "status": "Status",
+      "none": "None"
+    },
+    "defaultDuration": "Default Duration",
+    "emptyHint": "Add an event type to start scheduling one.",
+    "addAnEventType": "Add an Event Type"
+  },
+  "personPicker": {
+    "title": "Select People",
+    "noneSelected": "None selected",
+    "selectedCount": "{{count}} selected",
+    "tryDifferentSearch": "Try a different search",
+    "addSomeoneFirst": "Add someone on the People tab first"
+  },
+  "covenantPathTab": {
+    "genderPromptTitle": "Male or Female?",
+    "genderPromptBody": "Decides whether priesthood ordination shows on the covenant path.",
+    "female": "Female",
+    "male": "Male",
+    "titleWithName": "{{name}}'s Covenant Path",
+    "completeCount": "{{completed}}/{{total}} complete"
+  }
+}

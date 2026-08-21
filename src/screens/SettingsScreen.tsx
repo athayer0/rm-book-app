@@ -4,6 +4,7 @@ import {
   SafeAreaView, Alert, TextInput, Platform, useColorScheme, Switch, Pressable,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -18,7 +19,7 @@ import { EventTypesModal } from '../modals/EventTypesModal';
 import { ReorderEventTypesModal } from '../modals/ReorderEventTypesModal';
 import { EventReminderTypesModal } from '../modals/EventReminderTypesModal';
 import {
-  DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition,
+  DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition, eventTypeDisplayLabel,
 } from '../constants/eventTypeDefaults';
 import { normalizeHex } from '../utils/colorUtils';
 import { useSettings, DEFAULT_SETTINGS, type AppSettings } from '../hooks/useSettings';
@@ -31,7 +32,7 @@ import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
 import { CONTACT_METHODS, DEFAULT_CONTACT_METHOD, DEFAULT_METHOD_CHOICES } from '../constants/contactMethods';
 import { GoalIcon } from '../components/GoalIcon';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
-import { formatTime, parseTimeString } from '../utils/dateUtils';
+import { formatTime, parseTimeString, periodLabel, localizeTime } from '../utils/dateUtils';
 import { EVENT_REMINDER_MINUTE_OPTIONS, eventReminderLabel } from '../constants/eventReminders';
 import { scheduleDailyReview } from '../lib/notifications';
 import { useNotificationToggles } from '../hooks/useNotificationToggles';
@@ -46,10 +47,10 @@ const END_HOUR_OPTIONS = [21, 22, 23, 24];
 // "more below" without needing a visible scrollbar to say it.
 const EVENT_REMINDER_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
 
-function hourLabel(h: number): string {
-  if (h === 0 || h === 24) return '12 AM';
-  if (h === 12) return '12 PM';
-  return h < 12 ? `${h} AM` : `${h - 12} PM`;
+function hourLabel(h: number, language: 'en' | 'es'): string {
+  if (h === 0 || h === 24) return `12 ${periodLabel('AM', language)}`;
+  if (h === 12) return `12 ${periodLabel('PM', language)}`;
+  return h < 12 ? `${h} ${periodLabel('AM', language)}` : `${h - 12} ${periodLabel('PM', language)}`;
 }
 
 // Whether a built-in type's editable fields still match what it ships with —
@@ -75,7 +76,7 @@ function isStockBuiltInType(d: EventTypeDefinition): boolean {
 // at a time — opening one closes whichever else was open, rather than each
 // tracking its own independent boolean.
 type DropdownKey =
-  | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'dailyReviewTime' | 'eventReminderLead'
+  | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'language' | 'dailyReviewTime' | 'eventReminderLead'
   | 'colors' | 'method';
 
 /**
@@ -93,6 +94,7 @@ const IN_FLOW_DROPDOWNS: DropdownKey[] = ['colors', 'dailyReviewTime'];
 export function SettingsScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const { settings, updateSettings } = useSettings();
   const { resetAll, resetBuiltInDefinitions, definitions: goalDefinitions } = useWeeklyGoals();
@@ -200,26 +202,26 @@ export function SettingsScreen() {
     // sign-in — but until then the next account to use this device sees it.
     if (!cleared) {
       Alert.alert(
-        'Signed out — local data kept',
-        `${pending} change${pending === 1 ? '' : 's'} could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.`,
+        t('settingsScreen.signedOutLocalDataKeptTitle'),
+        t('settingsScreen.signedOutLocalDataKeptBody', { count: pending }),
       );
     }
   }
 
-  async function handleSelectDailyReviewTime(t: string) {
-    const { hour, minute } = parseTimeString(t);
+  async function handleSelectDailyReviewTime(timeStr: string) {
+    const { hour, minute } = parseTimeString(timeStr);
     updateSettings({ dailyReviewHour: hour, dailyReviewMinute: minute });
-    if (settings.dailyReviewEnabled) await scheduleDailyReview(hour, minute);
+    if (settings.dailyReviewEnabled) await scheduleDailyReview(hour, minute, t);
   }
 
   function handleResetWeek() {
     Alert.alert(
-      'Reset Week',
-      'This will clear all goal counts and targets for the current week, and restore the built-in Goals (labels, icons, colors, links, targets) to their original values. Custom Goals will not be affected.',
+      t('settingsScreen.resetWeekTitle'),
+      t('settingsScreen.resetWeekBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: () => {
             resetAll();
@@ -266,8 +268,11 @@ export function SettingsScreen() {
   // "All types" is the common case (nothing excluded yet), otherwise how many
   // of the current type list still send reminders.
   const reminderTypesLabel = settings.eventReminderExcludedTypeIds.length === 0
-    ? 'All Types'
-    : `${eventTypeDefinitions.length - settings.eventReminderExcludedTypeIds.length} of ${eventTypeDefinitions.length}`;
+    ? t('settingsScreen.eventReminders.allTypes')
+    : t('settingsScreen.eventReminders.typesOfTotal', {
+      count: eventTypeDefinitions.length - settings.eventReminderExcludedTypeIds.length,
+      total: eventTypeDefinitions.length,
+    });
 
   // Both resets are all-or-nothing and confirmed by an alert rather than a panel
   // of checkboxes. The alert names the count, since the row itself no longer
@@ -276,14 +281,12 @@ export function SettingsScreen() {
   function confirmResetEventColors() {
     const n = customizedColorTypes.length;
     Alert.alert(
-      'Reset Event Colors',
-      n === 1
-        ? '1 event type will go back to its original color. This cannot be undone.'
-        : `${n} event types will go back to their original colors. This cannot be undone.`,
+      t('settingsScreen.resetEventColorsTitle'),
+      t('settingsScreen.resetEventColorsBody', { count: n }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: () => {
             // Deleting the override is the reset — eventTypeColor then falls
@@ -302,14 +305,12 @@ export function SettingsScreen() {
   function confirmResetEventDurations() {
     const n = customizedDurationTypes.length;
     Alert.alert(
-      'Reset Default Durations',
-      n === 1
-        ? '1 event type will go back to its original duration. This cannot be undone.'
-        : `${n} event types will go back to their original durations. This cannot be undone.`,
+      t('settingsScreen.resetDurationsTitle'),
+      t('settingsScreen.resetDurationsBody', { count: n }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: () => {
             const next = { ...settings.eventTypeDefaultMinutes };
@@ -330,15 +331,16 @@ export function SettingsScreen() {
     const inUseCustoms = customEventTypes.filter(t => events.some(e => e.type === t.id));
 
     if (inUseCustoms.length > 0) {
-      const eventCount = inUseCustoms.reduce((sum, t) => sum + events.filter(e => e.type === t.id).length, 0);
+      const eventCount = inUseCustoms.reduce((sum, ty) => sum + events.filter(e => e.type === ty.id).length, 0);
+      const using = inUseCustoms.length === 1
+        ? `"${eventTypeDisplayLabel(inUseCustoms[0], t)}"`
+        : t('settingsScreen.customEventTypesCount', { count: inUseCustoms.length });
       Alert.alert(
-        'Reset Event Types',
-        `There ${eventCount === 1 ? 'is' : 'are'} still ${eventCount} event${eventCount === 1 ? '' : 's'} using ${
-          inUseCustoms.length === 1 ? `"${inUseCustoms[0].label}"` : `${inUseCustoms.length} custom event types`
-        } that would be removed. Would you like to delete ${eventCount === 1 ? 'it' : 'them'} and reset event types anyway?`,
+        t('settingsScreen.resetEventTypesTitle'),
+        t('settingsScreen.resetEventTypesInUseBody', { count: eventCount, using }),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete All & Reset', style: 'destructive', onPress: () => performResetEventTypes(customEventTypes) },
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('settingsScreen.deleteAllAndReset'), style: 'destructive', onPress: () => performResetEventTypes(customEventTypes) },
         ],
         { cancelable: true },
       );
@@ -346,13 +348,13 @@ export function SettingsScreen() {
     }
 
     Alert.alert(
-      'Reset Event Types to Default',
+      t('settingsScreen.eventTypes.resetEventTypes'),
       customEventTypes.length > 0
-        ? `Built-in event types will be restored to their original values, and ${customEventTypes.length} custom event type${customEventTypes.length === 1 ? '' : 's'} will be removed. This cannot be undone.`
-        : 'Built-in event types will be restored to their original values. This cannot be undone.',
+        ? t('settingsScreen.resetEventTypesBodyWithCustoms', { count: customEventTypes.length })
+        : t('settingsScreen.resetEventTypesBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', style: 'destructive', onPress: () => performResetEventTypes(customEventTypes) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.reset'), style: 'destructive', onPress: () => performResetEventTypes(customEventTypes) },
       ],
       { cancelable: true },
     );
@@ -367,12 +369,12 @@ export function SettingsScreen() {
 
   function confirmResetQuickAdd() {
     Alert.alert(
-      'Reset Event Bubble +',
-      'This will restore the default quick-add types and icons. This cannot be undone.',
+      t('settingsScreen.resetQuickAddTitle'),
+      t('settingsScreen.resetQuickAddBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: () => updateSettings({ quickAddTypes: DEFAULT_SETTINGS.quickAddTypes }),
         },
@@ -386,7 +388,7 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t('settingsScreen.title')}</Text>
       </View>
 
       {/* automaticallyAdjustKeyboardInsets, as on every other scroll in the app,
@@ -407,16 +409,16 @@ export function SettingsScreen() {
         {/* Theme — collapsed to one row, same shape as Event Size / Contact
             Method, instead of all three options sitting on the screen. */}
         <View style={[styles.section, elevatedDropdown === 'theme' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>THEME</Text>
+          <Text style={styles.sectionTitle}>{t('settings.theme.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'theme' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('theme')}
               >
-                <Text style={styles.rowLabel}>Mode</Text>
+                <Text style={styles.rowLabel}>{t('settings.theme.label')}</Text>
                 <Text style={styles.rowValue}>
-                  {settings.theme.charAt(0).toUpperCase() + settings.theme.slice(1)}
+                  {t(`settings.theme.${settings.theme}`)}
                 </Text>
                 <Ionicons
                   name={openDropdown === 'theme' ? 'chevron-up' : 'chevron-down'}
@@ -429,10 +431,45 @@ export function SettingsScreen() {
                 {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
                   <DropdownItem
                     key={theme}
-                    label={theme.charAt(0).toUpperCase() + theme.slice(1)}
+                    label={t(`settings.theme.${theme}`)}
                     selected={settings.theme === theme}
                     showSeparator={i < arr.length - 1}
                     onPress={() => { updateSettings({ theme }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+          </View>
+        </View>
+
+        {/* Language — same shape as Theme above: a floating two-option picker. */}
+        <View style={[styles.section, elevatedDropdown === 'language' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>{t('settings.language.sectionTitle')}</Text>
+          <View style={styles.card}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'language' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={[styles.row, styles.rowLast]}
+                onPress={() => toggleDropdown('language')}
+              >
+                <Text style={styles.rowLabel}>{t('settings.language.label')}</Text>
+                <Text style={styles.rowValue}>
+                  {settings.language === 'es' ? t('settings.language.spanish') : t('settings.language.english')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'language' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'language'}>
+                {(['en', 'es'] as const).map((language, i, arr) => (
+                  <DropdownItem
+                    key={language}
+                    label={language === 'es' ? t('settings.language.spanish') : t('settings.language.english')}
+                    selected={settings.language === language}
+                    showSeparator={i < arr.length - 1}
+                    onPress={() => { updateSettings({ language }); setOpenDropdown(null); }}
                   />
                 ))}
               </DropdownMenu>
@@ -449,13 +486,13 @@ export function SettingsScreen() {
         {/* No lift for `colors`: no backdrop goes up for it, so there is
             nothing for the section to need lifting over. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>THEME COLORS</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.themeColors.sectionTitle')}</Text>
           <View style={styles.card}>
             <TouchableOpacity
               style={[styles.row, openDropdown !== 'colors' && styles.rowLast]}
               onPress={() => toggleDropdown('colors')}
             >
-              <Text style={styles.rowLabel}>Customize Colors</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.themeColors.customizeColors')}</Text>
               <View style={styles.dotPreviewRow}>
                 {visibleColorRows.map(row => (
                   <View
@@ -484,7 +521,7 @@ export function SettingsScreen() {
                       onPress={() => setColorSheet(row.key)}
                     >
                       <View style={[styles.colorDot, { backgroundColor: value }]} />
-                      <Text style={styles.dropdownItemText}>{row.label}</Text>
+                      <Text style={styles.dropdownItemText}>{t(`themeColorRows.${row.key}`, { defaultValue: row.label })}</Text>
                       <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
                     </TouchableOpacity>
                   );
@@ -498,16 +535,16 @@ export function SettingsScreen() {
             shape as Start Time / End Time above, instead of every option
             sitting on the screen at once. */}
         <View style={[styles.section, elevatedDropdown === 'size' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>EVENT SIZE</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.eventSize.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'size' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('size')}
               >
-                <Text style={styles.rowLabel}>Size</Text>
+                <Text style={styles.rowLabel}>{t('settingsScreen.eventSize.size')}</Text>
                 <Text style={styles.rowValue}>
-                  {EventSizes[selectedEventSize].label} ({eventSizePercent(selectedEventSize)}%)
+                  {t(`eventSizes.${selectedEventSize}`, { defaultValue: EventSizes[selectedEventSize].label })} ({eventSizePercent(selectedEventSize)}%)
                 </Text>
                 <Ionicons
                   name={openDropdown === 'size' ? 'chevron-up' : 'chevron-down'}
@@ -520,7 +557,7 @@ export function SettingsScreen() {
                 {EVENT_SIZE_OPTIONS.map((size, i, arr) => (
                   <DropdownItem
                     key={size}
-                    label={`${EventSizes[size].label} (${eventSizePercent(size)}%)`}
+                    label={`${t(`eventSizes.${size}`, { defaultValue: EventSizes[size].label })} (${eventSizePercent(size)}%)`}
                     selected={selectedEventSize === size}
                     showSeparator={i < arr.length - 1}
                     onPress={() => { updateSettings({ eventSize: size }); setOpenDropdown(null); }}
@@ -537,15 +574,15 @@ export function SettingsScreen() {
             those are gone, but their bulk "Reset to Default" actions stay
             here alongside a reset for the type list itself. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT TYPES</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.eventTypes.sectionTitle')}</Text>
           <View style={styles.card}>
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
-              <Text style={styles.rowLabel}>Customize</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.customize')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('reorder')}>
-              <Text style={styles.rowLabel}>Reorder</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.reorder')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
@@ -557,7 +594,7 @@ export function SettingsScreen() {
               {/* The greyed label and icon are the whole disabled state now —
                   nothing to reset reads clearly enough without saying so. */}
               <Text style={[styles.rowLabel, { color: customizedColorTypes.length ? Colors.text : Colors.textLight }]}>
-                Reset Colors to Default
+                {t('settingsScreen.eventTypes.resetColors')}
               </Text>
               <Ionicons
                 name="refresh"
@@ -572,7 +609,7 @@ export function SettingsScreen() {
               onPress={confirmResetEventDurations}
             >
               <Text style={[styles.rowLabel, { color: customizedDurationTypes.length ? Colors.text : Colors.textLight }]}>
-                Reset Default Durations to Default
+                {t('settingsScreen.eventTypes.resetDurations')}
               </Text>
               <Ionicons
                 name="refresh"
@@ -587,7 +624,7 @@ export function SettingsScreen() {
               onPress={confirmResetEventTypes}
             >
               <Text style={[styles.rowLabel, { color: eventTypesAreDefault ? Colors.textLight : Colors.text }]}>
-                Reset Event Types to Default
+                {t('settingsScreen.eventTypes.resetEventTypes')}
               </Text>
               <Ionicons
                 name="refresh"
@@ -601,10 +638,10 @@ export function SettingsScreen() {
         {/* Which types earn a bubble off the calendar's +, and their icon —
             the only place an event type's icon is ever shown. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EVENT BUBBLE +</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.eventBubble.sectionTitle')}</Text>
           <View style={styles.card}>
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('quickAdd')}>
-              <Text style={styles.rowLabel}>Customize</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.customize')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
@@ -614,7 +651,7 @@ export function SettingsScreen() {
               onPress={confirmResetQuickAdd}
             >
               <Text style={[styles.rowLabel, { color: quickAddIsDefault ? Colors.textLight : Colors.text }]}>
-                Reset to Default
+                {t('settingsScreen.resetToDefault')}
               </Text>
               <Ionicons
                 name="refresh"
@@ -630,10 +667,10 @@ export function SettingsScreen() {
         {/* No lift: the time wheel opens in the flow, so no backdrop goes up
             for it and there is nothing for the section to rise over. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DAILY REVIEW</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.dailyReview.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.row, !settings.dailyReviewEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>Notifications</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.notifications')}</Text>
               <Switch
                 value={settings.dailyReviewEnabled}
                 onValueChange={toggleDailyReview}
@@ -647,9 +684,9 @@ export function SettingsScreen() {
                   style={[styles.row, openDropdown !== 'dailyReviewTime' && styles.rowLast]}
                   onPress={() => toggleDropdown('dailyReviewTime')}
                 >
-                  <Text style={styles.rowLabel}>Time</Text>
+                  <Text style={styles.rowLabel}>{t('settingsScreen.time')}</Text>
                   <Text style={styles.rowValue}>
-                    {formatTime(settings.dailyReviewHour, settings.dailyReviewMinute)}
+                    {localizeTime(formatTime(settings.dailyReviewHour, settings.dailyReviewMinute), settings.language)}
                   </Text>
                   <Ionicons
                     name={openDropdown === 'dailyReviewTime' ? 'chevron-up' : 'chevron-down'}
@@ -674,10 +711,10 @@ export function SettingsScreen() {
         {/* Event Reminders — a second, independent local notification: one
             per upcoming event occurrence rather than a single daily one. */}
         <View style={[styles.section, elevatedDropdown === 'eventReminderLead' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>EVENT REMINDERS</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.eventReminders.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>Notifications</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.notifications')}</Text>
               <Switch
                 value={settings.eventReminderEnabled}
                 onValueChange={toggleEventReminders}
@@ -692,8 +729,8 @@ export function SettingsScreen() {
                     style={styles.row}
                     onPress={() => toggleDropdown('eventReminderLead')}
                   >
-                    <Text style={styles.rowLabel}>Time Before</Text>
-                    <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes)}</Text>
+                    <Text style={styles.rowLabel}>{t('settingsScreen.eventReminders.timeBefore')}</Text>
+                    <Text style={styles.rowValue}>{eventReminderLabel(settings.eventReminderMinutes, t)}</Text>
                     <Ionicons
                       name={openDropdown === 'eventReminderLead' ? 'chevron-up' : 'chevron-down'}
                       size={16}
@@ -712,7 +749,7 @@ export function SettingsScreen() {
                       {EVENT_REMINDER_MINUTE_OPTIONS.map((minutes, i, arr) => (
                         <DropdownItem
                           key={minutes}
-                          label={eventReminderLabel(minutes)}
+                          label={eventReminderLabel(minutes, t)}
                           selected={settings.eventReminderMinutes === minutes}
                           showSeparator={i < arr.length - 1}
                           onPress={() => { updateSettings({ eventReminderMinutes: minutes }); setOpenDropdown(null); }}
@@ -728,7 +765,7 @@ export function SettingsScreen() {
                   style={[styles.row, styles.rowLast]}
                   onPress={() => setEventSheet('reminderTypes')}
                 >
-                  <Text style={styles.rowLabel}>Types</Text>
+                  <Text style={styles.rowLabel}>{t('settingsScreen.eventReminders.types')}</Text>
                   <Text style={styles.rowValue}>{reminderTypesLabel}</Text>
                   <Ionicons name="chevron-forward" size={16} color={Colors.textLight} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
@@ -739,7 +776,7 @@ export function SettingsScreen() {
 
         {/* Week Start */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>WEEK START</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.weekStart.sectionTitle')}</Text>
           <View style={styles.card}>
             {(['sunday', 'monday'] as const).map(day => (
               <TouchableOpacity
@@ -747,7 +784,7 @@ export function SettingsScreen() {
                 style={styles.row}
                 onPress={() => updateSettings({ weekStart: day })}
               >
-                <Text style={styles.rowLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+                <Text style={styles.rowLabel}>{t(`calendar.weekdayFull.${day}`)}</Text>
                 {settings.weekStart === day && (
                   <Ionicons name="checkmark" size={18} color={Colors.control} />
                 )}
@@ -758,15 +795,15 @@ export function SettingsScreen() {
 
         {/* Schedule Hours */}
         <View style={[styles.section, (elevatedDropdown === 'hourStart' || elevatedDropdown === 'hourEnd') && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>SCHEDULE HOURS</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.scheduleHours.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'hourStart' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={styles.row}
                 onPress={() => toggleDropdown('hourStart')}
               >
-                <Text style={styles.rowLabel}>Start Time</Text>
-                <Text style={styles.rowValue}>{hourLabel(settings.gridStartHour)}</Text>
+                <Text style={styles.rowLabel}>{t('addEditEvent.startTime')}</Text>
+                <Text style={styles.rowValue}>{hourLabel(settings.gridStartHour, settings.language)}</Text>
                 <Ionicons
                   name={openDropdown === 'hourStart' ? 'chevron-up' : 'chevron-down'}
                   size={16}
@@ -778,7 +815,7 @@ export function SettingsScreen() {
                 {START_HOUR_OPTIONS.map((h, i) => (
                   <DropdownItem
                     key={h}
-                    label={hourLabel(h)}
+                    label={hourLabel(h, settings.language)}
                     selected={settings.gridStartHour === h}
                     showSeparator={i < START_HOUR_OPTIONS.length - 1}
                     onPress={() => { updateSettings({ gridStartHour: h }); setOpenDropdown(null); }}
@@ -792,8 +829,8 @@ export function SettingsScreen() {
                 style={[styles.row, styles.rowLast]}
                 onPress={() => toggleDropdown('hourEnd')}
               >
-                <Text style={styles.rowLabel}>End Time</Text>
-                <Text style={styles.rowValue}>{hourLabel(settings.gridEndHour)}</Text>
+                <Text style={styles.rowLabel}>{t('addEditEvent.endTime')}</Text>
+                <Text style={styles.rowValue}>{hourLabel(settings.gridEndHour, settings.language)}</Text>
                 <Ionicons
                   name={openDropdown === 'hourEnd' ? 'chevron-up' : 'chevron-down'}
                   size={16}
@@ -805,7 +842,7 @@ export function SettingsScreen() {
                 {END_HOUR_OPTIONS.map((h, i) => (
                   <DropdownItem
                     key={h}
-                    label={hourLabel(h)}
+                    label={hourLabel(h, settings.language)}
                     selected={settings.gridEndHour === h}
                     showSeparator={i < END_HOUR_OPTIONS.length - 1}
                     onPress={() => { updateSettings({ gridEndHour: h }); setOpenDropdown(null); }}
@@ -819,7 +856,7 @@ export function SettingsScreen() {
         {/* Default Contact Method. The section title names the setting, so the
             row carries the value alone rather than repeating it as a label. */}
         <View style={[styles.section, elevatedDropdown === 'method' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>DEFAULT CONTACT METHOD</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.defaultContactMethod')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'method' && styles.fieldRowOpen]}>
               <TouchableOpacity
@@ -834,7 +871,7 @@ export function SettingsScreen() {
                     color={Colors.textSecondary}
                   />
                 </View>
-                <Text style={styles.rowLabel}>{CONTACT_METHODS[selectedMethod].label}</Text>
+                <Text style={styles.rowLabel}>{t(`contactMethods.${selectedMethod}`, { defaultValue: CONTACT_METHODS[selectedMethod].label })}</Text>
                 <Ionicons
                   name={openDropdown === 'method' ? 'chevron-up' : 'chevron-down'}
                   size={16}
@@ -845,7 +882,7 @@ export function SettingsScreen() {
                 {DEFAULT_METHOD_CHOICES.map((key, i, arr) => (
                   <DropdownItem
                     key={key}
-                    label={CONTACT_METHODS[key].label}
+                    label={t(`contactMethods.${key}`, { defaultValue: CONTACT_METHODS[key].label })}
                     selected={selectedMethod === key}
                     showSeparator={i < arr.length - 1}
                     leading={
@@ -871,7 +908,7 @@ export function SettingsScreen() {
           style={styles.section}
           onLayout={e => { codeSectionY.current = e.nativeEvent.layout.y; }}
         >
-          <Text style={styles.sectionTitle}>DEFAULT COUNTRY CODE</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.countryCode.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.row, styles.rowLast]}>
               <TextInput
@@ -892,7 +929,7 @@ export function SettingsScreen() {
             </View>
           </View>
           <Text style={styles.sectionFootnote}>
-            Used for WhatsApp numbers saved without a + code.
+            {t('settingsScreen.countryCode.footnote')}
           </Text>
         </View>
 
@@ -900,7 +937,7 @@ export function SettingsScreen() {
             always opens in Google Maps. */}
         {Platform.OS === 'ios' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>PREFERRED MAPS APP</Text>
+            <Text style={styles.sectionTitle}>{t('settingsScreen.preferredMapsApp')}</Text>
             <View style={styles.card}>
               {MAPS_APP_OPTIONS.map((option, i, arr) => (
                 <TouchableOpacity
@@ -973,23 +1010,23 @@ export function SettingsScreen() {
 
         {/* Account */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACCOUNT</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.account')}</Text>
           <View style={styles.card}>
             <TouchableOpacity
               style={[styles.row, styles.rowLast]}
               onPress={() =>
                 Alert.alert(
-                  'Sign Out',
-                  'Are you sure you want to sign out?',
+                  t('settingsScreen.signOutTitle'),
+                  t('settingsScreen.signOutBody'),
                   [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('settingsScreen.signOutTitle'), style: 'destructive', onPress: handleSignOut },
                   ],
                   { cancelable: true }
                 )
               }
             >
-              <Text style={[styles.rowLabel, { color: Colors.danger }]}>Sign Out</Text>
+              <Text style={[styles.rowLabel, { color: Colors.danger }]}>{t('settingsScreen.signOutTitle')}</Text>
               <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
             </TouchableOpacity>
           </View>
@@ -997,25 +1034,25 @@ export function SettingsScreen() {
 
         {/* About */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ABOUT</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.about')}</Text>
           <View style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>App Name</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.appName')}</Text>
               <Text style={styles.rowValue}>RM Book</Text>
             </View>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Version</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.version')}</Text>
               <Text style={styles.rowValue}>1.0.0</Text>
             </View>
             <TouchableOpacity style={styles.row} onPress={replayOnboarding}>
-              <Text style={styles.rowLabel}>Replay Onboarding</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.replayOnboarding')}</Text>
               <Ionicons name="play-circle-outline" size={18} color={Colors.textLight} />
             </TouchableOpacity>
             <View style={[styles.row, styles.scriptureRow]}>
               <Text style={styles.scripture}>
-                "But be ye doers of the word, and not hearers only."
+                {t('settingsScreen.scriptureQuote')}
               </Text>
-              <Text style={styles.scriptureRef}>— James 1:22</Text>
+              <Text style={styles.scriptureRef}>{t('settingsScreen.scriptureRef')}</Text>
             </View>
           </View>
         </View>
@@ -1032,7 +1069,7 @@ export function SettingsScreen() {
             ? normalizeHex(settings[colorSheetRow.settingKey]) ?? colorSheetRow.defaultValue
             : DEFAULT_THEME_COLOR
         }
-        title={colorSheetRow?.label}
+        title={colorSheetRow ? t(`themeColorRows.${colorSheetRow.key}`, { defaultValue: colorSheetRow.label }) : undefined}
         defaultColor={colorSheetRow?.defaultValue}
         onCancel={() => setColorSheet(null)}
         onDone={hex => {

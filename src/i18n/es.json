@@ -1,0 +1,671 @@
+{
+  "colorSchemes": {
+    "classic": "Clásico",
+    "marine": "Marino",
+    "wildflower": "Flor silvestre",
+    "sunset": "Atardecer",
+    "amazon": "Amazonas"
+  },
+  "onboarding": {
+    "skip": "Omitir",
+    "next": "Siguiente",
+    "getStarted": "Comenzar",
+    "welcome": {
+      "title": "Bienvenido a RM Book",
+      "body": "Tu compañero para el próximo capítulo. Demos un vistazo rápido: Inicio para tus metas, Calendario para registrar tus días, Personas para quienes más importan, y Ajustes para personalizarlo todo."
+    },
+    "colors": {
+      "title": "Elige el tema de tu app"
+    },
+    "home": {
+      "title": "Inicio: tus metas",
+      "body": "Sigue tus metas semanales y mensuales directamente desde Inicio. Aquí está Estudio personal, seis semanas después."
+    },
+    "goals": {
+      "title": "Elige tus metas",
+      "body": "Selecciona las metas que te gustaría seguir. Añade, edita o elimina metas cuando quieras desde Inicio → Editar metas."
+    },
+    "calendar": {
+      "title": "Calendario: registra tus días",
+      "body": "Disfruta de la sensación familiar de programar y reportar tus días en la página del Calendario. Puedes comenzar con un horario ya preparado abajo, o crear el tuyo desde cero.",
+      "starterSchedule": "Horario inicial",
+      "starterScheduleHint": "Oración, estudio, comidas, ejercicio e iglesia los domingos, de forma recurrente.",
+      "iWork": "Trabajo",
+      "imAStudent": "Soy estudiante"
+    },
+    "eventTypes": {
+      "title": "Elige tus tipos de evento",
+      "body": "Selecciona los tipos de eventos que te gustaría usar en la página del Calendario.",
+      "footnote": "Añade, elimina o vincula tipos de evento a una meta cuando quieras desde Ajustes → Tipos de evento."
+    },
+    "people": {
+      "title": "Personas: quienes más importan",
+      "body": "Guarda información de contacto en la página de Personas. Ahí puedes encontrar a personas como John, un converso reciente, y ver su progreso en el camino del convenio."
+    },
+    "contacts": {
+      "title": "Importa tus contactos",
+      "body": "¿Ya tienes a todos en tu teléfono? Importa nombres, números y direcciones directamente desde tus contactos en lugar de escribirlos uno por uno.",
+      "importFromContacts": "Importar de contactos",
+      "importHint": "Trae nombres, números y direcciones desde tu teléfono.",
+      "footnote": "También puedes añadir, editar o eliminar personas manualmente en cualquier momento."
+    },
+    "settings": {
+      "title": "Ajustes: hazlo tuyo",
+      "body": "Elige tus preferencias ahora, o deja los valores predeterminados. Todo esto y más se puede personalizar en cualquier momento desde la página de Ajustes.",
+      "dailyReview": "Revisión diaria",
+      "dailyReviewHint": "Un recordatorio nocturno para reportar los eventos de hoy.",
+      "eventReminders": "Recordatorios de eventos",
+      "eventRemindersHint": "Un aviso poco antes de que comience cada evento.",
+      "theme": "Tema",
+      "weekStart": "Inicio de semana"
+    },
+    "ready": {
+      "title": "Todo listo",
+      "scriptureRef": "Santiago 1:22"
+    },
+    "starter": {
+      "morningPrayer": "Oración matutina",
+      "scriptureStudy": "Estudio de las Escrituras",
+      "breakfast": "Desayuno",
+      "lunch": "Almuerzo",
+      "exercise": "Ejercicio",
+      "dinner": "Cena",
+      "nightlyPrayer": "Oración nocturna",
+      "church": "Iglesia",
+      "work": "Trabajo",
+      "school": "Escuela"
+    }
+  },
+  "iconPicker": {
+    "title": "Ícono"
+  },
+  "colorPicker": {
+    "colorTitle": "Color",
+    "default": "Predeterminado",
+    "tab": {
+      "grid": "Cuadrícula",
+      "spectrum": "Espectro"
+    }
+  },
+  "importContacts": {
+    "title": "Importar contactos",
+    "adding": "Añadiendo…",
+    "import": "Importar",
+    "introTitle": "Importa a las personas que elijas",
+    "introBody": "A continuación, tu teléfono te preguntará qué contactos compartir con esta app. Compartir solo una o dos personas está perfectamente bien — compartir más es totalmente opcional, y no hay nada que compartir si prefieres añadir personas a mano.",
+    "chooseContactsToShare": "Elegir contactos para compartir",
+    "notNow": "Ahora no",
+    "searchPlaceholder": "Buscar contactos...",
+    "loadingContacts": "Cargando contactos…",
+    "accessDeniedTitle": "Acceso a contactos denegado",
+    "accessDeniedBody": "Permite el acceso en Ajustes para importar personas de tu teléfono — seguirás eligiendo exactamente quién se añade, nada sucede automáticamente.",
+    "openSettings": "Abrir Ajustes",
+    "couldntLoadTitle": "No se pudieron cargar los contactos",
+    "couldntLoadBody": "Algo salió mal al leer tus contactos.",
+    "tryAgain": "Intentar de nuevo",
+    "onlySomeShared": "Solo se compartieron algunos contactos.",
+    "manageSettings": "Administrar ajustes",
+    "noContactsSharedYet": "Aún no se han compartido contactos",
+    "optionalSharingHint": "Eso está totalmente bien — compartir contactos es opcional. Elige solo a las personas que quieras importar, o pasa esto por completo.",
+    "chooseContacts": "Elegir contactos",
+    "added": "Añadido"
+  },
+  "unreportedRow": {
+    "nothingWaiting": "Nada pendiente de reportar",
+    "eventsWaiting_one": "{{count}} evento pendiente de reportar",
+    "eventsWaiting_other": "{{count}} eventos pendientes de reportar"
+  },
+  "unreportedEvents": {
+    "title": "Eventos sin reportar",
+    "allCaughtUp": "Todo al día",
+    "waiting": "{{count}} pendientes · últimos 30 días",
+    "nothingToReport": "Nada que reportar",
+    "emptyHint": "Los eventos aparecen aquí una vez que su hora de inicio ha pasado."
+  },
+  "personTimeline": {
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "tomorrow": "Mañana",
+    "noEventsYet": "Aún no hay eventos",
+    "emptyHint": "Los eventos aparecerán aquí en cuanto añadas a esta persona a uno."
+  },
+  "notifications": {
+    "dailyReviewTitle": "Revisión diaria",
+    "dailyReviewBody": "Es hora de reportar los eventos de hoy.",
+    "startingNow": "Comienza ahora.",
+    "startsInOneHour": "Comienza en 1 hora.",
+    "startsInMinutes": "Comienza en {{count}} minutos."
+  },
+  "notificationToggles": {
+    "disabledTitle": "Notificaciones desactivadas",
+    "dailyReviewBody": "Activa las notificaciones para RM Book en los ajustes de tu dispositivo para usar el recordatorio de revisión diaria.",
+    "eventRemindersBody": "Activa las notificaciones para RM Book en los ajustes de tu dispositivo para usar los recordatorios de eventos."
+  },
+  "phoneUtils": {
+    "cantPlaceCallTitle": "No se puede realizar la llamada",
+    "cantPlaceCallBody": "Este dispositivo no tiene ninguna app que pueda marcar números de teléfono.",
+    "cantStartMessageTitle": "No se puede iniciar un mensaje",
+    "cantStartMessageBody": "Este dispositivo no tiene ninguna app que pueda enviar mensajes de texto.",
+    "cantOpenWhatsappTitle": "No se puede abrir WhatsApp",
+    "cantOpenWhatsappBody": "Nada en este dispositivo pudo abrir el enlace de WhatsApp.",
+    "cantOpenMessengerTitle": "No se puede abrir Messenger",
+    "cantOpenMessengerBody": "Nada en este dispositivo pudo abrir el enlace de Messenger."
+  },
+  "mapUtils": {
+    "cantOpenMapsTitle": "No se puede abrir Mapas",
+    "cantOpenMapsBody": "Nada en este dispositivo pudo abrir la dirección."
+  },
+  "auth": {
+    "enterEmailPassword": "Por favor, introduce tu correo y contraseña.",
+    "errorTitle": "Error",
+    "checkEmailConfirmation": "Revisa tu correo para ver el enlace de confirmación.",
+    "signInSubtitle": "Inicia sesión en tu cuenta",
+    "signUpSubtitle": "Crea una cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "signIn": "Iniciar sesión",
+    "createAccount": "Crear cuenta",
+    "needAccount": "¿No tienes cuenta? Regístrate",
+    "haveAccount": "¿Ya tienes cuenta? Inicia sesión"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "done": "Listo",
+    "add": "Añadir",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "close": "Cerrar",
+    "ok": "Aceptar",
+    "remove": "Quitar",
+    "confirm": "Confirmar",
+    "reset": "Restablecer",
+    "search": "Buscar",
+    "loading": "Cargando..."
+  },
+  "settings": {
+    "theme": {
+      "sectionTitle": "TEMA",
+      "label": "Modo",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "system": "Sistema"
+    },
+    "language": {
+      "sectionTitle": "IDIOMA",
+      "label": "Idioma",
+      "english": "English",
+      "spanish": "Español"
+    }
+  },
+  "contactMethods": {
+    "in_person": "En persona",
+    "phone": "Llamada telefónica",
+    "text": "Mensaje de texto",
+    "whatsapp": "WhatsApp",
+    "messenger": "Messenger",
+    "video": "Videollamada",
+    "other": "Otro",
+    "field": {
+      "dateType": "Tipo de cita",
+      "contactMethod": "Método de contacto"
+    }
+  },
+  "personStatuses": {
+    "Eternal Companion": "Cónyuge eterno",
+    "Recent Converts": "Conversos recientes",
+    "Family": "Familia",
+    "Members": "Miembros",
+    "Mission Leaders": "Líderes de misión",
+    "Mission Friends": "Amigos de la misión",
+    "Friends": "Amigos",
+    "Relationship": "Relación",
+    "1+ Dates": "1+ citas",
+    "Potential Dates": "Citas potenciales",
+    "Not Interested": "No interesado",
+    "Do Not Contact": "No contactar",
+    "Other": "Otro"
+  },
+  "personStatusesSingular": {
+    "Recent Converts": "Converso reciente",
+    "Potential Dates": "Cita potencial",
+    "Members": "Miembro",
+    "Mission Leaders": "Líder de misión",
+    "Mission Friends": "Amigo de la misión",
+    "Friends": "Amigo"
+  },
+  "personStatusGroups": {
+    "Church": "Iglesia",
+    "Friends & Family": "Amigos y familia",
+    "Dating": "Citas"
+  },
+  "calendar": {
+    "weekdayShort": {
+      "mon": "Lu",
+      "tue": "Ma",
+      "wed": "Mi",
+      "thu": "Ju",
+      "fri": "Vi",
+      "sat": "Sá",
+      "sun": "Do"
+    },
+    "deleteEventsTitle": "Eliminar eventos",
+    "deleteEventsBody_one": "¿Eliminar {{count}} evento seleccionado?",
+    "deleteEventsBody_other": "¿Eliminar {{count}} eventos seleccionados?",
+    "recurringEventTitle": "Evento recurrente",
+    "recurringMoveBody": "Este evento es recurrente. ¿Mover solo esta ocurrencia, o esta y todas las siguientes?",
+    "thisEventOnly": "Solo este evento",
+    "thisAndAllFuture": "Este y todos los futuros",
+    "deleteSelectedEvents": "Eliminar eventos seleccionados",
+    "selectEvents": "Seleccionar eventos",
+    "weekdayAbbrev": {
+      "sun": "dom",
+      "mon": "lun",
+      "tue": "mar",
+      "wed": "mié",
+      "thu": "jue",
+      "fri": "vie",
+      "sat": "sáb"
+    },
+    "weekdayInitial": {
+      "sun": "D",
+      "mon": "L",
+      "tue": "M",
+      "wed": "M",
+      "thu": "J",
+      "fri": "V",
+      "sat": "S"
+    },
+    "weekdayFull": {
+      "sunday": "Domingo",
+      "monday": "Lunes"
+    }
+  },
+  "eventStatus": {
+    "pending": "Pendiente",
+    "completed": "Completado",
+    "failed": "Fallido"
+  },
+  "eventDetail": {
+    "title": "Título",
+    "backup": "Respaldo",
+    "deleteEvent": "Eliminar evento",
+    "status": "Estado",
+    "notCompleted": "No completado",
+    "quantity": "Cantidad",
+    "units": "Unidades",
+    "optional": "opcional",
+    "eventType": "Tipo de evento",
+    "when": "Cuándo",
+    "until": "hasta {{date}}",
+    "people": "Personas",
+    "unknownPerson": "Persona desconocida",
+    "everyDay": "Todos los días",
+    "everyMonth": "Todos los meses",
+    "everyWeekOn": "Cada semana el {{days}}"
+  },
+  "eventTypes": {
+    "church": "Iglesia",
+    "travel": "Viaje",
+    "meal": "Comida",
+    "activity": "Actividad",
+    "date": "Cita",
+    "contact": "Contacto",
+    "work": "Trabajo",
+    "temple": "Templo",
+    "school": "Escuela",
+    "service": "Servicio",
+    "prayer": "Oración",
+    "scripture": "Estudio de las Escrituras",
+    "task": "Tarea",
+    "exercise": "Ejercicio",
+    "other": "Otro"
+  },
+  "goals": {
+    "morning_prayer": "Oraciones matutinas",
+    "nightly_prayer": "Oraciones nocturnas",
+    "times_exercised": "Veces que hizo ejercicio",
+    "personal_study": "Estudio personal",
+    "total_dates": "Total de citas",
+    "service_hours": "Horas de servicio",
+    "church_hours": "Horas en la iglesia",
+    "temple_attendance": "Visitas al templo",
+    "selectGoal": "Seleccionar meta",
+    "none": "Ninguno",
+    "untitled": "Meta sin título"
+  },
+  "editGoals": {
+    "title": "Editar metas",
+    "goalSectionTitle": "META",
+    "noGoals": "Sin metas",
+    "name": "Nombre",
+    "goalNamePlaceholder": "Nombre de la meta...",
+    "deleteGoal": "Eliminar meta",
+    "icon": "Ícono",
+    "color": "Color",
+    "goalPeriod": "Período de la meta",
+    "period": {
+      "weekly": "Semanal",
+      "monthly": "Mensual",
+      "both": "Ambos"
+    },
+    "periodLimitHint": "Cada cuadrícula muestra un máximo de {{max}} metas — quita otra meta primero.",
+    "linkedEventType": "Tipo de evento vinculado",
+    "linkedEventTypeEvening": "{{type}} (noche)",
+    "emptyHint": "Añade una meta para empezar a seguirla.",
+    "addAGoal": "Añadir una meta",
+    "maxGoalsPerGrid": "Máximo de {{max}} metas por cuadrícula",
+    "reorderGoals": "Reordenar metas",
+    "anEventType": "un tipo de evento",
+    "linkedToEventTypeTitle": "Vinculado a un tipo de evento",
+    "linkedToEventTypeBody": "\"{{goal}}\" está vinculado a {{type}}. Cambia su Tipo de evento vinculado a Ninguno y luego elimina esta meta.",
+    "deleteGoalTitle": "¿Eliminar \"{{name}}\"?",
+    "cannotBeUndone": "Esto no se puede deshacer."
+  },
+  "covenantPath": {
+    "baptism": "Bautismo",
+    "confirmation": "Confirmación",
+    "aaronic_priesthood": "Sacerdocio Aarónico",
+    "patriarchal_blessing": "Bendición patriarcal",
+    "melchizedek_priesthood": "Sacerdocio de Melquisedec",
+    "endowment": "Investidura",
+    "sealing": "Sellamiento"
+  },
+  "reminders": {
+    "atStartTime": "A la hora de inicio",
+    "oneHour": "1 hora",
+    "minutes": "{{count}} min"
+  },
+  "people": {
+    "title": "Personas",
+    "deleteSelected": "Eliminar seleccionados",
+    "exitSelectMode": "Salir del modo de selección",
+    "selectPeople": "Seleccionar personas",
+    "setType": "Asignar tipo",
+    "importFromContacts": "Importar de contactos",
+    "filterAll": "Todos",
+    "searchPlaceholder": "Buscar personas...",
+    "noMatches": "Sin coincidencias",
+    "noPeopleYet": "Aún no hay personas",
+    "tryDifferentSearch": "Prueba otra búsqueda o filtro",
+    "tapToAdd": "Toca + para añadir a alguien que estés siguiendo",
+    "deletePeopleTitle": "Eliminar personas",
+    "deletePeopleBody_one": "¿Eliminar {{count}} persona seleccionada?",
+    "deletePeopleBody_other": "¿Eliminar {{count}} personas seleccionadas?"
+  },
+  "personFields": {
+    "name": "Nombre",
+    "status": "Estado",
+    "phone": "Teléfono",
+    "whatsapp": "WhatsApp",
+    "messenger": "Messenger",
+    "address": "Dirección",
+    "notes": "Notas"
+  },
+  "personDetail": {
+    "unnamed": "Sin nombre",
+    "deletePerson": "Eliminar persona",
+    "messageWithName": "Enviar mensaje a {{name}}",
+    "messageThisNumber": "Enviar mensaje a este número",
+    "callWithName": "Llamar a {{name}}",
+    "callThisNumber": "Llamar a este número",
+    "whatsappWithName": "WhatsApp a {{name}}",
+    "openInWhatsapp": "Abrir en WhatsApp",
+    "messageOnMessengerWithName": "Enviar mensaje a {{name}} por Messenger",
+    "openInMessenger": "Abrir en Messenger",
+    "openAddressWithName": "Abrir la dirección de {{name}} en Maps",
+    "openThisAddress": "Abrir esta dirección en Maps"
+  },
+  "addEditPerson": {
+    "personTitle": "Persona",
+    "editPersonTitle": "Editar persona",
+    "addPersonTitle": "Añadir persona",
+    "tabs": {
+      "details": "Detalles",
+      "timeline": "Cronología",
+      "covenant": "Camino"
+    },
+    "fullNamePlaceholder": "Nombre completo",
+    "phonePlaceholder": "Número de teléfono",
+    "removeWhatsapp": "Quitar WhatsApp",
+    "whatsappPlaceholder": "Número de WhatsApp",
+    "removeMessenger": "Quitar Messenger",
+    "messengerPlaceholder": "Enlace de perfil o nombre de usuario",
+    "messengerHintBounce": "Se abre a través de m.me, que puede rebotar por el navegador. Guardar su enlace profile.php?id=… en su lugar entra directo a Messenger.",
+    "messengerHintShareLink": "Ese es un enlace para compartir — solo Facebook puede expandirlo. Ábrelo en un navegador y luego copia la dirección facebook.com/… a la que llega.",
+    "messengerHintUnrecognized": "No se pudo leer un perfil de eso. Pega su enlace de facebook.com o m.me, o solo su nombre de usuario.",
+    "addContactMethod": "Añadir método de contacto",
+    "removeAddress": "Quitar dirección",
+    "addressPlaceholder": "Calle, ciudad, estado",
+    "addAddress": "Añadir dirección",
+    "notesPlaceholder": "Notas sobre esta persona...",
+    "deletePersonTitle": "Eliminar persona",
+    "deletePersonBody": "¿Eliminar a {{name}}? Sus eventos permanecen, sin estar vinculados a ella.",
+    "thisPerson": "esta persona"
+  },
+  "addEditEvent": {
+    "quantitySaveFailed": "No se pudo guardar la cantidad. Inténtalo de nuevo.",
+    "unitsSaveFailed": "No se pudieron guardar las unidades. Inténtalo de nuevo.",
+    "deleteEventTitle": "Eliminar evento",
+    "deleteEventBody": "¿Seguro que quieres eliminar este evento?",
+    "deleteRecurringTitle": "Eliminar evento recurrente",
+    "deleteRecurringBody": "Este evento es recurrente. ¿Qué te gustaría eliminar?",
+    "recurringUpdateBody": "Este evento es recurrente. ¿Qué te gustaría actualizar?",
+    "eventSaveFailed": "No se pudo guardar el evento. Inténtalo de nuevo.",
+    "eventTitle": "Evento",
+    "eventTitlePlaceholder": "Título del evento",
+    "editEventTitle": "Editar evento",
+    "newEventTitle": "Nuevo evento",
+    "date": "Fecha",
+    "startTime": "Hora de inicio",
+    "endTime": "Hora de fin",
+    "addEndTime": "Añadir hora de fin",
+    "removeEndTime": "Quitar hora de fin",
+    "removePerson": "Quitar a {{name}}",
+    "addPerson": "Añadir persona",
+    "backupEvent": "Evento de respaldo",
+    "recurring": "Recurrente",
+    "frequency": "Frecuencia",
+    "frequencyOption": {
+      "daily": "Diario",
+      "weekly": "Semanal",
+      "monthly": "Mensual"
+    },
+    "ends": "Termina",
+    "addNotesPlaceholder": "Añadir notas..."
+  },
+  "home": {
+    "title": "Inicio",
+    "goals": "Metas",
+    "progress": "Progreso",
+    "gridReorderTitle": "{{title}} ({{tapped}}/{{total}})",
+    "editAction": "EDITAR"
+  },
+  "goalsModal": {
+    "title": "Metas"
+  },
+  "goalGraphModal": {
+    "title": "Gráfica de metas"
+  },
+  "eventSizes": {
+    "sm": "Pequeño",
+    "md": "Mediano",
+    "lg": "Grande",
+    "xl": "Extra grande"
+  },
+  "themeColorRows": {
+    "primary": "Color primario",
+    "secondaryLight": "Color secundario (claro)",
+    "secondaryDark": "Color secundario (oscuro)",
+    "tertiaryLight": "Color terciario (claro)",
+    "tertiaryDark": "Color terciario (oscuro)",
+    "statusCompletedLight": "Color de estado completado (claro)",
+    "statusCompletedDark": "Color de estado completado (oscuro)",
+    "statusFailedLight": "Color de estado fallido (claro)",
+    "statusFailedDark": "Color de estado fallido (oscuro)",
+    "statusPendingLight": "Color de estado pendiente (claro)",
+    "statusPendingDark": "Color de estado pendiente (oscuro)"
+  },
+  "settingsScreen": {
+    "title": "Ajustes",
+    "customize": "Personalizar",
+    "reorder": "Reordenar",
+    "resetToDefault": "Restablecer a los valores predeterminados",
+    "notifications": "Notificaciones",
+    "time": "Hora",
+    "defaultContactMethod": "MÉTODO DE CONTACTO PREDETERMINADO",
+    "preferredMapsApp": "APP DE MAPAS PREFERIDA",
+    "account": "CUENTA",
+    "signOutTitle": "Cerrar sesión",
+    "signOutBody": "¿Seguro que quieres cerrar sesión?",
+    "about": "ACERCA DE",
+    "appName": "Nombre de la app",
+    "version": "Versión",
+    "replayOnboarding": "Repetir introducción",
+    "scriptureQuote": "\"Mas sed hacedores de la palabra, y no tan solamente oidores, engañándoos a vosotros mismos.\"",
+    "scriptureRef": "— Santiago 1:22",
+    "signedOutLocalDataKeptTitle": "Sesión cerrada — datos locales conservados",
+    "signedOutLocalDataKeptBody_one": "{{count}} cambio no se pudo sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
+    "signedOutLocalDataKeptBody_other": "{{count}} cambios no se pudieron sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
+    "resetWeekTitle": "Restablecer semana",
+    "resetWeekBody": "Esto borrará todos los conteos y metas de la semana actual, y restaurará las Metas integradas (nombres, íconos, colores, vínculos, objetivos) a sus valores originales. Las Metas personalizadas no se verán afectadas.",
+    "resetEventColorsTitle": "Restablecer colores de eventos",
+    "resetEventColorsBody_one": "1 tipo de evento volverá a su color original. Esto no se puede deshacer.",
+    "resetEventColorsBody_other": "{{count}} tipos de evento volverán a sus colores originales. Esto no se puede deshacer.",
+    "resetDurationsTitle": "Restablecer duraciones predeterminadas",
+    "resetDurationsBody_one": "1 tipo de evento volverá a su duración original. Esto no se puede deshacer.",
+    "resetDurationsBody_other": "{{count}} tipos de evento volverán a sus duraciones originales. Esto no se puede deshacer.",
+    "resetEventTypesTitle": "Restablecer tipos de evento",
+    "customEventTypesCount": "{{count}} tipos de evento personalizados",
+    "resetEventTypesInUseBody_one": "Todavía hay {{count}} evento usando {{using}} que se eliminaría. ¿Quieres eliminarlo y restablecer los tipos de evento de todos modos?",
+    "resetEventTypesInUseBody_other": "Todavía hay {{count}} eventos usando {{using}} que se eliminarían. ¿Quieres eliminarlos y restablecer los tipos de evento de todos modos?",
+    "deleteAllAndReset": "Eliminar todo y restablecer",
+    "resetEventTypesBodyWithCustoms_one": "Los tipos de evento integrados se restaurarán a sus valores originales, y {{count}} tipo de evento personalizado se eliminará. Esto no se puede deshacer.",
+    "resetEventTypesBodyWithCustoms_other": "Los tipos de evento integrados se restaurarán a sus valores originales, y {{count}} tipos de evento personalizados se eliminarán. Esto no se puede deshacer.",
+    "resetEventTypesBody": "Los tipos de evento integrados se restaurarán a sus valores originales. Esto no se puede deshacer.",
+    "resetQuickAddTitle": "Restablecer burbuja de evento +",
+    "resetQuickAddBody": "Esto restaurará los tipos e íconos de añadido rápido predeterminados. Esto no se puede deshacer.",
+    "themeColors": {
+      "sectionTitle": "COLORES DEL TEMA",
+      "customizeColors": "Personalizar colores"
+    },
+    "eventSize": {
+      "sectionTitle": "TAMAÑO DE EVENTO",
+      "size": "Tamaño"
+    },
+    "eventTypes": {
+      "sectionTitle": "TIPOS DE EVENTO",
+      "resetColors": "Restablecer colores predeterminados",
+      "resetDurations": "Restablecer duraciones predeterminadas",
+      "resetEventTypes": "Restablecer tipos de evento predeterminados"
+    },
+    "eventBubble": {
+      "sectionTitle": "BURBUJA DE EVENTO +"
+    },
+    "dailyReview": {
+      "sectionTitle": "REVISIÓN DIARIA"
+    },
+    "eventReminders": {
+      "sectionTitle": "RECORDATORIOS DE EVENTOS",
+      "timeBefore": "Tiempo antes",
+      "types": "Tipos",
+      "allTypes": "Todos los tipos",
+      "typesOfTotal": "{{count}} de {{total}}"
+    },
+    "weekStart": {
+      "sectionTitle": "INICIO DE SEMANA"
+    },
+    "scheduleHours": {
+      "sectionTitle": "HORARIO DEL CALENDARIO"
+    },
+    "countryCode": {
+      "sectionTitle": "CÓDIGO DE PAÍS PREDETERMINADO",
+      "footnote": "Se usa para números de WhatsApp guardados sin un código +."
+    }
+  },
+  "eventReminderTypes": {
+    "title": "Tipos de recordatorio",
+    "hint": "Elige qué tipos de evento envían una notificación de recordatorio."
+  },
+  "reorderEventTypes": {
+    "title": "Reordenar",
+    "hint": "Mantén presionado y arrastra un tipo para cambiar dónde aparece en todas las listas de tipos de evento."
+  },
+  "quickAddTypes": {
+    "title": "Añadir rápido",
+    "maxReached": "Se alcanzó el máximo de {{max}} — quita uno para añadir otro.",
+    "chooseUpTo": "Elige hasta {{max}} tipos para mostrar como burbujas de añadido rápido en el botón + del calendario."
+  },
+  "goalPeriodList": {
+    "setGoals": "Establecer metas",
+    "actual": "Real",
+    "goal": "Meta"
+  },
+  "goalGrain": {
+    "week": {
+      "tabLabel": "Semanal",
+      "graphTabLabel": "Últimas 6 semanas",
+      "gridLabel": "Metas semanales",
+      "summary": { "prev": "Semana pasada", "current": "Esta semana", "next": "Próxima semana" }
+    },
+    "month": {
+      "tabLabel": "Mensual",
+      "graphTabLabel": "Últimos 6 meses",
+      "gridLabel": "Metas mensuales",
+      "summary": { "prev": "Mes pasado", "current": "Este mes", "next": "Próximo mes" }
+    }
+  },
+  "eventTypesModal": {
+    "untitled": "Tipo de evento sin título",
+    "deleteEventTypeTitle": "Eliminar tipo de evento",
+    "deleteEventTypeBody_one": "Todavía hay {{count}} evento de \"{{name}}\" en tu calendario. ¿Quieres eliminarlos todos y eliminar el tipo de evento?",
+    "deleteEventTypeBody_other": "Todavía hay {{count}} eventos de \"{{name}}\" en tu calendario. ¿Quieres eliminarlos todos y eliminar el tipo de evento?",
+    "deleteAll": "Eliminar todo",
+    "title": "Tipos de evento",
+    "eventTypeSectionTitle": "TIPO DE EVENTO",
+    "noEventTypes": "Sin tipos de evento",
+    "eventTypeNamePlaceholder": "Nombre del tipo de evento...",
+    "deleteEventTypeA11y": "Eliminar tipo de evento",
+    "morningGoal": "Meta matutina",
+    "linkedGoal": "Meta vinculada",
+    "eveningGoal": "Meta nocturna",
+    "switchesAt": "Cambia a las",
+    "theMorningGoal": "la meta matutina",
+    "theEveningGoal": "la meta nocturna",
+    "splitHintWithEvening": "Las finalizaciones antes de las {{time}} cuentan para {{morning}}, y desde las {{time}} en adelante para {{evening}}.",
+    "splitHintNoEvening": "Cada finalización cuenta para {{morning}} hasta que se elija una meta nocturna.",
+    "goalCountType": "Tipo de conteo de meta",
+    "countChoice": {
+      "count": "Finalización",
+      "hours": "Horas",
+      "quantity": "Cantidad",
+      "dayNight": "Día/Noche"
+    },
+    "statusType": "Tipo de estado",
+    "statusTypeOption": {
+      "checkbox": "Casilla",
+      "status": "Estado",
+      "none": "Ninguno"
+    },
+    "defaultDuration": "Duración predeterminada",
+    "emptyHint": "Añade un tipo de evento para empezar a programarlo.",
+    "addAnEventType": "Añadir un tipo de evento"
+  },
+  "personPicker": {
+    "title": "Seleccionar personas",
+    "noneSelected": "Ninguno seleccionado",
+    "selectedCount": "{{count}} seleccionados",
+    "tryDifferentSearch": "Prueba otra búsqueda",
+    "addSomeoneFirst": "Añade a alguien en la pestaña Personas primero"
+  },
+  "covenantPathTab": {
+    "genderPromptTitle": "¿Hombre o mujer?",
+    "genderPromptBody": "Determina si la ordenación al sacerdocio aparece en el camino del convenio.",
+    "female": "Mujer",
+    "male": "Hombre",
+    "titleWithName": "Camino del convenio de {{name}}",
+    "completeCount": "{{completed}}/{{total}} completado"
+  }
+}

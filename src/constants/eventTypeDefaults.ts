@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import { EventColors, EventTypeLabels } from './colors';
 
 /**
@@ -93,6 +94,25 @@ export const DEFAULT_EVENT_TYPES: EventTypeDefinition[] = Object.keys(EventColor
   builtIn: true,
   order,
 }));
+
+/**
+ * The label to show for a type, for read-only display only — never for an edit
+ * input's value, and never for an equality check against the shipped default
+ * (see isStockBuiltInType in SettingsScreen.tsx).
+ *
+ * `label` is user-editable data, not a fixed constant: a built-in's stored
+ * label is merged over its shipped default, and the user can rename it via
+ * EventTypesModal. Translating it unconditionally would show a translated
+ * string as a rename input's starting value, and saving would persist that
+ * translated text as the new permanent label — so this only substitutes a
+ * translation when the type is still built-in AND its label still matches
+ * what shipped, i.e. nobody has renamed it.
+ */
+export function eventTypeDisplayLabel(def: EventTypeDefinition, t: TFunction): string {
+  return def.builtIn && def.label === EventTypeLabels[def.id]
+    ? t(`eventTypes.${def.id}`, { defaultValue: def.label })
+    : def.label;
+}
 
 /**
  * The built-in event-type-to-goal links that used to be a hardcoded switch in

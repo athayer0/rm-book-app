@@ -4,6 +4,7 @@ import {
   StyleSheet, Pressable, Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { Person } from '../hooks/usePeople';
@@ -40,12 +41,6 @@ interface Props {
 
 type TabKey = 'details' | 'timeline' | 'covenant';
 
-const TAB_LABELS: Record<TabKey, string> = {
-  details: 'Details',
-  timeline: 'Timeline',
-  covenant: 'Path',
-};
-
 const RECENT_CONVERT_STATUS = 'Recent Converts';
 
 /**
@@ -57,6 +52,7 @@ type FieldKey = 'name' | 'notes';
 export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Other');
@@ -190,7 +186,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   const methodOptions = [
     {
       key: 'whatsapp' as const,
-      label: 'WhatsApp',
+      label: t('contactMethods.whatsapp'),
       present: whatsapp !== null,
       // Seeded from the phone field at the moment it's added, then left alone —
       // later edits to the phone number do not follow, so the two can differ.
@@ -198,7 +194,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
     },
     {
       key: 'messenger' as const,
-      label: 'Messenger',
+      label: t('contactMethods.messenger'),
       present: messenger !== null,
       add: () => setMessenger(''),
     },
@@ -239,12 +235,12 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   function handleDelete() {
     if (!person || !onDelete) return;
     Alert.alert(
-      'Delete Person',
-      `Delete ${person.name.trim() || 'this person'}? Their events stay, without them attached.`,
+      t('addEditPerson.deletePersonTitle'),
+      t('addEditPerson.deletePersonBody', { name: person.name.trim() || t('addEditPerson.thisPerson') }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => { onDelete(person.id); onClose(); },
         },
@@ -281,7 +277,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 onPress={onClose}
                 style={styles.closeBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('common.close')}
               >
                 {/* 24, the same as the edit header's × and back arrow. The
                     header has no fixed height, so it takes its size from the
@@ -290,9 +286,9 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                     shifted everything below it. */}
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Person</Text>
+              <Text style={styles.headerTitle}>{t('addEditPerson.personTitle')}</Text>
               <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
-                <Text style={styles.save}>Edit</Text>
+                <Text style={styles.save}>{t('common.edit')}</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -305,15 +301,15 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 onPress={handleCancel}
                 style={styles.closeBtn}
                 accessibilityRole="button"
-                accessibilityLabel={person ? 'Back' : 'Close'}
+                accessibilityLabel={person ? t('common.back') : t('common.close')}
               >
                 {person
                   ? <Ionicons name="arrow-back" size={24} color={Colors.textSecondary} />
                   : <Ionicons name="close" size={24} color={Colors.textSecondary} />}
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>{person ? 'Edit Person' : 'Add Person'}</Text>
+              <Text style={styles.headerTitle}>{person ? t('addEditPerson.editPersonTitle') : t('addEditPerson.addPersonTitle')}</Text>
               <TouchableOpacity onPress={handleSave} style={styles.headerRightBtn}>
-                <Text style={styles.save}>Save</Text>
+                <Text style={styles.save}>{t('common.save')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -332,7 +328,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 activeOpacity={0.75}
               >
                 <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
-                  {TAB_LABELS[tab]}
+                  {t(`addEditPerson.tabs.${tab}`)}
                 </Text>
                 {activeTab === tab && <View style={styles.tabUnderline} />}
               </TouchableOpacity>
@@ -378,14 +374,14 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             <Pressable style={styles.cardBackdrop} onPress={closePickers} />
           )}
           <View style={styles.group}>
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>{t('personFields.name')}</Text>
             <View style={styles.fieldRow}>
               <TextInput
                 style={[styles.input, styles.inputBoxed, styles.fieldInput, focusedField === 'name' && styles.inputFocused]}
                 value={name}
                 onChangeText={setName}
                 {...focusProps('name')}
-                placeholder="Full name"
+                placeholder={t('addEditPerson.fullNamePlaceholder')}
                 placeholderTextColor={Colors.textLight}
               />
               {/* Beside the name rather than at the foot of the form, matching
@@ -397,7 +393,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   onPress={handleDelete}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
-                  accessibilityLabel="Delete person"
+                  accessibilityLabel={t('personDetail.deletePerson')}
                 >
                   <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
@@ -413,7 +409,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 something else. */}
             <View style={styles.columns}>
               <View style={[styles.column, styles.columnWide]}>
-                <Text style={styles.label}>Status</Text>
+                <Text style={styles.label}>{t('personFields.status')}</Text>
                 <View>
                   <TouchableOpacity
                     style={styles.picker}
@@ -422,7 +418,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                     {PERSON_STATUSES[status] && (
                       <StatusIcon config={PERSON_STATUSES[status]} size={14} style={{ marginRight: 6 }} />
                     )}
-                    <Text style={styles.pickerText} numberOfLines={1}>{statusDisplayName(status)}</Text>
+                    <Text style={styles.pickerText} numberOfLines={1}>{statusDisplayName(status, t)}</Text>
                     <Ionicons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                   </TouchableOpacity>
                   <DropdownMenu open={showStatusPicker}>
@@ -436,7 +432,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                       {STATUS_OPTIONS.map((s, i) => (
                         <DropdownItem
                           key={s}
-                          label={statusDisplayName(s)}
+                          label={statusDisplayName(s, t)}
                           selected={status === s}
                           showSeparator={i < STATUS_OPTIONS.length - 1}
                           leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={{ marginRight: 8 }} />}
@@ -455,13 +451,13 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
 
           <View style={[styles.group, styles.columns]}>
             <View style={[styles.column, styles.columnWide]}>
-              <Text style={styles.label}>Phone</Text>
+              <Text style={styles.label}>{t('personFields.phone')}</Text>
               <TextInput
                 style={styles.input}
                 value={phone}
                 onChangeText={setPhone}
                 onFocus={closePickers}
-                placeholder="Phone number"
+                placeholder={t('addEditPerson.phonePlaceholder')}
                 placeholderTextColor={Colors.textLight}
                 keyboardType="phone-pad"
               />
@@ -477,12 +473,12 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
             <View style={[styles.group, styles.columns]}>
               <View style={[styles.column, styles.columnWide]}>
                 <View style={styles.methodHeader}>
-                  <Text style={styles.label}>WhatsApp</Text>
+                  <Text style={styles.label}>{t('personFields.whatsapp')}</Text>
                   <TouchableOpacity
                     onPress={() => { closePickers(); setWhatsapp(null); }}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="Remove WhatsApp"
+                    accessibilityLabel={t('addEditPerson.removeWhatsapp')}
                   >
                     <Ionicons name="close" size={18} color={Colors.textLight} />
                   </TouchableOpacity>
@@ -492,7 +488,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   value={whatsapp}
                   onChangeText={setWhatsapp}
                   onFocus={closePickers}
-                  placeholder="WhatsApp number"
+                  placeholder={t('addEditPerson.whatsappPlaceholder')}
                   placeholderTextColor={Colors.textLight}
                   keyboardType="phone-pad"
                 />
@@ -504,12 +500,12 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           {messenger !== null && (
             <View style={[styles.group]}>
               <View style={styles.methodHeader}>
-                <Text style={styles.label}>Messenger</Text>
+                <Text style={styles.label}>{t('personFields.messenger')}</Text>
                 <TouchableOpacity
                   onPress={() => { closePickers(); setMessenger(null); }}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel="Remove Messenger"
+                  accessibilityLabel={t('addEditPerson.removeMessenger')}
                 >
                   <Ionicons name="close" size={18} color={Colors.textLight} />
                 </TouchableOpacity>
@@ -529,7 +525,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   value={messenger}
                   onChangeText={setMessenger}
                   onFocus={closePickers}
-                  placeholder="Profile link or username"
+                  placeholder={t('addEditPerson.messengerPlaceholder')}
                   placeholderTextColor={Colors.textLight}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -548,15 +544,14 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               </View>
               {messengerHandle.length > 0 && !/^\d+$/.test(messengerHandle) && (
                 <Text style={styles.fieldHint}>
-                  Opens through m.me, which may bounce via the browser. Saving their
-                  profile.php?id=… link instead jumps straight into Messenger.
+                  {t('addEditPerson.messengerHintBounce')}
                 </Text>
               )}
               {messenger.trim().length > 0 && messengerHandle.length === 0 && (
                 <Text style={styles.fieldHint}>
                   {isFacebookShareLink(messenger)
-                    ? 'That’s a share link — only Facebook can expand it. Open it in a browser, then copy the facebook.com/… address it lands on.'
-                    : 'Couldn’t read a profile out of that. Paste their facebook.com or m.me link, or just their username.'}
+                    ? t('addEditPerson.messengerHintShareLink')
+                    : t('addEditPerson.messengerHintUnrecognized')}
                 </Text>
               )}
             </View>
@@ -585,7 +580,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                   onPress={() => { setShowStatusPicker(false); setShowMethodPicker(v => !v); }}
                 >
                   <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
-                  <Text style={styles.addMethodText}>Add contact method</Text>
+                  <Text style={styles.addMethodText}>{t('addEditPerson.addContactMethod')}</Text>
                 </TouchableOpacity>
                 <DropdownMenu open={showMethodPicker}>
                   {availableMethods.map((method, i) => (
@@ -615,12 +610,12 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
           {address !== null && (
             <View style={[styles.group]}>
               <View style={styles.methodHeader}>
-                <Text style={styles.label}>Address</Text>
+                <Text style={styles.label}>{t('personFields.address')}</Text>
                 <TouchableOpacity
                   onPress={() => { closePickers(); setAddress(null); }}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel="Remove address"
+                  accessibilityLabel={t('addEditPerson.removeAddress')}
                 >
                   <Ionicons name="close" size={18} color={Colors.textLight} />
                 </TouchableOpacity>
@@ -630,7 +625,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 value={address}
                 onChangeText={setAddress}
                 onFocus={closePickers}
-                placeholder="Street, city, state"
+                placeholder={t('addEditPerson.addressPlaceholder')}
                 placeholderTextColor={Colors.textLight}
                 autoCapitalize="words"
                 autoCorrect={false}
@@ -648,19 +643,19 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 accessibilityRole="button"
               >
                 <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
-                <Text style={styles.addMethodText}>Add address</Text>
+                <Text style={styles.addMethodText}>{t('addEditPerson.addAddress')}</Text>
               </TouchableOpacity>
             </View>
           )}
 
           <View style={[styles.group]}>
-            <Text style={styles.label}>Notes</Text>
+            <Text style={styles.label}>{t('personFields.notes')}</Text>
             <TextInput
               style={[styles.input, styles.inputBoxed, styles.notesInput, focusedField === 'notes' && styles.inputFocused]}
               value={notes}
               onChangeText={setNotes}
               {...focusProps('notes')}
-              placeholder="Notes about this person..."
+              placeholder={t('addEditPerson.notesPlaceholder')}
               placeholderTextColor={Colors.textLight}
               multiline
               numberOfLines={4}
@@ -713,10 +708,11 @@ function makeStyles(C: ColorPalette) {
       color: C.text,
     },
     // The display header's ×-and-Edit pair, sized the way EditGoalsModal
-    // sizes its close button: equal 60pt slots on both ends so the title sits
-    // centred whatever the right-hand label says.
-    closeBtn: { width: 60, alignItems: 'flex-start' },
-    headerRightBtn: { width: 60, alignItems: 'flex-end' },
+    // sizes its close button: equal slots on both ends so the title sits
+    // centred whatever the right-hand label says. Wider than a bare "Save"
+    // needs, since "Guardar" (Spanish) is long enough to wrap at 60.
+    closeBtn: { width: 72, alignItems: 'flex-start' },
+    headerRightBtn: { width: 72, alignItems: 'flex-end' },
     save: { fontSize: 16, fontWeight: '600', color: C.accent },
     // Same two-tab bar as the weekly planning sheet, so switching panes reads the
     // same way wherever the app does it.

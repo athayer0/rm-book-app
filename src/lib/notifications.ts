@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { addDays, format } from 'date-fns';
+import type { TFunction } from 'i18next';
 import { CalendarEvent, getEventsForDate } from '../utils/eventUtils';
 import { parseTimeString } from '../utils/dateUtils';
 
@@ -30,13 +31,13 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /** Idempotent — safe to call on every settings change; moves the time rather than duplicating the reminder. */
-export async function scheduleDailyReview(hour: number, minute: number): Promise<void> {
+export async function scheduleDailyReview(hour: number, minute: number, t: TFunction): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(DAILY_REVIEW_NOTIFICATION_ID);
   await Notifications.scheduleNotificationAsync({
     identifier: DAILY_REVIEW_NOTIFICATION_ID,
     content: {
-      title: 'Daily Review',
-      body: "It's time to report on today's events.",
+      title: t('notifications.dailyReviewTitle'),
+      body: t('notifications.dailyReviewBody'),
       data: DAILY_REVIEW_DATA,
     },
     trigger: {
@@ -78,10 +79,10 @@ function eventReminderIdentifier(eventId: string, dateStr: string): string {
   return `${EVENT_REMINDER_ID_PREFIX}${eventId}::${dateStr}`;
 }
 
-function eventReminderBody(leadMinutes: number): string {
-  if (leadMinutes === 0) return 'Starting now.';
-  if (leadMinutes === 60) return 'Starts in 1 hour.';
-  return `Starts in ${leadMinutes} minutes.`;
+function eventReminderBody(leadMinutes: number, t: TFunction): string {
+  if (leadMinutes === 0) return t('notifications.startingNow');
+  if (leadMinutes === 60) return t('notifications.startsInOneHour');
+  return t('notifications.startsInMinutes', { count: leadMinutes });
 }
 
 async function cancelAllEventReminders(): Promise<void> {
@@ -102,6 +103,7 @@ export async function syncEventReminders(
   events: CalendarEvent[],
   leadMinutes: number,
   excludedTypeIds: string[] = [],
+  t: TFunction,
 ): Promise<void> {
   await cancelAllEventReminders();
 
@@ -130,8 +132,8 @@ export async function syncEventReminders(
       Notifications.scheduleNotificationAsync({
         identifier: eventReminderIdentifier(event.id, date),
         content: {
-          title: event.title || 'Event',
-          body: eventReminderBody(leadMinutes),
+          title: event.title || t('addEditEvent.eventTitle'),
+          body: eventReminderBody(leadMinutes, t),
           data: { type: EVENT_REMINDER_DATA_TYPE, eventId: event.id, date },
         },
         trigger: {

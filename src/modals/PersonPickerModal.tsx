@@ -3,10 +3,11 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { usePeople } from '../hooks/usePeople';
-import { statusRank, groupByStatus } from '../constants/personStatuses';
+import { statusRank, groupByStatus, statusGroupLabel } from '../constants/personStatuses';
 import { PersonCard } from '../components/PersonCard';
 import { SheetModal } from '../components/SheetModal';
 
@@ -32,6 +33,7 @@ interface Props {
 export function PersonPickerModal({ visible, selectedIds, onConfirm, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { people } = usePeople();
 
   const [search, setSearch] = useState('');
@@ -72,16 +74,16 @@ export function PersonPickerModal({ visible, selectedIds, onConfirm, onClose }: 
     <SheetModal visible={visible} onClose={onClose}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose}>
-          <Text style={styles.cancel}>Cancel</Text>
+          <Text style={styles.cancel}>{t('common.cancel')}</Text>
         </TouchableOpacity>
         <View style={styles.headerLabels}>
-          <Text style={styles.headerTitle}>Select People</Text>
+          <Text style={styles.headerTitle}>{t('personPicker.title')}</Text>
           <Text style={styles.headerCount}>
-            {selected.length === 0 ? 'None selected' : `${selected.length} selected`}
+            {selected.length === 0 ? t('personPicker.noneSelected') : t('personPicker.selectedCount', { count: selected.length })}
           </Text>
         </View>
         <TouchableOpacity onPress={() => onConfirm(selected)}>
-          <Text style={styles.done}>Done</Text>
+          <Text style={styles.done}>{t('common.done')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -92,7 +94,7 @@ export function PersonPickerModal({ visible, selectedIds, onConfirm, onClose }: 
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search people..."
+            placeholder={t('people.searchPlaceholder')}
             placeholderTextColor={Colors.textLight}
           />
           {search.length > 0 && (
@@ -114,12 +116,12 @@ export function PersonPickerModal({ visible, selectedIds, onConfirm, onClose }: 
             <View style={styles.empty}>
               <Ionicons name="people-outline" size={48} color={Colors.textLight} />
               <Text style={styles.emptyTitle}>
-                {search.length > 0 ? 'No matches' : 'No people yet'}
+                {search.length > 0 ? t('people.noMatches') : t('people.noPeopleYet')}
               </Text>
               <Text style={styles.emptyText}>
                 {search.length > 0
-                  ? 'Try a different search'
-                  : 'Add someone on the People tab first'}
+                  ? t('personPicker.tryDifferentSearch')
+                  : t('personPicker.addSomeoneFirst')}
               </Text>
             </View>
           ) : (
@@ -127,7 +129,7 @@ export function PersonPickerModal({ visible, selectedIds, onConfirm, onClose }: 
               <View key={group.label ?? '__ungrouped'}>
                 {group.label && (
                   <View style={[styles.sectionRow, rowIndex === 0 && styles.sectionRowFirst]}>
-                    <Text style={styles.sectionLabel}>{group.label}</Text>
+                    <Text style={styles.sectionLabel}>{statusGroupLabel(group.label, t)}</Text>
                   </View>
                 )}
                 {group.people.map(person => (

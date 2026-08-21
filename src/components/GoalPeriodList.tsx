@@ -5,12 +5,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { GoalDefinition, MAX_GOAL_VALUE } from '../constants/defaultGoals';
+import { GoalDefinition, MAX_GOAL_VALUE, goalDisplayLabel } from '../constants/defaultGoals';
 import { resolveGoal } from '../hooks/useWeeklyGoals';
+import { useSettings } from '../hooks/useSettings';
 import {
   GoalGrain, GRAIN, MIN_OFFSET, MAX_OFFSET, PeriodDataReader, PeriodValueWriter, sortForGrain,
 } from '../utils/goalGrain';
@@ -72,6 +74,8 @@ export function GoalPeriodList({
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
+  const { settings } = useSettings();
 
   const { visibilityKey, keyByOffset, navLabel } = GRAIN[grain];
 
@@ -190,7 +194,7 @@ export function GoalPeriodList({
       <View style={styles.periodNav}>
         <View style={styles.periodLabelRow}>
           <Ionicons name="calendar-outline" size={16} color={Colors.accent} style={{ marginRight: 6 }} />
-          <Text style={styles.periodLabelText}>{navLabel(periodKey)}</Text>
+          <Text style={styles.periodLabelText}>{navLabel(periodKey, settings.language)}</Text>
         </View>
         <View style={styles.arrows}>
           <TouchableOpacity
@@ -237,7 +241,7 @@ export function GoalPeriodList({
                     <GoalIcon icon={def.icon} iconFamily={def.iconFamily} size={18} color={isDark ? lightenColor(def.color) : def.color} />
                   </View>
 
-                  <Text style={styles.kiLabel} numberOfLines={2}>{def.label}</Text>
+                  <Text style={styles.kiLabel} numberOfLines={2}>{goalDisplayLabel(def, t)}</Text>
 
                   {/* A future period with no goal set yet has nothing to show a ratio
                       against — just the "Set goals" prompt. Once a goal exists, the
@@ -260,7 +264,7 @@ export function GoalPeriodList({
                       style={styles.setGoalBtn}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={styles.setGoalText}>Set goals</Text>
+                      <Text style={styles.setGoalText}>{t('goalPeriodList.setGoals')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -291,12 +295,12 @@ export function GoalPeriodList({
               },
             ]}
           >
-            <Text style={styles.editTitle}>{editingDef?.label ?? ''}</Text>
+            <Text style={styles.editTitle}>{editingDef ? goalDisplayLabel(editingDef, t) : ''}</Text>
 
             <View style={styles.editFieldsRow}>
               {editingRow.showActual && (
                 <View style={styles.editFieldRow}>
-                  <Text style={styles.editFieldLabel}>Actual</Text>
+                  <Text style={styles.editFieldLabel}>{t('goalPeriodList.actual')}</Text>
                   <View style={styles.stepperRow}>
                     <TextInput
                       style={styles.editInput}
@@ -327,7 +331,7 @@ export function GoalPeriodList({
               )}
 
               <View style={styles.editFieldRow}>
-                <Text style={styles.editFieldLabel}>Goal</Text>
+                <Text style={styles.editFieldLabel}>{t('goalPeriodList.goal')}</Text>
                 <View style={styles.stepperRow}>
                   <TextInput
                     style={styles.editInput}

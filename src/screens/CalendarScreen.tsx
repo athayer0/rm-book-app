@@ -6,11 +6,15 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays, parseISO, differenceInCalendarDays } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { type ColorPalette } from '../constants/colors';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useSettings } from '../hooks/useSettings';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
+import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
+import { dateFnsLocale, datePattern, yearLabel } from '../utils/dateFnsLocale';
+import { weekdayShortLabels } from '../utils/dateUtils';
 import { TimeGrid } from '../components/TimeGrid';
 import { DayPager } from '../components/DayPager';
 import { WeekStrip } from '../components/WeekStrip';
@@ -29,6 +33,7 @@ const EDGE_ZONE = 60;
 function CalendarContent({ route, navigation }: { route?: any; navigation?: any }) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showEventModal, setShowEventModal] = useState(false);
@@ -85,11 +90,11 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
         .filter(q => !!eventTypeById[q.id])
         .map(q => ({
           key: q.id,
-          label: eventTypeById[q.id]?.label ?? q.id,
+          label: eventTypeById[q.id] ? eventTypeDisplayLabel(eventTypeById[q.id], t) : q.id,
           icon: q.icon,
           iconFamily: q.iconFamily,
         })),
-    [settings.quickAddTypes, eventTypeById],
+    [settings.quickAddTypes, eventTypeById, t, settings.language],
   );
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -192,12 +197,12 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     const ids = Array.from(selectedEventIds);
     if (ids.length === 0) return;
     Alert.alert(
-      'Delete Events',
-      `Delete ${ids.length} selected event${ids.length === 1 ? '' : 's'}?`,
+      t('calendar.deleteEventsTitle'),
+      t('calendar.deleteEventsBody', { count: ids.length }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             for (const id of ids) {
@@ -317,12 +322,12 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
       return;
     }
     Alert.alert(
-      'Recurring Event',
-      'This event is recurring. Move just this occurrence, or this and every occurrence after it?',
+      t('calendar.recurringEventTitle'),
+      t('calendar.recurringMoveBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'This event only', onPress: () => moves.forEach(m => applyMove(m, 'single')) },
-        { text: 'This and all future', onPress: () => moves.forEach(m => applyMove(m, 'future')) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('calendar.thisEventOnly'), onPress: () => moves.forEach(m => applyMove(m, 'single')) },
+        { text: t('calendar.thisAndAllFuture'), onPress: () => moves.forEach(m => applyMove(m, 'future')) },
       ],
       { cancelable: true }
     );
@@ -447,8 +452,8 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     <SafeAreaView style={styles.safe}>
       <View style={styles.header} onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerDate}>{format(selectedDate, 'MMM d')}</Text>
-          <Text style={styles.headerYear}>{format(selectedDate, 'yyyy')}</Text>
+          <Text style={styles.headerDate}>{format(selectedDate, datePattern('monthDay', settings.language), { locale: dateFnsLocale(settings.language) })}</Text>
+          <Text style={styles.headerYear}>{yearLabel(selectedDate, settings.language)}</Text>
           <TouchableOpacity onPress={() => setShowMonthPicker(v => !v)} style={styles.chevronBtn}>
             <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.onPrimaryMuted} />
           </TouchableOpacity>
@@ -464,7 +469,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
               onPress={handleDeleteSelected}
               style={styles.navBtn}
               accessibilityRole="button"
-              accessibilityLabel="Delete selected events"
+              accessibilityLabel={t('calendar.deleteSelectedEvents')}
             >
               <Ionicons name="trash-outline" size={22} color={Colors.onPrimary} />
             </TouchableOpacity>
@@ -473,7 +478,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
             onPress={() => selectMode ? exitSelectMode() : setSelectMode(true)}
             style={styles.navBtn}
             accessibilityRole="button"
-            accessibilityLabel="Select Events"
+            accessibilityLabel={t('calendar.selectEvents')}
           >
             <Ionicons name={selectMode ? 'checkbox' : 'checkbox-outline'} size={22} color={Colors.onPrimary} />
           </TouchableOpacity>
@@ -575,16 +580,13 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
               <TouchableOpacity onPress={() => navigatePickerMonth(-1)} style={styles.pickerNavBtn}>
                 <Ionicons name="chevron-back" size={20} color={Colors.text} />
               </TouchableOpacity>
-              <Text style={styles.pickerMonthTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
+              <Text style={styles.pickerMonthTitle}>{format(pickerMonth, 'MMMM yyyy', { locale: dateFnsLocale(settings.language) })}</Text>
               <TouchableOpacity onPress={() => navigatePickerMonth(1)} style={styles.pickerNavBtn}>
                 <Ionicons name="chevron-forward" size={20} color={Colors.text} />
               </TouchableOpacity>
             </View>
             <View style={styles.pickerDayHeaders}>
-              {(settings.weekStart === 'monday'
-                ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-                : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-              ).map(d => <Text key={d} style={styles.pickerDayHeader}>{d}</Text>)}
+              {weekdayShortLabels(settings.weekStart, t).map((d, i) => <Text key={i} style={styles.pickerDayHeader}>{d}</Text>)}
             </View>
             {getMonthGrid(pickerMonth).map((week, wi) => (
               <View key={wi} style={styles.pickerWeek}>

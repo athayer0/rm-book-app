@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { GoalDefinition } from '../constants/defaultGoals';
+import { GoalDefinition, goalDisplayLabel } from '../constants/defaultGoals';
 import { GoalIcon } from './GoalIcon';
 
 interface Props {
@@ -20,6 +21,7 @@ export function GoalCard({ definition, count, goal, onPress, compact }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   // An unset goal resolves to 0, which every count would otherwise "reach".
   const goalReached = goal > 0 && count >= goal;
@@ -37,7 +39,7 @@ export function GoalCard({ definition, count, goal, onPress, compact }: Props) {
 
       <View style={styles.textCol}>
         <Text style={[styles.label, compact && styles.labelCompact]} numberOfLines={2}>
-          {definition.label}
+          {goalDisplayLabel(definition, t)}
         </Text>
         <View style={styles.countRow}>
           <Text style={[styles.count, { color: goalReached ? Colors.success : Colors.accent }, compact && styles.countCompact]}>

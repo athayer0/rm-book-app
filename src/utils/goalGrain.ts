@@ -35,28 +35,28 @@ export const MAX_OFFSET = 3;
  * `useMonthlyGoals`, so whichever sheet owns those hooks passes them in.
  */
 export const GRAIN: Record<GoalGrain, {
-  /** This grain's tab in the Goals sheet. */
-  tabLabel: string;
-  /** This grain's tab in the Goal Graph sheet. */
-  graphTabLabel: string;
-  /** Heading over this grain's grid on the Home screen. */
-  gridLabel: string;
+  /** This grain's tab in the Goals sheet — a translation key, not display text. */
+  tabLabelKey: string;
+  /** This grain's tab in the Goal Graph sheet — a translation key. */
+  graphTabLabelKey: string;
+  /** Heading over this grain's grid on the Home screen — a translation key. */
+  gridLabelKey: string;
   /** Which of a goal's two independent visibility flags this grain honours. */
   visibilityKey: 'visible' | 'monthlyVisible';
   /** Which of a goal's two independent position fields this grain honours. */
   orderKey: 'order' | 'monthlyOrder';
   keyByOffset: (offset: number) => string;
   /** The period nav's own label — the full name, with room for it. */
-  navLabel: (periodKey: string) => string;
+  navLabel: (periodKey: string, language?: 'en' | 'es') => string;
   /** Short enough for one of six chart columns at fontSize 9; navLabel is not. */
-  axisLabel: (periodKey: string) => string;
-  /** Captions over the chart's three summary figures. */
-  summary: { prev: string; current: string; next: string };
+  axisLabel: (periodKey: string, language?: 'en' | 'es') => string;
+  /** Captions over the chart's three summary figures — translation keys. */
+  summaryKeys: { prev: string; current: string; next: string };
 }> = {
   week: {
-    tabLabel: 'Weekly',
-    graphTabLabel: 'Last 6 Weeks',
-    gridLabel: 'Weekly Goals',
+    tabLabelKey: 'goalGrain.week.tabLabel',
+    graphTabLabelKey: 'goalGrain.week.graphTabLabel',
+    gridLabelKey: 'goalGrain.week.gridLabel',
     visibilityKey: 'visible',
     orderKey: 'order',
     keyByOffset: getWeekKeyByOffset,
@@ -64,21 +64,21 @@ export const GRAIN: Record<GoalGrain, {
     // The axis only needs to say which week a column is, so it carries the start
     // date alone — formatWeekLabel's full "MMM d – MMM d" range is more than six
     // columns have room for.
-    axisLabel: k => formatWeekLabel(k).split(' – ')[0] ?? '',
-    summary: { prev: 'Last week', current: 'This week', next: 'Next week' },
+    axisLabel: (k, language) => formatWeekLabel(k, language).split(' – ')[0] ?? '',
+    summaryKeys: { prev: 'goalGrain.week.summary.prev', current: 'goalGrain.week.summary.current', next: 'goalGrain.week.summary.next' },
   },
   month: {
-    tabLabel: 'Monthly',
-    graphTabLabel: 'Last 6 Months',
-    gridLabel: 'Monthly Goals',
+    tabLabelKey: 'goalGrain.month.tabLabel',
+    graphTabLabelKey: 'goalGrain.month.graphTabLabel',
+    gridLabelKey: 'goalGrain.month.gridLabel',
     visibilityKey: 'monthlyVisible',
     orderKey: 'monthlyOrder',
     keyByOffset: getMonthKeyByOffset,
     navLabel: formatMonthLabel,
     // "August 2026" cut to "Aug". The year goes with it, as it does on the weekly
     // axis — six consecutive months read unambiguously across a year boundary.
-    axisLabel: k => formatMonthLabel(k).slice(0, 3),
-    summary: { prev: 'Last month', current: 'This month', next: 'Next month' },
+    axisLabel: (k, language) => formatMonthLabel(k, language).slice(0, 3),
+    summaryKeys: { prev: 'goalGrain.month.summary.prev', current: 'goalGrain.month.summary.current', next: 'goalGrain.month.summary.next' },
   },
 };
 

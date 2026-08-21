@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { TFunction } from 'i18next';
 import { useColors } from '../hooks/useColors';
 import { EventStatus } from '../utils/eventUtils';
 
@@ -15,11 +16,9 @@ const OPTIONS: { value: EventStatus; icon: string }[] = [
   { value: 'completed', icon: 'checkmark-circle' },
 ];
 
-export const STATUS_LABELS: Record<EventStatus, string> = {
-  pending: 'Pending',
-  completed: 'Completed',
-  failed: 'Failed',
-};
+export function statusLabel(status: EventStatus, t: TFunction): string {
+  return t(`eventStatus.${status}`);
+}
 
 /** The size the event edit modal has always drawn these at. */
 export const BASE_SIZE = 54;

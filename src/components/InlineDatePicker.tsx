@@ -2,8 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
+import { useSettings } from '../hooks/useSettings';
+import { dateFnsLocale } from '../utils/dateFnsLocale';
+import { weekdayShortLabels } from '../utils/dateUtils';
 
 function getMonthGrid(month: Date, weekStart: 'monday' | 'sunday'): (Date | null)[][] {
   const year = month.getFullYear();
@@ -33,6 +37,9 @@ interface Props {
 export function InlineDatePicker({ value, onChange, weekStart, minDate }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
+  const { settings } = useSettings();
+  const locale = dateFnsLocale(settings.language);
   const [pickerMonth, setPickerMonth] = useState(() => new Date(value + 'T12:00:00'));
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -46,7 +53,7 @@ export function InlineDatePicker({ value, onChange, weekStart, minDate }: Props)
         >
           <Ionicons name="chevron-back" size={20} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.monthTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
+        <Text style={styles.monthTitle}>{format(pickerMonth, 'MMMM yyyy', { locale })}</Text>
         <TouchableOpacity
           onPress={() => setPickerMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
           style={styles.navBtn}
@@ -56,10 +63,7 @@ export function InlineDatePicker({ value, onChange, weekStart, minDate }: Props)
       </View>
 
       <View style={styles.dayHeaders}>
-        {(weekStart === 'monday'
-          ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-          : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-        ).map(day => <Text key={day} style={styles.dayHeader}>{day}</Text>)}
+        {weekdayShortLabels(weekStart, t).map((day, i) => <Text key={i} style={styles.dayHeader}>{day}</Text>)}
       </View>
 
       {getMonthGrid(pickerMonth, weekStart).map((week, wi) => (

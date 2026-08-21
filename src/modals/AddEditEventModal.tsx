@@ -4,6 +4,7 @@ import {
   StyleSheet, Switch, Alert, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeConfig } from '../constants/colors';
@@ -15,13 +16,15 @@ import {
   CONTACT_METHODS, contactMethodLabel, methodFieldLabel,
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
+import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
+import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import { DropdownMenu, DropdownItem, Collapsible, MenuScrollView } from '../components/DropdownMenu';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
-import { addMinutesToTimeString, parseTimeString } from '../utils/dateUtils';
+import { addMinutesToTimeString, parseTimeString, weekdayInitial, localizeTime } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { usePeople, Person } from '../hooks/usePeople';
@@ -81,9 +84,6 @@ function minutesBetween(startTime: string, endTime: string): number {
   return diff > 0 ? diff : diff + 24 * 60;
 }
 
-// Single-letter labels indexed by JS weekday (0 = Sunday … 6 = Saturday).
-const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
 function weekdayOf(dateStr: string): number {
   return new Date(dateStr + 'T12:00:00').getDay();
 }
@@ -106,6 +106,7 @@ const FLOATING_PICKERS: PickerId[] = ['type', 'method', 'rule'];
 export function AddEditEventModal({ visible, event, defaultDate, defaultStartTime, prefill, settings, currentStatus, onStatusChange, onSave, onDelete, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { people: allPeople } = usePeople();
   const { definitions, byId: eventTypeById } = useEventTypeDefinitions();
 
@@ -118,8 +119,8 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     return current && !ids.includes(current) ? [...ids, current] : ids;
   }, [definitions, event?.type]);
 
-  function typeLabel(t: string): string {
-    return eventTypeById[t]?.label ?? t;
+  function typeLabel(typeId: string): string {
+    return eventTypeById[typeId] ? eventTypeDisplayLabel(eventTypeById[typeId], t) : typeId;
   }
 
   /**
@@ -274,7 +275,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       await onSave({ ...buildEventData(), quantity: newQuantity });
     } catch (e) {
       console.error('[AddEditEventModal] quantity save failed:', e);
-      setError('Failed to save quantity. Please try again.');
+      setError(t('addEditEvent.quantitySaveFailed'));
     }
   }
 
@@ -288,7 +289,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       await onSave({ ...buildEventData(), units: newUnits || undefined });
     } catch (e) {
       console.error('[AddEditEventModal] units save failed:', e);
-      setError('Failed to save units. Please try again.');
+      setError(t('addEditEvent.unitsSaveFailed'));
     }
   }
 
@@ -372,12 +373,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     if (!event || !onDelete) return;
     if (!event.recurring) {
       Alert.alert(
-        'Delete Event',
-        'Are you sure you want to delete this event?',
+        t('addEditEvent.deleteEventTitle'),
+        t('addEditEvent.deleteEventBody'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('common.delete'),
             style: 'destructive',
             onPress: () => { onDelete(event.id, event.date, 'single'); onClose(); },
           },
@@ -387,17 +388,17 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       return;
     }
     Alert.alert(
-      'Delete Recurring Event',
-      'This event is recurring. What would you like to delete?',
+      t('addEditEvent.deleteRecurringTitle'),
+      t('addEditEvent.deleteRecurringBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'This event only',
+          text: t('calendar.thisEventOnly'),
           style: 'destructive',
           onPress: () => { onDelete(event.id, event.date, 'single'); onClose(); },
         },
         {
-          text: 'This and all future',
+          text: t('calendar.thisAndAllFuture'),
           style: 'destructive',
           onPress: () => { onDelete(event.id, event.date, 'future'); onClose(); },
         },
@@ -454,12 +455,12 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       return;
     }
     Alert.alert(
-      'Recurring Event',
-      'This event is recurring. What would you like to update?',
+      t('calendar.recurringEventTitle'),
+      t('addEditEvent.recurringUpdateBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'This event only', onPress: () => commitSave('single') },
-        { text: 'This and all future', onPress: () => commitSave('future') },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('calendar.thisEventOnly'), onPress: () => commitSave('single') },
+        { text: t('calendar.thisAndAllFuture'), onPress: () => commitSave('future') },
       ],
       { cancelable: true }
     );
@@ -477,7 +478,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       if (event) setMode('view'); else onClose();
     } catch (e) {
       console.error('[AddEditEventModal] onSave failed:', e);
-      setError('Failed to save event. Please try again.');
+      setError(t('addEditEvent.eventSaveFailed'));
     }
   }
 
@@ -548,7 +549,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 onPress={onClose}
                 style={styles.closeBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('common.close')}
               >
                 {/* 24, the same as the edit header's × and back arrow. The
                     header has no fixed height, so it takes its size from the
@@ -557,9 +558,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                     shifted everything below it. */}
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Event</Text>
+              <Text style={styles.headerTitle}>{t('addEditEvent.eventTitle')}</Text>
               <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
-                <Text style={styles.save}>Edit</Text>
+                <Text style={styles.save}>{t('common.edit')}</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -572,15 +573,15 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 onPress={handleCancel}
                 style={styles.closeBtn}
                 accessibilityRole="button"
-                accessibilityLabel={event ? 'Back' : 'Close'}
+                accessibilityLabel={event ? t('common.back') : t('common.close')}
               >
                 {event
                   ? <Ionicons name="arrow-back" size={24} color={Colors.textSecondary} />
                   : <Ionicons name="close" size={24} color={Colors.textSecondary} />}
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>{event ? 'Edit Event' : 'New Event'}</Text>
+              <Text style={styles.headerTitle}>{event ? t('addEditEvent.editEventTitle') : t('addEditEvent.newEventTitle')}</Text>
               <TouchableOpacity onPress={handleSave} style={styles.headerRightBtn}>
-                <Text style={styles.save}>Save</Text>
+                <Text style={styles.save}>{t('common.save')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -609,7 +610,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             <Pressable style={styles.cardBackdrop} onPress={closeFloatingPicker} />
           )}
           <View style={styles.group}>
-            <Text style={styles.label}>Title</Text>
+            <Text style={styles.label}>{t('eventDetail.title')}</Text>
             <View style={styles.titleRow}>
               <TextInput
                 style={[styles.input, styles.titleInput, focusedField === 'title' && styles.inputFocused]}
@@ -617,7 +618,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 onChangeText={setTitle}
                 onFocus={() => { closePickers(); setFocusedField('title'); }}
                 onBlur={() => setFocusedField(null)}
-                placeholder={typeLabel(type) || 'Event title'}
+                placeholder={typeLabel(type) || t('addEditEvent.eventTitlePlaceholder')}
                 placeholderTextColor={Colors.textLight}
               />
               {event && onDelete && (
@@ -625,7 +626,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   onPress={handleDelete}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
-                  accessibilityLabel="Delete event"
+                  accessibilityLabel={t('eventDetail.deleteEvent')}
                 >
                   <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
@@ -635,7 +636,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={[styles.group, styles.columns, styles.pickerRow, elevatedPicker === 'type' && styles.openPickerRow]}>
             <View style={styles.column}>
-              <Text style={styles.label}>Event Type</Text>
+              <Text style={styles.label}>{t('eventDetail.eventType')}</Text>
               <View>
                 <TouchableOpacity style={styles.picker} onPress={() => togglePicker('type')}>
                   <View style={[styles.colorDot, { backgroundColor: resolvedColor(type, settings) }]} />
@@ -663,9 +664,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               </View>
             </View>
             <View style={styles.column}>
-              <Text style={styles.label}>Date</Text>
+              <Text style={styles.label}>{t('addEditEvent.date')}</Text>
               <TouchableOpacity style={styles.picker} onPress={() => togglePicker('date')}>
-                <Text style={styles.pickerText}>{format(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</Text>
+                <Text style={styles.pickerText}>{format(new Date(date + 'T12:00:00'), datePattern('monthDayYear', settings.language), { locale: dateFnsLocale(settings.language) })}</Text>
                 <Ionicons name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
               </TouchableOpacity>
             </View>
@@ -696,19 +697,19 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={[styles.group, styles.columns, styles.pickerRow, (elevatedPicker === 'start' || elevatedPicker === 'end') && styles.openPickerRow]}>
             <View style={styles.column}>
-              <Text style={styles.label}>Start Time</Text>
+              <Text style={styles.label}>{t('addEditEvent.startTime')}</Text>
               <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
-                <Text style={styles.pickerText}>{startTime}</Text>
+                <Text style={styles.pickerText}>{localizeTime(startTime, settings.language)}</Text>
                 <Ionicons name={showStartPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
               </TouchableOpacity>
             </View>
 
             {!fixed && endOmitted && (
               <View style={styles.column}>
-                <Text style={styles.label}>End Time</Text>
+                <Text style={styles.label}>{t('addEditEvent.endTime')}</Text>
                 <TouchableOpacity style={styles.picker} onPress={addEndTime}>
                   <Ionicons name="add-circle-outline" size={16} color={Colors.control} style={{ marginRight: 6 }} />
-                  <Text style={[styles.pickerText, styles.pickerActionText]}>Add end time</Text>
+                  <Text style={[styles.pickerText, styles.pickerActionText]}>{t('addEditEvent.addEndTime')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -716,20 +717,20 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             {!fixed && !endOmitted && (
               <View style={styles.column}>
                 <View style={styles.labelRow}>
-                  <Text style={[styles.label, { marginBottom: 0 }]}>End Time</Text>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>{t('addEditEvent.endTime')}</Text>
                   {hasOptionalEnd(type) && (
                     <TouchableOpacity
                       onPress={removeEndTime}
                       hitSlop={8}
                       accessibilityRole="button"
-                      accessibilityLabel="Remove end time"
+                      accessibilityLabel={t('addEditEvent.removeEndTime')}
                     >
                       <Ionicons name="close" size={16} color={Colors.textLight} />
                     </TouchableOpacity>
                   )}
                 </View>
                 <TouchableOpacity style={styles.picker} onPress={() => togglePicker('end')}>
-                  <Text style={styles.pickerText}>{endTime}</Text>
+                  <Text style={styles.pickerText}>{localizeTime(endTime, settings.language)}</Text>
                   <Ionicons name={showEndPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                 </TouchableOpacity>
               </View>
@@ -755,7 +756,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           {usesContactMethod(type) && (
             <View style={[styles.group, styles.columns, styles.pickerRow, elevatedPicker === 'method' && styles.openPickerRow]}>
               <View style={[styles.column, styles.columnWide]}>
-                <Text style={styles.label}>{methodFieldLabel(type)}</Text>
+                <Text style={styles.label}>{methodFieldLabel(type, t)}</Text>
                 <View>
                   <TouchableOpacity style={styles.picker} onPress={() => togglePicker('method')}>
                     <GoalIcon
@@ -764,14 +765,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                       size={16}
                       color={Colors.textSecondary}
                     />
-                    <Text style={[styles.pickerText, { marginLeft: 8 }]}>{contactMethodLabel(contactMethod)}</Text>
+                    <Text style={[styles.pickerText, { marginLeft: 8 }]}>{contactMethodLabel(contactMethod, t)}</Text>
                     <Ionicons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                   </TouchableOpacity>
                   <DropdownMenu open={showMethodPicker}>
                     {methodOptionsFor(type).map((m, i, arr) => (
                       <DropdownItem
                         key={m}
-                        label={CONTACT_METHODS[m].label}
+                        label={t(`contactMethods.${m}`, { defaultValue: CONTACT_METHODS[m].label })}
                         selected={contactMethod === m}
                         showSeparator={i < arr.length - 1}
                         labelStyle={{ marginLeft: 8 }}
@@ -794,7 +795,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           )}
 
           <View style={[styles.group]}>
-            <Text style={styles.label}>People</Text>
+            <Text style={styles.label}>{t('eventDetail.people')}</Text>
             {/* Nothing at all when no one is on the event. The label says what
                 the group is and the link below says what to do about it; a line
                 of prose between them only repeated that the list was empty. */}
@@ -809,13 +810,13 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         {/* A person deleted (or not yet synced) still has an id on the
                             event; showing the gap is better than dropping them silently. */}
                         <Text style={styles.personName} numberOfLines={1}>
-                          {attendee?.name ?? 'Unknown person'}
+                          {attendee?.name ?? t('eventDetail.unknownPerson')}
                         </Text>
                         <TouchableOpacity
                           onPress={() => { closePickers(); toggleAttendee(id); }}
                           hitSlop={8}
                           accessibilityRole="button"
-                          accessibilityLabel={`Remove ${attendee?.name ?? 'this person'}`}
+                          accessibilityLabel={t('addEditEvent.removePerson', { name: attendee?.name ?? t('addEditPerson.thisPerson') })}
                         >
                           <Ionicons name="close" size={16} color={Colors.textLight} />
                         </TouchableOpacity>
@@ -837,13 +838,13 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               activeOpacity={0.7}
             >
               <Ionicons name="add-circle-outline" size={20} color={Colors.control} />
-              <Text style={styles.addPersonText}>Add Person</Text>
+              <Text style={styles.addPersonText}>{t('addEditEvent.addPerson')}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={[styles.group]}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>Backup Event</Text>
+              <Text style={styles.label}>{t('addEditEvent.backupEvent')}</Text>
               <Switch
                 value={isBackup}
                 // Sits above the dismiss backdrop now that the card does, so it
@@ -858,7 +859,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={[styles.group, styles.pickerRow, (elevatedPicker === 'rule' || elevatedPicker === 'endsOn') && styles.openPickerRow]}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>Recurring</Text>
+              <Text style={styles.label}>{t('addEditEvent.recurring')}</Text>
               <Switch
                 value={recurring}
                 onValueChange={handleRecurringToggle}
@@ -870,11 +871,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               <>
                 <View style={[styles.columns, { marginTop: 24 }, elevatedPicker === 'rule' && styles.openPickerRow]}>
                   <View style={styles.column}>
-                    <Text style={styles.label}>Frequency</Text>
+                    <Text style={styles.label}>{t('addEditEvent.frequency')}</Text>
                     <View>
                       <TouchableOpacity style={styles.picker} onPress={() => togglePicker('rule')}>
                         <Text style={styles.pickerText}>
-                          {recurringRule.charAt(0).toUpperCase() + recurringRule.slice(1)}
+                          {t(`addEditEvent.frequencyOption.${recurringRule}`)}
                         </Text>
                         <Ionicons name={showRulePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                       </TouchableOpacity>
@@ -882,7 +883,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                         {(['daily', 'weekly', 'monthly'] as const).map((rule, i, arr) => (
                           <DropdownItem
                             key={rule}
-                            label={rule.charAt(0).toUpperCase() + rule.slice(1)}
+                            label={t(`addEditEvent.frequencyOption.${rule}`)}
                             selected={recurringRule === rule}
                             showSeparator={i < arr.length - 1}
                             onPress={() => { changeRule(rule); closePickers(); }}
@@ -893,10 +894,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   </View>
 
                   <View style={styles.column}>
-                    <Text style={styles.label}>Ends</Text>
+                    <Text style={styles.label}>{t('addEditEvent.ends')}</Text>
                     <TouchableOpacity style={styles.picker} onPress={() => togglePicker('endsOn')}>
                       <Text style={styles.pickerText}>
-                        {format(new Date(endsOn + 'T12:00:00'), 'MMM d, yyyy')}
+                        {format(new Date(endsOn + 'T12:00:00'), datePattern('monthDayYear', settings.language), { locale: dateFnsLocale(settings.language) })}
                       </Text>
                       <Ionicons name={showEndsOnPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                     </TouchableOpacity>
@@ -931,7 +932,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                           onPress={() => toggleDay(day)}
                         >
                           <Text style={[styles.dayCircleText, selected && styles.dayCircleTextActive]}>
-                            {DAY_LETTERS[day]}
+                            {weekdayInitial(day, t)}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -943,14 +944,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
           </View>
 
           <View style={[styles.group]}>
-            <Text style={styles.label}>Notes</Text>
+            <Text style={styles.label}>{t('personFields.notes')}</Text>
             <TextInput
               style={[styles.input, styles.notesInput, focusedField === 'notes' && styles.inputFocused]}
               value={notes}
               onChangeText={setNotes}
               onFocus={() => { closePickers(); setFocusedField('notes'); }}
               onBlur={() => setFocusedField(null)}
-              placeholder="Add notes..."
+              placeholder={t('addEditEvent.addNotesPlaceholder')}
               placeholderTextColor={Colors.textLight}
               multiline
               numberOfLines={3}
@@ -993,10 +994,11 @@ function makeStyles(C: ColorPalette) {
     },
     headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
     // The display header's ×-and-Edit pair, sized the way EditGoalsModal
-    // sizes its close button: equal 60pt slots on both ends so the title sits
-    // centred whatever the right-hand label says.
-    closeBtn: { width: 60, alignItems: 'flex-start' },
-    headerRightBtn: { width: 60, alignItems: 'flex-end' },
+    // sizes its close button: equal slots on both ends so the title sits
+    // centred whatever the right-hand label says. Wider than a bare "Save"
+    // needs, since "Guardar" (Spanish) is long enough to wrap at 60.
+    closeBtn: { width: 72, alignItems: 'flex-start' },
+    headerRightBtn: { width: 72, alignItems: 'flex-end' },
     save: { fontSize: 16, fontWeight: '600', color: C.accent },
     form: { flex: 1, backgroundColor: C.background },
     /**

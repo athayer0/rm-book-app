@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, NativeSyntheticEvent, NativeScrollE
 import * as Haptics from 'expo-haptics';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { formatTime, parseTimeString } from '../utils/dateUtils';
+import { useSettings } from '../hooks/useSettings';
+import { formatTime, parseTimeString, periodLabel } from '../utils/dateUtils';
 
 const ITEM_HEIGHT = 36;
 const VISIBLE_ITEMS = 5;
@@ -132,6 +133,7 @@ interface Props {
 export function TimeWheelPicker({ value, onChange }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { settings } = useSettings();
 
   const { hour: hour24, minute } = parseTimeString(value);
   const hour12 = hour24 % 12 || 12;
@@ -169,7 +171,7 @@ export function TimeWheelPicker({ value, onChange }: Props) {
         <Wheel
           items={PERIODS}
           value={period}
-          renderLabel={p => p}
+          renderLabel={p => periodLabel(p, settings.language)}
           onSettle={p => commit(hour12, roundedMinute, p)}
           styles={styles}
         />

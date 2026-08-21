@@ -475,6 +475,7 @@ create table if not exists settings (
     references auth.users,
   week_start text default 'monday',
   theme text default 'light',
+  language text default 'en',
   -- Undefaulted, like event_size: the shipped
   -- starting colour has moved once already and
   -- a copy here would silently drift from
@@ -565,6 +566,9 @@ alter table settings
 alter table settings
   add column if not exists
   event_reminder_excluded_type_ids jsonb default '[]'::jsonb;
+alter table settings
+  add column if not exists
+  language text default 'en';
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

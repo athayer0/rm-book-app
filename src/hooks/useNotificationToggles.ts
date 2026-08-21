@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSettings } from './useSettings';
 import { requestNotificationPermissions, scheduleDailyReview, cancelDailyReview } from '../lib/notifications';
 
@@ -9,6 +10,7 @@ import { requestNotificationPermissions, scheduleDailyReview, cancelDailyReview 
  */
 export function useNotificationToggles() {
   const { settings, updateSettings } = useSettings();
+  const { t } = useTranslation();
 
   // Requesting/scheduling here (rather than leaving it to App.tsx's settings-
   // driven effect alone) is what lets a denied permission stay off instead of
@@ -19,12 +21,12 @@ export function useNotificationToggles() {
       const granted = await requestNotificationPermissions();
       if (!granted) {
         Alert.alert(
-          'Notifications Disabled',
-          'Enable notifications for RM Book in your device settings to use the daily review reminder.',
+          t('notificationToggles.disabledTitle'),
+          t('notificationToggles.dailyReviewBody'),
         );
         return;
       }
-      await scheduleDailyReview(settings.dailyReviewHour, settings.dailyReviewMinute);
+      await scheduleDailyReview(settings.dailyReviewHour, settings.dailyReviewMinute, t);
       updateSettings({ dailyReviewEnabled: true });
     } else {
       await cancelDailyReview();
@@ -41,8 +43,8 @@ export function useNotificationToggles() {
       const granted = await requestNotificationPermissions();
       if (!granted) {
         Alert.alert(
-          'Notifications Disabled',
-          'Enable notifications for RM Book in your device settings to use event reminders.',
+          t('notificationToggles.disabledTitle'),
+          t('notificationToggles.eventRemindersBody'),
         );
         return;
       }

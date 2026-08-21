@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors } from '../constants/colors';
@@ -14,12 +16,15 @@ import {
 import { GoalIcon } from './GoalIcon';
 import { StatusCheckbox } from './StatusCheckbox';
 import { StatusIcon } from './StatusIcon';
-import { StatusPicker, STATUS_LABELS } from './StatusPicker';
+import { StatusPicker, statusLabel } from './StatusPicker';
 import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { usePeople, Person } from '../hooks/usePeople';
 import { AppSettings } from '../hooks/useSettings';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
+import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
+import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
+import { localizeTime } from '../utils/dateUtils';
 
 interface Props {
   /**
@@ -40,26 +45,27 @@ interface Props {
   onDelete?: () => void;
 }
 
-const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-function longDate(dateStr: string): string {
-  return format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d, yyyy');
+function longDate(dateStr: string, language: 'en' | 'es'): string {
+  return format(new Date(dateStr + 'T12:00:00'), datePattern('weekdayMonthDayYear', language), { locale: dateFnsLocale(language) });
 }
 
-function shortDate(dateStr: string): string {
-  return format(new Date(dateStr + 'T12:00:00'), 'MMM d, yyyy');
+function shortDate(dateStr: string, language: 'en' | 'es'): string {
+  return format(new Date(dateStr + 'T12:00:00'), datePattern('monthDayYear', language), { locale: dateFnsLocale(language) });
 }
 
 /** "Every week on Mon, Wed" — the series in one line, without its end date. */
-function recurrenceSummary(event: CalendarEvent): string {
-  if (event.recurringRule === 'daily') return 'Every day';
-  if (event.recurringRule === 'monthly') return 'Every month';
+function recurrenceSummary(event: CalendarEvent, t: TFunction): string {
+  if (event.recurringRule === 'daily') return t('eventDetail.everyDay');
+  if (event.recurringRule === 'monthly') return t('eventDetail.everyMonth');
   // Weekly, including a series saved before per-day selection existed: those
   // repeat on the start date's own weekday.
   const days = event.recurringDays?.length
     ? event.recurringDays
     : [new Date(event.date + 'T12:00:00').getDay()];
-  return `Every week on ${[...days].sort((a, b) => a - b).map(d => WEEKDAY_NAMES[d]).join(', ')}`;
+  const names = [...days].sort((a, b) => a - b).map(d => t(`calendar.weekdayAbbrev.${WEEKDAY_KEYS[d]}`));
+  return t('eventDetail.everyWeekOn', { days: names.join(', ') });
 }
 
 // Smaller than StatusPicker's icons: a filled/outlined box reads heavier than a
@@ -87,6 +93,7 @@ export function EventDetailView({
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { people: allPeople } = usePeople();
   const { byId: eventTypeById } = useEventTypeDefinitions();
 
@@ -155,12 +162,12 @@ export function EventDetailView({
     key: 'name',
     node: (
       <>
-        <Text style={styles.label}>Title</Text>
+        <Text style={styles.label}>{t('eventDetail.title')}</Text>
         <View style={styles.nameRow}>
           <Text style={[styles.value, styles.nameValue]}>{event.title}</Text>
           {isBackup && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Backup</Text>
+              <Text style={styles.badgeText}>{t('eventDetail.backup')}</Text>
             </View>
           )}
           {onDelete && (
@@ -168,7 +175,7 @@ export function EventDetailView({
               onPress={onDelete}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel="Delete event"
+              accessibilityLabel={t('eventDetail.deleteEvent')}
             >
               <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -184,12 +191,12 @@ export function EventDetailView({
       key: 'status',
       node: (
         <>
-          <Text style={styles.label}>Status</Text>
+          <Text style={styles.label}>{t('eventDetail.status')}</Text>
           <View style={styles.statusRow}>
             <Text style={styles.value}>
               {isStatusCheckbox
-                ? (status === 'completed' ? 'Completed' : 'Not completed')
-                : (status ? STATUS_LABELS[status] : 'None')}
+                ? (status === 'completed' ? t('eventStatus.completed') : t('eventDetail.notCompleted'))
+                : (status ? statusLabel(status, t) : t('goals.none'))}
             </Text>
             {isStatusCheckbox ? (
               <TouchableOpacity
@@ -216,7 +223,7 @@ export function EventDetailView({
       node: (
         <View style={styles.quantityRow}>
           <View>
-            <Text style={styles.label}>Quantity</Text>
+            <Text style={styles.label}>{t('eventDetail.quantity')}</Text>
             <TextInput
               style={styles.quantityBox}
               value={quantityText}
@@ -227,13 +234,13 @@ export function EventDetailView({
               keyboardType="number-pad"
               selectTextOnFocus
               maxLength={3}
-              accessibilityLabel="Quantity"
+              accessibilityLabel={t('eventDetail.quantity')}
             />
           </View>
           {/* Takes the rest of the row: a unit is a word, and it reads as one
               field with the number rather than a second thing below it. */}
           <View style={styles.unitsField}>
-            <Text style={styles.label}>Units</Text>
+            <Text style={styles.label}>{t('eventDetail.units')}</Text>
             <TextInput
               style={[styles.quantityBox, styles.unitsBox]}
               value={unitsText}
@@ -243,11 +250,11 @@ export function EventDetailView({
               editable={!!onUnitsChange}
               // Neutral on purpose: a real unit ("miles") reads as a value
               // already filled in, and suggests this box wants that one.
-              placeholder="optional"
+              placeholder={t('eventDetail.optional')}
               placeholderTextColor={Colors.textLight}
               autoCapitalize="none"
               maxLength={UNITS_MAX_LENGTH}
-              accessibilityLabel="Units"
+              accessibilityLabel={t('eventDetail.units')}
             />
           </View>
         </View>
@@ -259,10 +266,12 @@ export function EventDetailView({
     key: 'type',
     node: (
       <>
-        <Text style={styles.label}>Event Type</Text>
+        <Text style={styles.label}>{t('eventDetail.eventType')}</Text>
         <View style={styles.inlineValue}>
           <View style={[styles.colorDot, { backgroundColor: color }]} />
-          <Text style={styles.value}>{eventTypeById[event.type]?.label ?? event.type}</Text>
+          <Text style={styles.value}>
+            {eventTypeById[event.type] ? eventTypeDisplayLabel(eventTypeById[event.type], t) : event.type}
+          </Text>
         </View>
       </>
     ),
@@ -273,7 +282,7 @@ export function EventDetailView({
       key: 'method',
       node: (
         <>
-          <Text style={styles.label}>{methodFieldLabel(event.type)}</Text>
+          <Text style={styles.label}>{methodFieldLabel(event.type, t)}</Text>
           <View style={styles.inlineValue}>
             <GoalIcon
               icon={CONTACT_METHODS[method].icon}
@@ -281,7 +290,7 @@ export function EventDetailView({
               size={16}
               color={Colors.textSecondary}
             />
-            <Text style={styles.value}>{contactMethodLabel(method)}</Text>
+            <Text style={styles.value}>{contactMethodLabel(method, t)}</Text>
           </View>
         </>
       ),
@@ -292,7 +301,7 @@ export function EventDetailView({
     key: 'when',
     node: (
       <>
-        <Text style={styles.label}>When</Text>
+        <Text style={styles.label}>{t('eventDetail.when')}</Text>
         {/*
           Date and time carry an icon each rather than stacking as two more lines
           of the same 16pt text: the group holds up to three facts about one
@@ -303,14 +312,14 @@ export function EventDetailView({
         */}
         <View style={styles.whenRow}>
           <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.whenIcon} />
-          <Text style={styles.value}>{longDate(event.date)}</Text>
+          <Text style={styles.value}>{longDate(event.date, settings.language)}</Text>
         </View>
         <View style={[styles.whenRow, styles.whenRowSpaced]}>
           <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.whenIcon} />
           <Text style={styles.value}>
             {isCheckboxType(event.type) || !hasEndTime(event)
-              ? event.startTime
-              : `${event.startTime} – ${event.endTime}`}
+              ? localizeTime(event.startTime, settings.language)
+              : `${localizeTime(event.startTime, settings.language)} – ${localizeTime(event.endTime, settings.language)}`}
           </Text>
         </View>
         {event.recurring && (
@@ -321,10 +330,10 @@ export function EventDetailView({
                 its own inside the chip so a long rule and its end date don't run
                 together. */}
             <View style={styles.repeatTextBlock}>
-              <Text style={styles.repeatText}>{recurrenceSummary(event)}</Text>
+              <Text style={styles.repeatText}>{recurrenceSummary(event, t)}</Text>
               {!!event.recurringUntil && (
                 <Text style={[styles.repeatText, styles.repeatUntil]}>
-                  {`until ${shortDate(event.recurringUntil)}`}
+                  {t('eventDetail.until', { date: shortDate(event.recurringUntil, settings.language) })}
                 </Text>
               )}
             </View>
@@ -339,14 +348,14 @@ export function EventDetailView({
       key: 'people',
       node: (
         <>
-          <Text style={styles.label}>People</Text>
+          <Text style={styles.label}>{t('eventDetail.people')}</Text>
           {attendees.map((id, i) => {
             const attendee = peopleById.get(id);
             return (
               <View key={id} style={[styles.personRow, i > 0 && styles.personRowDivided]}>
                 <StatusIcon config={statusConfigOf(attendee)} size={18} style={styles.personIcon} />
                 <Text style={styles.personName} numberOfLines={1}>
-                  {attendee?.name ?? 'Unknown person'}
+                  {attendee?.name ?? t('eventDetail.unknownPerson')}
                 </Text>
               </View>
             );
@@ -361,7 +370,7 @@ export function EventDetailView({
       key: 'notes',
       node: (
         <>
-          <Text style={styles.label}>Notes</Text>
+          <Text style={styles.label}>{t('personFields.notes')}</Text>
           <Text style={styles.value}>{notes}</Text>
         </>
       ),

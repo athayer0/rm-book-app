@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 /** The grid only has room for so many before it turns into a wall of cards. */
 export const MAX_VISIBLE_GOALS = 10;
 
@@ -54,6 +56,19 @@ export interface GoalDefinition {
  * and the right column cool (violet, purple, navy, cyan). Anything inserted here
  * shifts every card after it — keep new goals on the column their colour belongs to.
  */
+/**
+ * The label to show for a goal, for read-only display only — see
+ * eventTypeDisplayLabel in eventTypeDefaults.ts for why: `label` is
+ * user-editable (a built-in can be renamed via EditGoalsModal), so this only
+ * substitutes a translation when the goal is still built-in AND unrenamed.
+ */
+export function goalDisplayLabel(def: GoalDefinition, t: TFunction): string {
+  const shipped = DEFAULT_GOALS.find(g => g.id === def.id)?.label;
+  return def.builtIn && shipped !== undefined && def.label === shipped
+    ? t(`goals.${def.id}`, { defaultValue: def.label })
+    : def.label;
+}
+
 export const DEFAULT_GOALS: GoalDefinition[] = [
   {
     id: 'morning_prayer',

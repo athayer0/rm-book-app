@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { GoalDefinition } from '../constants/defaultGoals';
@@ -31,6 +32,7 @@ interface Props {
 export function GoalGraphModal({ visible, onClose, definitions, initialGrain = 'week' }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const { getWeekData } = useWeeklyGoals();
   const { getMonthData } = useMonthlyGoals();
@@ -48,12 +50,12 @@ export function GoalGraphModal({ visible, onClose, definitions, initialGrain = '
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={22} color={Colors.textSecondary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Goal Graph</Text>
+          <Text style={styles.headerTitle}>{t('goalGraphModal.title')}</Text>
           <View style={{ width: 44 }} />
         </View>
 
         <SheetTabs
-          tabs={GRAINS.map(g => ({ key: g, label: GRAIN[g].graphTabLabel }))}
+          tabs={GRAINS.map(g => ({ key: g, label: t(GRAIN[g].graphTabLabelKey) }))}
           active={grain}
           onChange={setGrain}
         />

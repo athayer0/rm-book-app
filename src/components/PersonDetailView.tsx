@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { PERSON_STATUSES, statusDisplayName } from '../constants/personStatuses';
@@ -57,6 +58,7 @@ export function PersonDetailView({
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const trimmedName = name.trim();
   const dialable = toDialable(phone);
@@ -82,15 +84,15 @@ export function PersonDetailView({
     key: 'name',
     node: (
       <>
-        <Text style={styles.label}>Name</Text>
+        <Text style={styles.label}>{t('personFields.name')}</Text>
         <View style={styles.nameRow}>
-          <Text style={[styles.value, styles.nameValue]}>{trimmedName || 'Unnamed'}</Text>
+          <Text style={[styles.value, styles.nameValue]}>{trimmedName || t('personDetail.unnamed')}</Text>
           {onDelete && (
             <TouchableOpacity
               onPress={onDelete}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel="Delete person"
+              accessibilityLabel={t('personDetail.deletePerson')}
             >
               <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -104,10 +106,10 @@ export function PersonDetailView({
     key: 'status',
     node: (
       <>
-        <Text style={styles.label}>Status</Text>
+        <Text style={styles.label}>{t('personFields.status')}</Text>
         <View style={styles.inlineValue}>
           {PERSON_STATUSES[status] && <StatusIcon config={PERSON_STATUSES[status]} size={14} />}
-          <Text style={styles.value}>{statusDisplayName(status)}</Text>
+          <Text style={styles.value}>{statusDisplayName(status, t)}</Text>
         </View>
       </>
     ),
@@ -118,24 +120,24 @@ export function PersonDetailView({
       key: 'phone',
       node: (
         <>
-          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.label}>{t('personFields.phone')}</Text>
           <View style={styles.fieldRow}>
             <Text style={[styles.value, styles.fieldValue]}>{phoneText}</Text>
             {dialable.length > 0 && (
               <>
                 <TouchableOpacity
                   style={styles.contactBtn}
-                  onPress={() => onContact('text', () => messageNumber(phone))}
+                  onPress={() => onContact('text', () => messageNumber(phone, t))}
                   accessibilityRole="button"
-                  accessibilityLabel={trimmedName ? `Message ${trimmedName}` : 'Message this number'}
+                  accessibilityLabel={trimmedName ? t('personDetail.messageWithName', { name: trimmedName }) : t('personDetail.messageThisNumber')}
                 >
                   <Ionicons name="chatbubble" size={17} color={Colors.control} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.contactBtn}
-                  onPress={() => onContact('phone', () => callNumber(phone))}
+                  onPress={() => onContact('phone', () => callNumber(phone, t))}
                   accessibilityRole="button"
-                  accessibilityLabel={trimmedName ? `Call ${trimmedName}` : 'Call this number'}
+                  accessibilityLabel={trimmedName ? t('personDetail.callWithName', { name: trimmedName }) : t('personDetail.callThisNumber')}
                 >
                   <Ionicons name="call" size={18} color={Colors.control} />
                 </TouchableOpacity>
@@ -152,15 +154,15 @@ export function PersonDetailView({
       key: 'whatsapp',
       node: (
         <>
-          <Text style={styles.label}>WhatsApp</Text>
+          <Text style={styles.label}>{t('personFields.whatsapp')}</Text>
           <View style={styles.fieldRow}>
             <Text style={[styles.value, styles.fieldValue]}>{whatsappText}</Text>
             {whatsappDialable.length > 0 && (
               <TouchableOpacity
                 style={styles.contactBtn}
-                onPress={() => onContact('whatsapp', () => openWhatsApp(whatsapp, settings.defaultCountryCode))}
+                onPress={() => onContact('whatsapp', () => openWhatsApp(whatsapp, settings.defaultCountryCode, t))}
                 accessibilityRole="button"
-                accessibilityLabel={trimmedName ? `WhatsApp ${trimmedName}` : 'Open in WhatsApp'}
+                accessibilityLabel={trimmedName ? t('personDetail.whatsappWithName', { name: trimmedName }) : t('personDetail.openInWhatsapp')}
               >
                 <MaterialCommunityIcons name="whatsapp" size={20} color={Colors.control} />
               </TouchableOpacity>
@@ -176,7 +178,7 @@ export function PersonDetailView({
       key: 'messenger',
       node: (
         <>
-          <Text style={styles.label}>Messenger</Text>
+          <Text style={styles.label}>{t('personFields.messenger')}</Text>
           <View style={styles.fieldRow}>
             {/* Shown whole and dragged through rather than truncated. It is
                 usually a profile URL, where the tail is the part that names the
@@ -190,9 +192,9 @@ export function PersonDetailView({
             {messengerHandle.length > 0 && (
               <TouchableOpacity
                 style={styles.contactBtn}
-                onPress={() => onContact('messenger', () => openMessenger(messenger))}
+                onPress={() => onContact('messenger', () => openMessenger(messenger, t))}
                 accessibilityRole="button"
-                accessibilityLabel={trimmedName ? `Message ${trimmedName} on Messenger` : 'Open in Messenger'}
+                accessibilityLabel={trimmedName ? t('personDetail.messageOnMessengerWithName', { name: trimmedName }) : t('personDetail.openInMessenger')}
               >
                 <MaterialCommunityIcons name="facebook-messenger" size={20} color={Colors.control} />
               </TouchableOpacity>
@@ -208,7 +210,7 @@ export function PersonDetailView({
       key: 'address',
       node: (
         <>
-          <Text style={styles.label}>Address</Text>
+          <Text style={styles.label}>{t('personFields.address')}</Text>
           <View style={styles.fieldRow}>
             <Text style={[styles.value, styles.fieldValue]}>{addressText}</Text>
             {/* Not routed through onContact: looking up where someone lives isn't
@@ -216,9 +218,9 @@ export function PersonDetailView({
             {mapQuery.length > 0 && (
               <TouchableOpacity
                 style={styles.contactBtn}
-                onPress={() => openMaps(address, settings.mapsApp)}
+                onPress={() => openMaps(address, settings.mapsApp, t)}
                 accessibilityRole="button"
-                accessibilityLabel={trimmedName ? `Open ${trimmedName}’s address in Maps` : 'Open this address in Maps'}
+                accessibilityLabel={trimmedName ? t('personDetail.openAddressWithName', { name: trimmedName }) : t('personDetail.openThisAddress')}
               >
                 <MaterialCommunityIcons name="map-marker" size={20} color={Colors.control} />
               </TouchableOpacity>
@@ -234,7 +236,7 @@ export function PersonDetailView({
       key: 'notes',
       node: (
         <>
-          <Text style={styles.label}>Notes</Text>
+          <Text style={styles.label}>{t('personFields.notes')}</Text>
           <Text style={styles.value}>{notesText}</Text>
         </>
       ),

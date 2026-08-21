@@ -5,6 +5,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import * as Notifications from 'expo-notifications';
+import { useTranslation } from 'react-i18next';
+import i18next from './src/i18n';
 import { AppNavigation, navigationRef } from './src/navigation';
 import { AuthProvider, useAuth } from './src/lib/AuthContext';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -58,6 +60,7 @@ function AppRoot() {
   const { session, user, loading } = useAuth();
   const { settings, loaded: settingsLoaded } = useSettings();
   const { events } = useCalendarEvents();
+  const { t } = useTranslation();
   const [synced, setSynced] = useState(false);
   const onboarding = useOnboardingState(synced);
 
@@ -153,12 +156,16 @@ function AppRoot() {
     (async () => {
       if (settings.dailyReviewEnabled) {
         const granted = await requestNotificationPermissions();
-        if (granted) await scheduleDailyReview(settings.dailyReviewHour, settings.dailyReviewMinute);
+        if (granted) await scheduleDailyReview(settings.dailyReviewHour, settings.dailyReviewMinute, t);
       } else {
         await cancelDailyReview();
       }
     })();
-  }, [settingsLoaded, settings.dailyReviewEnabled, settings.dailyReviewHour, settings.dailyReviewMinute]);
+  // `t` deliberately isn't a dep: react-i18next hands back a fresh function
+  // reference every render, and this effect only actually needs to re-run when
+  // the language itself changes — settings.language already covers that.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoaded, settings.dailyReviewEnabled, settings.dailyReviewHour, settings.dailyReviewMinute, settings.language]);
 
   // Same reconciliation as above, but for the rolling window of per-event
   // reminders (see syncEventReminders' own comment for why it's a window
@@ -174,7 +181,7 @@ function AppRoot() {
         const granted = await requestNotificationPermissions();
         if (cancelled) return;
         if (granted) {
-          await syncEventReminders(events, settings.eventReminderMinutes, settings.eventReminderExcludedTypeIds);
+          await syncEventReminders(events, settings.eventReminderMinutes, settings.eventReminderExcludedTypeIds, t);
         } else {
           await clearEventReminders();
         }
@@ -191,11 +198,15 @@ function AppRoot() {
       cancelled = true;
       sub.remove();
     };
+  // `t` deliberately isn't a dep here either — see the daily-review effect's
+  // note above; settings.language is what actually needs to trigger a resync.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     settingsLoaded,
     settings.eventReminderEnabled,
     settings.eventReminderMinutes,
     settings.eventReminderExcludedTypeIds,
+    settings.language,
     events,
   ]);
 
@@ -240,6 +251,11 @@ function AppRoot() {
 
 function SettingsProvider({ children }: { children: React.ReactNode }) {
   const value = useSettingsState();
+  // i18next's `useTranslation()` reads the library's own language state, not
+  // AppSettings directly, so this is the one bridge point between the two.
+  useEffect(() => {
+    i18next.changeLanguage(value.settings.language);
+  }, [value.settings.language]);
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 

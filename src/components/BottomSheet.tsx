@@ -4,6 +4,7 @@ import {
   StyleSheet, Animated, Keyboard, KeyboardEvent, LayoutAnimation, Platform, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 
@@ -45,6 +46,7 @@ interface Props {
 export function BottomSheet({ visible, title, height, avoidKeyboard = true, onCancel, onDone, children }: Props) {
   const Colors = useColors();
   const styles = makeStyles(Colors);
+  const { t } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -126,11 +128,11 @@ export function BottomSheet({ visible, title, height, avoidKeyboard = true, onCa
         >
           <View style={styles.header}>
             <TouchableOpacity onPress={onCancel} style={styles.headerBtn} hitSlop={8}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle} numberOfLines={1}>{title ?? ''}</Text>
             <TouchableOpacity onPress={onDone} style={[styles.headerBtn, styles.headerBtnRight]} hitSlop={8}>
-              <Text style={styles.doneText}>Done</Text>
+              <Text style={styles.doneText}>{t('common.done')}</Text>
             </TouchableOpacity>
           </View>
 

@@ -5,6 +5,7 @@ import {
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useTrackDrag } from '../hooks/useTrackDrag';
 import { BottomSheet } from './BottomSheet';
@@ -34,10 +35,7 @@ import {
 
 type Tab = 'grid' | 'spectrum';
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'grid', label: 'Grid' },
-  { key: 'spectrum', label: 'Spectrum' },
-];
+const TABS: Tab[] = ['grid', 'spectrum'];
 
 const HUE_STOPS = ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF', '#FF0000'];
 
@@ -99,6 +97,7 @@ export function useColorPickerStyles() {
 export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel, onDone }: Props) {
   const { Colors, styles } = useColorPickerStyles();
   const { height } = useWindowDimensions();
+  const { t } = useTranslation();
 
   // A solid half of the screen, with a floor so a small device still gets a
   // usable field rather than a squashed one.
@@ -132,7 +131,7 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
   return (
     <BottomSheet
       visible={visible}
-      title={title ?? 'Color'}
+      title={title ?? t('colorPicker.colorTitle')}
       height={sheetHeight}
       onCancel={onCancel}
       onDone={() => onDone(draft)}
@@ -176,6 +175,7 @@ export function ColorPickerBody({
   onChangeHsv: (next: HSV) => void;
   onTabChange: (t: Tab) => void;
 }) {
+  const { t } = useTranslation();
   const showReset = !!defaultColor && normalizeHex(defaultColor) !== draft;
 
   return (
@@ -202,7 +202,7 @@ export function ColorPickerBody({
             hitSlop={8}
           >
             <Ionicons name="refresh" size={14} color={Colors.text} />
-            <Text style={styles.defaultLabel}>Default</Text>
+            <Text style={styles.defaultLabel}>{t('colorPicker.default')}</Text>
             <View
               style={[styles.previewDot, { backgroundColor: normalizeHex(defaultColor) ?? defaultColor }]}
             />
@@ -211,15 +211,15 @@ export function ColorPickerBody({
       </View>
 
       <View style={styles.tabBar}>
-        {TABS.map(t => (
+        {TABS.map(tabKey => (
           <TouchableOpacity
-            key={t.key}
+            key={tabKey}
             style={styles.tabBtn}
-            onPress={() => onTabChange(t.key)}
+            onPress={() => onTabChange(tabKey)}
             activeOpacity={0.75}
           >
-            <Text style={[styles.tabLabel, tab === t.key && styles.tabLabelActive]}>{t.label}</Text>
-            {tab === t.key && <View style={styles.tabUnderline} />}
+            <Text style={[styles.tabLabel, tab === tabKey && styles.tabLabelActive]}>{t(`colorPicker.tab.${tabKey}`)}</Text>
+            {tab === tabKey && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         ))}
       </View>

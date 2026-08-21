@@ -4,14 +4,16 @@ import {
 } from 'react-native';
 import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
-import { GoalDefinition } from '../constants/defaultGoals';
+import { GoalDefinition, goalDisplayLabel } from '../constants/defaultGoals';
 import { GoalIcon } from './GoalIcon';
 import { DropdownMenu, DropdownItem } from './DropdownMenu';
 import { resolveGoal } from '../hooks/useWeeklyGoals';
+import { useSettings } from '../hooks/useSettings';
 import { GoalGrain, GRAIN, PeriodDataReader } from '../utils/goalGrain';
 
 interface PeriodPoint {
@@ -60,8 +62,10 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
+  const { settings } = useSettings();
 
-  const { visibilityKey, keyByOffset, axisLabel, summary } = GRAIN[grain];
+  const { visibilityKey, keyByOffset, axisLabel, summaryKeys } = GRAIN[grain];
   const visibleDefs = definitions.filter(d => d[visibilityKey]);
 
   const [selectedId, setSelectedId] = useState<string>(visibleDefs[0]?.id ?? '');
@@ -153,7 +157,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
               </View>
             )}
             <Text style={styles.dropLabel} numberOfLines={1}>
-              {selectedDef?.label ?? 'Select goal'}
+              {selectedDef ? goalDisplayLabel(selectedDef, t) : t('goals.selectGoal')}
             </Text>
             <Ionicons
               name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
@@ -166,7 +170,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
             {visibleDefs.map((def, i) => (
               <DropdownItem
                 key={def.id}
-                label={def.label}
+                label={goalDisplayLabel(def, t)}
                 selected={def.id === selectedId}
                 showSeparator={i < visibleDefs.length - 1}
                 leading={
@@ -201,7 +205,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
         {selectedDef && (
           <View style={styles.summaryRow}>
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>{summary.prev}</Text>
+              <Text style={styles.summaryLabel}>{t(summaryKeys.prev)}</Text>
               <Text style={styles.summaryValue}>
                 <Text style={{ color: selectedDef.color }}>{prevPoint.actual}</Text>
                 <Text style={styles.summaryGoalText}>/{prevPoint.goal}</Text>
@@ -209,7 +213,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>{summary.current}</Text>
+              <Text style={styles.summaryLabel}>{t(summaryKeys.current)}</Text>
               <Text style={styles.summaryValue}>
                 <Text style={{ color: selectedDef.color }}>{currentPoint.actual}</Text>
                 <Text style={styles.summaryGoalText}>/{currentPoint.goal}</Text>
@@ -217,7 +221,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>{summary.next}</Text>
+              <Text style={styles.summaryLabel}>{t(summaryKeys.next)}</Text>
               <Text style={styles.summaryValue}>
                 <Text style={{ color: Colors.textLight }}>{nextPeriod.actual}</Text>
                 <Text style={styles.summaryGoalText}>/{nextPeriod.goal ?? '—'}</Text>
@@ -320,7 +324,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
                   fill={Colors.textSecondary}
                   textAnchor="middle"
                 >
-                  {axisLabel(p.periodKey)}
+                  {axisLabel(p.periodKey, settings.language)}
                 </SvgText>
               ))}
             </Svg>

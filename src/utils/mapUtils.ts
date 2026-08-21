@@ -1,4 +1,5 @@
 import { Alert, Linking, Platform } from 'react-native';
+import type { TFunction } from 'i18next';
 
 /** Which app an iPhone opens an address in. Android always uses Google Maps. */
 export type MapsApp = 'apple' | 'google';
@@ -55,6 +56,7 @@ async function tryOpen(url: string): Promise<boolean> {
 export async function openMaps(
   address: string | null | undefined,
   preferred: MapsApp | undefined,
+  t: TFunction,
 ): Promise<void> {
   const query = toMapQuery(address);
   if (!query) return;
@@ -71,7 +73,7 @@ export async function openMaps(
 
   if (await tryOpen(googleWeb)) return;
   Alert.alert(
-    'Can’t open Maps',
-    'Nothing on this device could open the address.',
+    t('mapUtils.cantOpenMapsTitle'),
+    t('mapUtils.cantOpenMapsBody'),
   );
 }

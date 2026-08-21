@@ -3,14 +3,15 @@ import {
   Alert, View, Text, TextInput, TouchableOpacity, Pressable, ScrollView,
   StyleSheet,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import { useIsDark } from '../hooks/useIsDark';
 import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { DEFAULT_GOAL_COLOR } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { DEFAULT_GOALS, GoalDefinition, MAX_VISIBLE_GOALS } from '../constants/defaultGoals';
-import { EventTypeDefinition } from '../constants/eventTypeDefaults';
+import { DEFAULT_GOALS, GoalDefinition, MAX_VISIBLE_GOALS, goalDisplayLabel } from '../constants/defaultGoals';
+import { EventTypeDefinition, eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
@@ -18,9 +19,6 @@ import { IconPickerSheet, DEFAULT_ICON } from '../components/IconPicker';
 import { DropdownMenu, DropdownItem, MenuScrollView } from '../components/DropdownMenu';
 import { useSettings } from '../hooks/useSettings';
 import { eventTypeColor } from '../utils/eventUtils';
-
-/** What a goal is called in the picker and the header while its name is blank. */
-const UNTITLED = 'Untitled Goal';
 
 // How many rows each menu shows before it scrolls. The half row is the point:
 // a list cut mid-row says it continues, where a clean edge reads as the end.
@@ -34,12 +32,6 @@ type MenuId = 'goal' | 'link';
 type GoalPeriod = 'weekly' | 'monthly' | 'both';
 
 const PERIODS: GoalPeriod[] = ['weekly', 'monthly', 'both'];
-
-const PERIOD_LABEL: Record<GoalPeriod, string> = {
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  both: 'Both',
-};
 
 /**
  * The flag pair each choice writes. `visible` and `monthlyVisible` are still two
@@ -107,6 +99,7 @@ export function EditGoalsModal({
   const Colors = useColors();
   const isDark = useIsDark();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { settings } = useSettings();
 
   const [localDefs, setLocalDefs] = useState<GoalDefinition[]>(definitions);
@@ -159,7 +152,7 @@ export function EditGoalsModal({
     // A blank name is allowed while typing — nothing nameless is allowed to
     // persist, since the picker would then have a row you can't read.
     onUpdateDefinitions(localDefs.map(d => (
-      d.removed || d.label.trim() ? d : { ...d, label: UNTITLED }
+      d.removed || d.label.trim() ? d : { ...d, label: t('goals.untitled') }
     )));
     onUpdateEventTypeDefs(localEventTypeDefs);
   }
@@ -204,7 +197,7 @@ export function EditGoalsModal({
   }
 
   function label(def: GoalDefinition): string {
-    return def.label.trim() || UNTITLED;
+    return def.label.trim() ? goalDisplayLabel(def, t) : t('goals.untitled');
   }
 
   /** The icon's own tint — navy-on-near-black is unreadable, so dark mode lightens it. */
@@ -265,20 +258,21 @@ export function EditGoalsModal({
   function handleDeletePress() {
     if (!selected) return;
     if (goalInUse(selected.id)) {
-      const linkedTypeLabel = localEventTypeDefs.find(t => linksTo(t, selected.id))?.label ?? 'an event type';
+      const linkedTypeDef = localEventTypeDefs.find(et => linksTo(et, selected.id));
+      const linkedTypeLabel = linkedTypeDef ? eventTypeDisplayLabel(linkedTypeDef, t) : t('editGoals.anEventType');
       Alert.alert(
-        'Linked to an Event Type',
-        `"${label(selected)}" is linked to ${linkedTypeLabel}. Set its Linked Event Type to None, then delete this goal.`,
+        t('editGoals.linkedToEventTypeTitle'),
+        t('editGoals.linkedToEventTypeBody', { goal: label(selected), type: linkedTypeLabel }),
       );
       return;
     }
     Alert.alert(
-      `Delete "${label(selected)}"?`,
-      'This cannot be undone.',
+      t('editGoals.deleteGoalTitle', { name: label(selected) }),
+      t('editGoals.cannotBeUndone'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             // Lands on the next goal along, or the previous one at the end of
@@ -330,7 +324,7 @@ export function EditGoalsModal({
   // Derived rather than held in state: the link lives on the event type, so
   // reading it back from localEventTypeDefs is the same as reading it live.
   const linkedType = selected
-    ? localEventTypeDefs.find(t => linksTo(t, selected.id))
+    ? localEventTypeDefs.find(et => linksTo(et, selected.id))
     : undefined;
   /** Whether this goal is the later half of that type's pair, not its only goal. */
   const linkedAsEvening = !!selected && !!linkedType && linkedType.lateGoalId === selected.id;
@@ -349,7 +343,7 @@ export function EditGoalsModal({
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Goals</Text>
+        <Text style={styles.headerTitle}>{t('editGoals.title')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -371,7 +365,7 @@ export function EditGoalsModal({
         {/* Which goal every field below belongs to. Its own group, lifted over
             the cards that follow while its menu is out. */}
         <View style={elevatedMenu === 'goal' && styles.groupFloating}>
-          <Text style={styles.sectionLabel}>GOAL</Text>
+          <Text style={styles.sectionLabel}>{t('editGoals.goalSectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedMenu === 'goal' && styles.fieldRowOpen]}>
               <TouchableOpacity
@@ -385,7 +379,7 @@ export function EditGoalsModal({
                   </View>
                 )}
                 <Text style={[styles.rowTitle, !selected && styles.rowTitleEmpty]} numberOfLines={1}>
-                  {selected ? label(selected) : 'No goals'}
+                  {selected ? label(selected) : t('editGoals.noGoals')}
                 </Text>
                 <Ionicons
                   name={openMenu === 'goal' ? 'chevron-up' : 'chevron-down'}
@@ -428,7 +422,7 @@ export function EditGoalsModal({
             <View style={elevatedMenu === 'link' && styles.groupFloating}>
               <View style={[styles.card, { marginTop: 18 }]}>
                 <View style={styles.section}>
-                  <Text style={styles.fieldLabel}>Name</Text>
+                  <Text style={styles.fieldLabel}>{t('editGoals.name')}</Text>
                   <View style={styles.nameRow}>
                     <View style={styles.nameField}>
                       <TextInput
@@ -436,7 +430,7 @@ export function EditGoalsModal({
                         value={selected.label}
                         onChangeText={text => patchGoal(selected.id, { label: text })}
                         onFocus={() => setOpenMenu(null)}
-                        placeholder="Goal name..."
+                        placeholder={t('editGoals.goalNamePlaceholder')}
                         placeholderTextColor={Colors.textLight}
                         returnKeyType="done"
                       />
@@ -451,7 +445,7 @@ export function EditGoalsModal({
                       onPress={handleDeletePress}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       accessibilityRole="button"
-                      accessibilityLabel="Delete goal"
+                      accessibilityLabel={t('editGoals.deleteGoal')}
                     >
                       <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
                     </TouchableOpacity>
@@ -463,7 +457,7 @@ export function EditGoalsModal({
                   onPress={() => { setOpenMenu(null); setIconSheetOpen(true); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.rowLabel}>Icon</Text>
+                  <Text style={styles.rowLabel}>{t('editGoals.icon')}</Text>
                   <View style={styles.iconPreview}>
                     <GoalIcon icon={selected.icon} iconFamily={selected.iconFamily} size={18} color={selected.color} />
                   </View>
@@ -475,7 +469,7 @@ export function EditGoalsModal({
                   onPress={() => { setOpenMenu(null); setColorSheetOpen(true); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.rowLabel}>Color</Text>
+                  <Text style={styles.rowLabel}>{t('editGoals.color')}</Text>
                   <View style={[styles.rowDot, { marginRight: 0, backgroundColor: selected.color }]} />
                   <Ionicons name="chevron-forward" size={16} color={Colors.textLight} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
@@ -486,7 +480,7 @@ export function EditGoalsModal({
                     so the hairline moves onto it rather than cutting between a
                     dead segment and its own reason. */}
                 <View style={[styles.section, showPeriodLimitHint && styles.sectionFlush]}>
-                  <Text style={styles.fieldLabel}>Goal Period</Text>
+                  <Text style={styles.fieldLabel}>{t('editGoals.goalPeriod')}</Text>
                   <View style={styles.segmentTrack}>
                     {PERIODS.map(p => {
                       const blocked = periodBlocked(p);
@@ -505,7 +499,7 @@ export function EditGoalsModal({
                               blocked && styles.segmentTextDisabled,
                             ]}
                           >
-                            {PERIOD_LABEL[p]}
+                            {t(`editGoals.period.${p}`)}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -515,7 +509,7 @@ export function EditGoalsModal({
 
                 {showPeriodLimitHint && (
                   <Text style={styles.rowHint}>
-                    {`Each grid shows at most ${MAX_VISIBLE_GOALS} goals — move another goal off it first.`}
+                    {t('editGoals.periodLimitHint', { max: MAX_VISIBLE_GOALS })}
                   </Text>
                 )}
 
@@ -526,7 +520,7 @@ export function EditGoalsModal({
                     onPress={() => toggleMenu('link')}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.rowLabel}>Linked Event Type</Text>
+                    <Text style={styles.rowLabel}>{t('editGoals.linkedEventType')}</Text>
                     {linkedType && (
                       <View style={[styles.rowDot, { backgroundColor: eventTypeColor(linkedType.id, settings.eventTypeColors) }]} />
                     )}
@@ -535,7 +529,11 @@ export function EditGoalsModal({
                         completions, when it only takes the ones after the
                         cutoff. */}
                     <Text style={styles.rowValue}>
-                      {linkedType ? `${linkedType.label}${linkedAsEvening ? ' (evening)' : ''}` : 'None'}
+                      {linkedType
+                        ? (linkedAsEvening
+                          ? t('editGoals.linkedEventTypeEvening', { type: eventTypeDisplayLabel(linkedType, t) })
+                          : eventTypeDisplayLabel(linkedType, t))
+                        : t('goals.none')}
                     </Text>
                     <Ionicons
                       name={openMenu === 'link' ? 'chevron-up' : 'chevron-down'}
@@ -553,20 +551,20 @@ export function EditGoalsModal({
                       maxRows={TYPE_MENU_ROWS}
                     >
                       <DropdownItem
-                        label="None"
+                        label={t('goals.none')}
                         selected={linkedType === undefined}
                         showSeparator={availableEventTypes.length > 0}
                         onPress={() => { applyEventTypeLink(selected.id, undefined); setOpenMenu(null); }}
                       />
-                      {availableEventTypes.map((t, i, arr) => (
+                      {availableEventTypes.map((et, i, arr) => (
                         <DropdownItem
-                          key={t.id}
-                          label={t.label}
-                          selected={linkedType?.id === t.id}
+                          key={et.id}
+                          label={eventTypeDisplayLabel(et, t)}
+                          selected={linkedType?.id === et.id}
                           showSeparator={i < arr.length - 1}
-                          leading={<View style={[styles.rowDot, { marginRight: 0, backgroundColor: eventTypeColor(t.id, settings.eventTypeColors) }]} />}
+                          leading={<View style={[styles.rowDot, { marginRight: 0, backgroundColor: eventTypeColor(et.id, settings.eventTypeColors) }]} />}
                           labelStyle={{ marginLeft: 8 }}
-                          onPress={() => { applyEventTypeLink(selected.id, t.id); setOpenMenu(null); }}
+                          onPress={() => { applyEventTypeLink(selected.id, et.id); setOpenMenu(null); }}
                         />
                       ))}
                     </MenuScrollView>
@@ -577,7 +575,7 @@ export function EditGoalsModal({
 
           </>
         ) : (
-          <Text style={styles.emptyHint}>Add a goal to start tracking one.</Text>
+          <Text style={styles.emptyHint}>{t('editGoals.emptyHint')}</Text>
         )}
 
         {/* The only thing under the card now that deleting has moved up beside
@@ -591,7 +589,7 @@ export function EditGoalsModal({
         >
           <Ionicons name="add" size={18} color={canAddGoal ? Colors.white : Colors.textSecondary} />
           <Text style={[styles.addBtnText, !canAddGoal && styles.addBtnTextDisabled]}>
-            {canAddGoal ? 'Add a Goal' : `Maximum of ${MAX_VISIBLE_GOALS} goals per grid`}
+            {canAddGoal ? t('editGoals.addAGoal') : t('editGoals.maxGoalsPerGrid', { max: MAX_VISIBLE_GOALS })}
           </Text>
         </TouchableOpacity>
 
@@ -605,7 +603,7 @@ export function EditGoalsModal({
           style={styles.reorderBtn}
         >
           <Ionicons name="swap-vertical" size={18} color={Colors.textSecondary} />
-          <Text style={styles.reorderBtnText}>Reorder Goals</Text>
+          <Text style={styles.reorderBtnText}>{t('editGoals.reorderGoals')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />

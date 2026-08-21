@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { usePeople } from '../hooks/usePeople';
@@ -59,6 +60,7 @@ type LoadState = 'intro' | 'loading' | 'denied' | 'error' | 'ready';
 export function ImportContactsModal({ visible, onClose }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { people, addPerson } = usePeople();
 
   const [loadState, setLoadState] = useState<LoadState>('intro');
@@ -180,22 +182,22 @@ export function ImportContactsModal({ visible, onClose }: Props) {
           onPress={onClose}
           style={styles.closeBtn}
           accessibilityRole="button"
-          accessibilityLabel="Close"
+          accessibilityLabel={t('common.close')}
         >
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
         <View style={styles.headerLabels}>
-          <Text style={styles.headerTitle}>Import Contacts</Text>
+          <Text style={styles.headerTitle}>{t('importContacts.title')}</Text>
           {loadState === 'ready' && (
             <Text style={styles.headerCount}>
-              {selected.size === 0 ? 'None selected' : `${selected.size} selected`}
+              {selected.size === 0 ? t('personPicker.noneSelected') : t('personPicker.selectedCount', { count: selected.size })}
             </Text>
           )}
         </View>
         {loadState === 'ready' ? (
           <TouchableOpacity onPress={handleImport} disabled={selected.size === 0 || importing}>
             <Text style={[styles.done, (selected.size === 0 || importing) && styles.doneDisabled]}>
-              {importing ? 'Adding…' : 'Import'}
+              {importing ? t('importContacts.adding') : t('importContacts.import')}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -209,18 +211,15 @@ export function ImportContactsModal({ visible, onClose }: Props) {
             <View style={styles.introIconCircle}>
               <Ionicons name="people" size={36} color={Colors.onPrimary} />
             </View>
-            <Text style={styles.introTitle}>Import people you choose</Text>
+            <Text style={styles.introTitle}>{t('importContacts.introTitle')}</Text>
             <Text style={styles.introBody}>
-              Next, your phone will ask which contacts to share with this app.
-              Sharing just one or two people is completely fine — sharing more
-              is entirely optional, and there's nothing to share at all if you'd
-              rather add people by hand.
+              {t('importContacts.introBody')}
             </Text>
             <TouchableOpacity style={styles.introBtn} onPress={requestAndLoad} activeOpacity={0.85}>
-              <Text style={styles.introBtnText}>Choose Contacts to Share</Text>
+              <Text style={styles.introBtnText}>{t('importContacts.chooseContactsToShare')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={onClose} activeOpacity={0.7} hitSlop={8}>
-              <Text style={styles.introSkip}>Not Now</Text>
+              <Text style={styles.introSkip}>{t('importContacts.notNow')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -232,7 +231,7 @@ export function ImportContactsModal({ visible, onClose }: Props) {
               style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
-              placeholder="Search contacts..."
+              placeholder={t('importContacts.searchPlaceholder')}
               placeholderTextColor={Colors.textLight}
             />
             {search.length > 0 && (
@@ -246,20 +245,19 @@ export function ImportContactsModal({ visible, onClose }: Props) {
         {loadState === 'loading' && (
           <View style={styles.empty}>
             <ActivityIndicator color={Colors.control} />
-            <Text style={styles.emptyText}>Loading contacts…</Text>
+            <Text style={styles.emptyText}>{t('importContacts.loadingContacts')}</Text>
           </View>
         )}
 
         {loadState === 'denied' && (
           <View style={styles.empty}>
             <Ionicons name="lock-closed-outline" size={48} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>Contacts access denied</Text>
+            <Text style={styles.emptyTitle}>{t('importContacts.accessDeniedTitle')}</Text>
             <Text style={styles.emptyText}>
-              Allow access in Settings to import people from your phone — you'll
-              still choose exactly who gets added, nothing happens automatically.
+              {t('importContacts.accessDeniedBody')}
             </Text>
             <TouchableOpacity style={styles.settingsBtn} onPress={() => Linking.openSettings()}>
-              <Text style={styles.settingsBtnText}>Open Settings</Text>
+              <Text style={styles.settingsBtnText}>{t('importContacts.openSettings')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -267,13 +265,13 @@ export function ImportContactsModal({ visible, onClose }: Props) {
         {loadState === 'error' && (
           <View style={styles.empty}>
             <Ionicons name="alert-circle-outline" size={48} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>Couldn't load contacts</Text>
-            <Text style={styles.emptyText}>Something went wrong reading your contacts.</Text>
+            <Text style={styles.emptyTitle}>{t('importContacts.couldntLoadTitle')}</Text>
+            <Text style={styles.emptyText}>{t('importContacts.couldntLoadBody')}</Text>
             <TouchableOpacity
               style={styles.settingsBtn}
               onPress={() => { setLoadState('loading'); loadContacts().catch(() => setLoadState('error')); }}
             >
-              <Text style={styles.settingsBtnText}>Try Again</Text>
+              <Text style={styles.settingsBtnText}>{t('importContacts.tryAgain')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -282,10 +280,10 @@ export function ImportContactsModal({ visible, onClose }: Props) {
           <View style={styles.limitedBanner}>
             <Ionicons name="person-circle-outline" size={20} color={Colors.control} />
             <Text style={styles.limitedBannerText} numberOfLines={1}>
-              Only some contacts shared.
+              {t('importContacts.onlySomeShared')}
             </Text>
             <TouchableOpacity style={styles.limitedBannerBtn} onPress={openContactsSettings} activeOpacity={0.7}>
-              <Text style={styles.limitedBannerBtnText}>Manage Settings</Text>
+              <Text style={styles.limitedBannerBtnText}>{t('importContacts.manageSettings')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -303,16 +301,15 @@ export function ImportContactsModal({ visible, onClose }: Props) {
               <View style={styles.empty}>
                 <Ionicons name="people-outline" size={48} color={Colors.textLight} />
                 <Text style={styles.emptyTitle}>
-                  {search.length > 0 ? 'No matches' : 'No contacts shared yet'}
+                  {search.length > 0 ? t('people.noMatches') : t('importContacts.noContactsSharedYet')}
                 </Text>
                 {search.length === 0 && accessPrivileges === 'limited' && (
                   <>
                     <Text style={styles.emptyText}>
-                      That's completely fine — sharing contacts is optional. Choose
-                      just the people you'd like to import, or skip this entirely.
+                      {t('importContacts.optionalSharingHint')}
                     </Text>
                     <TouchableOpacity style={styles.settingsBtn} onPress={openContactsSettings}>
-                      <Text style={styles.settingsBtnText}>Choose Contacts</Text>
+                      <Text style={styles.settingsBtnText}>{t('importContacts.chooseContacts')}</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -348,7 +345,7 @@ export function ImportContactsModal({ visible, onClose }: Props) {
                       {alreadyAdded ? (
                         <View style={styles.addedPill}>
                           <Ionicons name="checkmark" size={13} color={Colors.textLight} />
-                          <Text style={styles.addedLabel}>Added</Text>
+                          <Text style={styles.addedLabel}>{t('importContacts.added')}</Text>
                         </View>
                       ) : (
                         <Ionicons

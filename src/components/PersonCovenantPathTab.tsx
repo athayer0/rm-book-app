@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { withAlpha } from '../utils/colorUtils';
@@ -31,6 +32,7 @@ const CONVERT_COLOR = PERSON_STATUSES['Recent Converts'].color;
 export function PersonCovenantPathTab({ personId }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   // Read the person live off the People list rather than trust a prop — this tab
   // writes gender straight to storage the moment the popup is answered, and a
   // stale snapshot handed down from the sheet wouldn't pick that up.
@@ -42,11 +44,11 @@ export function PersonCovenantPathTab({ personId }: Props) {
   useEffect(() => {
     if (!person || gender) return;
     Alert.alert(
-      'Male or Female?',
-      'Decides whether priesthood ordination shows on the covenant path.',
+      t('covenantPathTab.genderPromptTitle'),
+      t('covenantPathTab.genderPromptBody'),
       [
-        { text: 'Female', onPress: () => updatePerson(personId, { gender: 'female' }) },
-        { text: 'Male', onPress: () => updatePerson(personId, { gender: 'male' }) },
+        { text: t('covenantPathTab.female'), onPress: () => updatePerson(personId, { gender: 'female' }) },
+        { text: t('covenantPathTab.male'), onPress: () => updatePerson(personId, { gender: 'male' }) },
       ],
       { cancelable: false },
     );
@@ -79,7 +81,7 @@ export function PersonCovenantPathTab({ personId }: Props) {
       >
         <View style={styles.titleRow}>
           <StatusIcon config={PERSON_STATUSES['Recent Converts']} size={20} style={styles.titleIcon} />
-          <Text style={styles.title} numberOfLines={1}>{person.name}'s Covenant Path</Text>
+          <Text style={styles.title} numberOfLines={1}>{t('covenantPathTab.titleWithName', { name: person.name })}</Text>
         </View>
 
         <View style={styles.summary}>
@@ -92,7 +94,7 @@ export function PersonCovenantPathTab({ personId }: Props) {
             />
           </View>
           <Text style={[styles.progressLabel, allDone && styles.progressLabelDone]}>
-            {completedCount}/{total} complete
+            {t('covenantPathTab.completeCount', { completed: completedCount, total })}
           </Text>
         </View>
 
@@ -108,7 +110,7 @@ export function PersonCovenantPathTab({ personId }: Props) {
                 activeOpacity={0.7}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: complete }}
-                accessibilityLabel={milestone.label}
+                accessibilityLabel={t(`covenantPath.${milestone.id}`, { defaultValue: milestone.label })}
               >
                 <GoalIcon
                   icon={milestone.icon}
@@ -116,7 +118,9 @@ export function PersonCovenantPathTab({ personId }: Props) {
                   size={18}
                   color={complete ? CONVERT_COLOR : Colors.textLight}
                 />
-                <Text style={[styles.label, complete && styles.labelDone]}>{milestone.label}</Text>
+                <Text style={[styles.label, complete && styles.labelDone]}>
+                  {t(`covenantPath.${milestone.id}`, { defaultValue: milestone.label })}
+                </Text>
                 <View style={[styles.checkbox, complete && styles.checkboxChecked]}>
                   {complete && <Ionicons name="checkmark" size={14} color={Colors.white} />}
                 </View>

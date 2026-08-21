@@ -3,10 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, LayoutChange
 import { GestureDetector, Gesture, ScrollView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { SheetModal } from '../components/SheetModal';
-import { EventTypeDefinition } from '../constants/eventTypeDefaults';
+import { EventTypeDefinition, eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 import { useSettings } from '../hooks/useSettings';
 import { eventTypeColor } from '../utils/eventUtils';
 
@@ -41,6 +42,7 @@ function moveId(arr: string[], id: string, toIndex: number): string[] {
 export function ReorderEventTypesModal({ visible, onClose, definitions, onUpdateDefinitions }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const { settings } = useSettings();
 
   const baseOrder = useMemo(() => definitions.filter(d => !d.removed).map(d => d.id), [definitions]);
@@ -114,7 +116,7 @@ export function ReorderEventTypesModal({ visible, onClose, definitions, onUpdate
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={8}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reorder</Text>
+        <Text style={styles.headerTitle}>{t('reorderEventTypes.title')}</Text>
         <View style={styles.closeBtn} />
       </View>
 
@@ -126,7 +128,7 @@ export function ReorderEventTypesModal({ visible, onClose, definitions, onUpdate
         overScrollMode="never"
       >
         <Text style={styles.hint}>
-          Hold and drag a type to change where it appears everywhere event types are listed.
+          {t('reorderEventTypes.hint')}
         </Text>
 
         <View style={styles.list}>
@@ -177,6 +179,7 @@ interface RowProps {
 function ReorderRow({
   def, color, isLast, onLayout, isDragging, dragOffsetY, onDragStart, onDragUpdate, onDragEnd, Colors, styles,
 }: RowProps) {
+  const { t } = useTranslation();
   const isDraggingRef = useRef(false);
 
   const panGesture = Gesture.Pan()
@@ -205,7 +208,7 @@ function ReorderRow({
         onStartShouldSetResponder={() => true}
       >
         <View style={[styles.dot, { backgroundColor: color }]} />
-        <Text style={styles.label} numberOfLines={1}>{def.label}</Text>
+        <Text style={styles.label} numberOfLines={1}>{eventTypeDisplayLabel(def, t)}</Text>
         <Ionicons name="reorder-three-outline" size={22} color={Colors.textLight} />
       </View>
     </GestureDetector>

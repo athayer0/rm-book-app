@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 
@@ -19,6 +20,7 @@ interface Props {
 export function UnreportedRow({ count, onPress }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
   const clear = count === 0;
 
   return (
@@ -30,11 +32,11 @@ export function UnreportedRow({ count, onPress }: Props) {
       />
 
       <View style={styles.labels}>
-        <Text style={styles.title}>{clear ? 'All caught up' : 'Unreported Events'}</Text>
+        <Text style={styles.title}>{clear ? t('unreportedEvents.allCaughtUp') : t('unreportedEvents.title')}</Text>
         <Text style={styles.subtitle}>
           {clear
-            ? 'Nothing waiting to be reported'
-            : `${count} event${count === 1 ? '' : 's'} waiting to be reported`}
+            ? t('unreportedRow.nothingWaiting')
+            : t('unreportedRow.eventsWaiting', { count })}
         </Text>
       </View>
 

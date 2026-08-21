@@ -6,6 +6,8 @@
 // original name because the column does; what it means is "how", for any type
 // that has a how.
 
+import type { TFunction } from 'i18next';
+
 export interface ContactMethodConfig {
   label: string;
   icon: string;
@@ -59,12 +61,13 @@ export function methodOptionsFor(type: string): string[] {
 }
 
 /** What the picker's row is called. A date's "how" is really what kind of date it is. */
-export function methodFieldLabel(type: string): string {
-  return type === 'date' ? 'Date Type' : 'Contact Method';
+export function methodFieldLabel(type: string, t: TFunction): string {
+  return type === 'date' ? t('contactMethods.field.dateType') : t('contactMethods.field.contactMethod');
 }
 
-export function contactMethodLabel(method: string | undefined): string {
-  return CONTACT_METHODS[method ?? '']?.label ?? CONTACT_METHODS[DEFAULT_CONTACT_METHOD].label;
+export function contactMethodLabel(method: string | undefined, t: TFunction): string {
+  const id = method && CONTACT_METHODS[method] ? method : DEFAULT_CONTACT_METHOD;
+  return t(`contactMethods.${id}`, { defaultValue: CONTACT_METHODS[id].label });
 }
 
 /**

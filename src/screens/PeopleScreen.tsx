@@ -4,6 +4,8 @@ import {
   SafeAreaView, TextInput, Pressable, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
@@ -13,7 +15,7 @@ import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { ImportContactsModal } from '../modals/ImportContactsModal';
 import { FAB, FAB_SIZE, FAB_BOTTOM } from '../components/FAB';
 import {
-  PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus, statusDisplayName,
+  PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus, statusDisplayName, statusGroupLabel,
 } from '../constants/personStatuses';
 import { StatusIcon } from '../components/StatusIcon';
 import { DropdownMenu, DropdownItem, MenuDivider } from '../components/DropdownMenu';
@@ -38,17 +40,20 @@ type ListRow =
   | { kind: 'header'; label: string; key: string }
   | { kind: 'person'; person: Person; key: string };
 
-function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
+function buildRows(list: Person[], selection: FilterSelection, t: TFunction): ListRow[] {
   if (selection.kind === 'group' || selection.kind === 'status') {
     if (list.length === 0) return [];
+    const label = selection.kind === 'group'
+      ? statusGroupLabel(selection.name, t)
+      : t(`personStatuses.${selection.name}`, { defaultValue: selection.name });
     return [
-      { kind: 'header', label: selection.name, key: 'header' },
+      { kind: 'header', label, key: 'header' },
       ...list.map(person => ({ kind: 'person' as const, person, key: person.id })),
     ];
   }
   const rows: ListRow[] = [];
   for (const group of groupByStatus(list)) {
-    if (group.label) rows.push({ kind: 'header', label: group.label, key: `header-${group.label}` });
+    if (group.label) rows.push({ kind: 'header', label: statusGroupLabel(group.label, t), key: `header-${group.label}` });
     group.people.forEach(person => rows.push({ kind: 'person', person, key: person.id }));
   }
   return rows;
@@ -57,6 +62,7 @@ function buildRows(list: Person[], selection: FilterSelection): ListRow[] {
 export function PeopleScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
+  const { t } = useTranslation();
 
   const { people, addPerson, updatePerson, deletePerson, reload } = usePeople();
   const [showModal, setShowModal] = useState(false);
@@ -91,7 +97,7 @@ export function PeopleScreen() {
       return diff !== 0 ? diff : a.name.localeCompare(b.name);
     });
 
-  const rows = buildRows(filtered, filterSelection);
+  const rows = buildRows(filtered, filterSelection, t);
 
   const isFiltered = search.length > 0 || filterSelection.kind !== 'all';
 
@@ -131,12 +137,12 @@ export function PeopleScreen() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     Alert.alert(
-      'Delete People',
-      `Delete ${ids.length} selected ${ids.length === 1 ? 'person' : 'people'}?`,
+      t('people.deletePeopleTitle'),
+      t('people.deletePeopleBody', { count: ids.length }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             for (const id of ids) await deletePerson(id);
@@ -170,7 +176,7 @@ export function PeopleScreen() {
         {/* Select mode keeps the same header — only three things change: the
             checkbox fills in, the import/filter icons give way to Set Type, and
             a trash can appears left of the checkbox once something is selected. */}
-        <Text style={styles.headerTitle}>People</Text>
+        <Text style={styles.headerTitle}>{t('people.title')}</Text>
         <View style={styles.headerActions}>
           {selectMode && selectedIds.size > 0 && (
             <TouchableOpacity
@@ -178,7 +184,7 @@ export function PeopleScreen() {
               onPress={handleDeleteSelected}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Delete Selected"
+              accessibilityLabel={t('people.deleteSelected')}
             >
               <Ionicons name="trash-outline" size={23} color={Colors.onPrimary} />
             </TouchableOpacity>
@@ -188,7 +194,7 @@ export function PeopleScreen() {
             onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={selectMode ? 'Exit Select Mode' : 'Select People'}
+            accessibilityLabel={selectMode ? t('people.exitSelectMode') : t('people.selectPeople')}
           >
             <Ionicons
               name={selectMode ? 'checkbox' : 'checkbox-outline'}
@@ -204,7 +210,7 @@ export function PeopleScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.headerActionText, selectedIds.size === 0 && styles.headerActionTextDisabled]}>
-                Set Type
+                {t('people.setType')}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -214,7 +220,7 @@ export function PeopleScreen() {
                 onPress={() => setShowImportModal(true)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel="Import from Contacts"
+                accessibilityLabel={t('people.importFromContacts')}
               >
                 <MaterialCommunityIcons name="account-arrow-down-outline" size={24} color={Colors.onPrimary} />
               </TouchableOpacity>
@@ -244,7 +250,7 @@ export function PeopleScreen() {
               {STATUS_OPTIONS.map((s, i) => (
                 <DropdownItem
                   key={s}
-                  label={statusDisplayName(s)}
+                  label={statusDisplayName(s, t)}
                   showSeparator={i < STATUS_OPTIONS.length - 1}
                   leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
                   onPress={() => applyBulkStatus(s)}
@@ -272,14 +278,14 @@ export function PeopleScreen() {
             {...filterScrollEdges.scrollViewProps}
           >
             <DropdownItem
-              label="All"
+              label={t('people.filterAll')}
               selected={filterSelection.kind === 'all'}
               onPress={() => { setFilterSelection({ kind: 'all' }); setShowFilterDropdown(false); }}
             />
             {STATUS_GROUPS.map((g, i) => (
               <DropdownItem
                 key={g.name}
-                label={g.name}
+                label={statusGroupLabel(g.name, t)}
                 selected={filterSelection.kind === 'group' && filterSelection.name === g.name}
                 showSeparator={i < STATUS_GROUPS.length - 1}
                 onPress={() => { setFilterSelection({ kind: 'group', name: g.name, statuses: g.statuses }); setShowFilterDropdown(false); }}
@@ -289,7 +295,7 @@ export function PeopleScreen() {
             {STATUS_OPTIONS.map((s, i) => (
               <DropdownItem
                 key={s}
-                label={s}
+                label={t(`personStatuses.${s}`, { defaultValue: s })}
                 selected={filterSelection.kind === 'status' && filterSelection.name === s}
                 showSeparator={i < STATUS_OPTIONS.length - 1}
                 leading={<StatusIcon config={PERSON_STATUSES[s]} size={14} style={styles.filterChipIcon} />}
@@ -317,7 +323,7 @@ export function PeopleScreen() {
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search people..."
+          placeholder={t('people.searchPlaceholder')}
           placeholderTextColor={Colors.textLight}
         />
         {search.length > 0 && (
@@ -331,9 +337,9 @@ export function PeopleScreen() {
         {filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="people-outline" size={48} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>{isFiltered ? 'No matches' : 'No people yet'}</Text>
+            <Text style={styles.emptyTitle}>{isFiltered ? t('people.noMatches') : t('people.noPeopleYet')}</Text>
             <Text style={styles.emptyText}>
-              {isFiltered ? 'Try a different search or filter' : 'Tap + to add someone you\'re tracking'}
+              {isFiltered ? t('people.tryDifferentSearch') : t('people.tapToAdd')}
             </Text>
           </View>
         ) : (
