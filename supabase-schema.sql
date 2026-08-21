@@ -273,6 +273,16 @@ alter table event_type_definitions
 -- goal_definitions.sort_order above.
 alter table event_type_definitions
   add column if not exists sort_order int;
+-- A type has no icon of its own -- see the
+-- comment on this table above. A project
+-- created before that was decided still has
+-- these; nothing writes them any more, so they
+-- would only ever be dead weight. Only runs if
+-- the file is re-run.
+alter table event_type_definitions
+  drop column if exists icon;
+alter table event_type_definitions
+  drop column if exists icon_family;
 alter table event_type_definitions
   enable row level security;
 drop policy if exists "users own their event types"

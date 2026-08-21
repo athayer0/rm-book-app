@@ -46,8 +46,6 @@ FEATURES
 [x] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [x] add spanish 
 
-[ ] add other languages (portuguese french tagalog mandarin etc)
-
 
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
@@ -63,11 +61,12 @@ DEPLOYMENT TASKS
 [ ] dont get sued
 [ ] deploy to google play store
 [ ] deploy to app store
-[ ] FIGURE OUT THE MONEY MAKER $$$ (canvas sync for grades, ai agent, slack style see your data past 90 days)
 [ ] tip $5
 
 POST 1.0.0
+[ ] FIGURE OUT THE MONEY MAKER $$$ (canvas sync for grades, ai agent, slack style see your data past 90 days)
 [ ] add friends and districts, be able to add events to their calendars
 [ ] add snapchat map and ping friends 
 [ ] ki for doing something with one of your friends
 [ ] add some sort of streak feature
+[ ] add other languages (portuguese french tagalog mandarin etc)
