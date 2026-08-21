@@ -522,6 +522,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
                   isToday={isToday}
                   initialScrollY={syncScrollY}
                   onScrollSettle={setSyncScrollY}
+                  bounceEnabled={!dragActive}
                   selectMode={selectMode}
                   selectedEventIds={selectedEventIds}
                   onToggleEventSelect={toggleEventSelected}

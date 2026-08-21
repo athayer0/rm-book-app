@@ -51,6 +51,9 @@ interface Props {
   selectMode?: boolean;
   selectedEventIds?: Set<string>;
   onToggleEventSelect?: (event: CalendarEvent) => void;
+  // Off while an event is being dragged, so the drag's own autoscroll-near-edge
+  // logic isn't fighting a simultaneous rubber-band overscroll.
+  bounceEnabled?: boolean;
 }
 
 function gridHourLabel(hour: number): string {
@@ -59,7 +62,7 @@ function gridHourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect, bounceEnabled = true }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors, slotHeight), [Colors, slotHeight]);
 
@@ -223,8 +226,8 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
         ref={scrollViewRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        bounces={false}
-        overScrollMode="never"
+        bounces={bounceEnabled}
+        overScrollMode={bounceEnabled ? 'auto' : 'never'}
         scrollEventThrottle={16}
         onLayout={() => { measureViewport(); handleInitScroll(); }}
         onScroll={(e) => {
