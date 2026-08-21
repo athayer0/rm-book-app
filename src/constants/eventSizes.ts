@@ -26,6 +26,12 @@ export const DEFAULT_EVENT_SIZE: EventSize = 'md';
 
 export const DEFAULT_SLOT_HEIGHT = EventSizes[DEFAULT_EVENT_SIZE].slotHeight;
 
+// Width of the calendar's left-hand hour-label column. Shared by TimeGrid
+// (which lays the column out) and EventBlock (which derives event-block drag
+// width from screen width minus this) — a value only one of them knew about
+// would let the two silently disagree.
+export const TIME_COL_WIDTH = 64;
+
 // Settings persist to AsyncStorage, so a stored value may predate this list.
 export function resolveEventSize(size: EventSize | undefined): EventSize {
   return size && EventSizes[size] ? size : DEFAULT_EVENT_SIZE;

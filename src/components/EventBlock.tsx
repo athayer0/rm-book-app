@@ -7,7 +7,7 @@ import { CalendarEvent, EventStatus, resolveEventStatus, eventTopOffset, rendere
 import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../constants/contactMethods';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
-import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
+import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
 import { BASE_SIZE as STATUS_PICKER_BASE_SIZE } from './StatusPicker';
@@ -15,7 +15,6 @@ import { GoalIcon } from './GoalIcon';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const TIME_COL_WIDTH = 52;
 const TIME_GAP = 4; // styles.time marginLeft
 const GUTTER_GAP = 3; // between any two of the right-hand gutter's markers
 const UNITS_GAP = 3; // between the quantity and its units, inside the one marker
@@ -65,8 +64,76 @@ const BLOCK = {
 // dependable for them; titles vary, and over-estimating one only drops the time, which is
 // the precedence we want anyway.
 const AVG_CHAR_WIDTH = 0.55;
-function textWidth(text: string, fontSize: number): number {
-  return text.length * fontSize * AVG_CHAR_WIDTH;
+// Bold (and semibold) glyphs render measurably wider per character than the
+// regular weight AVG_CHAR_WIDTH was calibrated against. The title renders
+// bold, so measuring it with the regular constant systematically
+// underestimates its real width — which is exactly what let the "is there
+// spare room for the time" check say yes when there wasn't quite enough,
+// letting the title's flexShrink quietly eat its own last character to make
+// room. Anything measured at this weight (title, quantity, units) must use
+// this constant instead so that check only ever errs toward hiding the time,
+// never toward showing one that clips the title.
+const AVG_CHAR_WIDTH_BOLD = 0.62;
+function textWidth(text: string, fontSize: number, bold = false): number {
+  return text.length * fontSize * (bold ? AVG_CHAR_WIDTH_BOLD : AVG_CHAR_WIDTH);
+}
+
+// Wraps `text` into as many lines as it takes to show it in full, none wider
+// than `lineWidth` under the same width heuristic textWidth() uses everywhere
+// else in this file — always measured bold, since this only ever chops the
+// (bold) title. Wraps on word boundaries where possible; a single word
+// wider than lineWidth on its own (e.g. "Refrigerator" in a narrow column) is
+// split character-by-character instead of overrunning the line.
+//
+// Deliberately uncapped: an earlier version stopped once it had produced as
+// many lines as the block's height seemed to have room for, which meant any
+// title needing a second line in a no-duration block (COMPACT_EVENT_HEIGHT is
+// short enough to fit only one line's worth) silently dropped every word
+// after the first. Producing every line and letting the caller render them
+// inside the block's own `overflow: hidden` + fixed height means the block's
+// actual edge does the cutting — including, if it comes to it, showing a
+// partial last line — rather than this function guessing wrong and dropping
+// whole words instead.
+function wrapTitleLines(text: string, fontSize: number, lineWidth: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  let word = '';
+
+  function flushWord() {
+    while (word) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (textWidth(candidate, fontSize, true) <= lineWidth) {
+        line = candidate;
+        word = '';
+        return;
+      }
+      if (line) {
+        // Doesn't fit alongside what's already on the line — close the line
+        // out and retry the whole word against a fresh one.
+        lines.push(line);
+        line = '';
+        continue;
+      }
+      // Doesn't fit even alone on an empty line — split it character by
+      // character, taking as much as fits (at least one character, so a
+      // pathological single glyph wider than lineWidth still terminates).
+      let chunk = '';
+      for (const ch of word) {
+        if (chunk && textWidth(chunk + ch, fontSize, true) > lineWidth) break;
+        chunk += ch;
+      }
+      lines.push(chunk);
+      word = word.slice(chunk.length);
+    }
+  }
+
+  for (const ch of text) {
+    if (ch === ' ') flushWord();
+    else word += ch;
+  }
+  flushWord();
+  if (line) lines.push(line);
+  return lines;
 }
 
 interface Props {
@@ -212,8 +279,8 @@ export function EventBlock({
   // only reserves room. Under-reserving would let the repeat marker slide
   // underneath the digits; over-reserving costs the title a few points.
   const quantityWidth = quantityLabel
-    ? Math.ceil(quantityLabel.length * quantityFontSize * 0.62)
-      + (unitsLabel ? UNITS_GAP + Math.ceil(unitsLabel.length * fontSize * 0.62) : 0)
+    ? Math.ceil(textWidth(quantityLabel, quantityFontSize, true))
+      + (unitsLabel ? UNITS_GAP + Math.ceil(textWidth(unitsLabel, fontSize, true)) : 0)
     : 0;
 
   // The right-hand gutter, filled from the edge inward: status badge, then the
@@ -240,10 +307,43 @@ export function EventBlock({
 
   // The title's line height is pinned rather than left to the platform's default
   // line spacing, because the padding below is derived from the row's height and
-  // that can't be a guess. The glyph is the taller of the two, so it sets the
-  // row's height on the blocks that carry one.
+  // that can't be a guess.
   const titleLineHeight = Math.round(fontSize * TITLE_LINE_RATIO);
-  const rowHeight = Math.max(titleLineHeight, method ? methodSize : 0);
+
+  const contentWidth =
+    columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
+    - (isBackup ? 0 : BLOCK.accentWidth)              // left colour border
+    - (isBackup ? 8 : BLOCK.paddingLeft)              // paddingLeft
+    - gutter                                          // paddingRight
+    - methodWidth;                                    // leading method marker
+
+  const titleWidth = textWidth(event.title, fontSize, true);
+  const titleFitsOneLine = titleWidth <= contentWidth;
+
+  const spare = contentWidth - titleWidth - TIME_GAP;
+
+  // Only an event that actually spans time can show a start–end range; a checkbox
+  // event, or a contact logged without an end, has just the one time to show. A
+  // title that doesn't even fit on one line has already claimed the whole row —
+  // there's nothing left to spare a time into.
+  const bothLabel = `${event.startTime} – ${event.endTime}`;
+  const timeLabel = !titleFitsOneLine ? null
+    : hasEndTime(event) && spare >= textWidth(bothLabel, fontSize) ? bothLabel
+    : spare >= textWidth(event.startTime, fontSize) ? event.startTime
+    : null;
+
+  // A title that doesn't fit on one line wraps word-by-word (splitting an
+  // overlong single word by character) into however many lines it needs.
+  // Nothing here caps that count — the block's own overflow: hidden and fixed
+  // height, below, are what actually cut it off.
+  const titleLines = titleFitsOneLine
+    ? [event.title]
+    : wrapTitleLines(event.title, fontSize, contentWidth);
+
+  // The glyph is the taller of the two on a single-line title, so it sets the
+  // row's height on the blocks that carry one; a wrapped title instead grows
+  // the row itself.
+  const rowHeight = Math.max(titleLineHeight * titleLines.length, method ? methodSize : 0);
 
   /**
    * Every block gets the padding that would centre its title inside a
@@ -260,23 +360,6 @@ export function EventBlock({
     Math.floor((COMPACT_EVENT_HEIGHT - rowHeight) / 2),
     Math.floor((height - rowHeight) / 2),
   ));
-
-  const contentWidth =
-    columnWidth * (SCREEN_WIDTH - TIME_COL_WIDTH)
-    - (isBackup ? 0 : BLOCK.accentWidth)              // left colour border
-    - (isBackup ? 8 : BLOCK.paddingLeft)              // paddingLeft
-    - gutter                                          // paddingRight
-    - methodWidth;                                    // leading method marker
-
-  const spare = contentWidth - textWidth(event.title, fontSize) - TIME_GAP;
-
-  // Only an event that actually spans time can show a start–end range; a checkbox
-  // event, or a contact logged without an end, has just the one time to show.
-  const bothLabel = `${event.startTime} – ${event.endTime}`;
-  const timeLabel =
-    hasEndTime(event) && spare >= textWidth(bothLabel, fontSize) ? bothLabel
-    : spare >= textWidth(event.startTime, fontSize) ? event.startTime
-    : null;
 
   return (
     <GestureDetector gesture={composed}>
@@ -329,11 +412,54 @@ export function EventBlock({
               />
             </View>
           )}
-          <Text style={[styles.title, { fontSize, lineHeight: titleLineHeight }]} numberOfLines={1}>
-            {event.title}
-          </Text>
+          {titleFitsOneLine ? (
+            // titleFitsOneLine already confirmed this fits via textWidth()'s
+            // estimate, so numberOfLines={1} normally never binds — but that
+            // estimate is a flat per-character average, not real font metrics,
+            // so it can be a hair off for an unusual string. 'clip' is the
+            // backstop for that gap: silently clip rather than fall back to
+            // RN's default 'tail' ellipsis, which this app never shows.
+            <Text
+              style={[styles.title, { fontSize, lineHeight: titleLineHeight }]}
+              numberOfLines={1}
+              ellipsizeMode="clip"
+            >
+              {event.title}
+            </Text>
+          ) : (
+            // One Text per computed line, each hard-capped to numberOfLines={1},
+            // rather than one Text holding every line joined by "\n". RN's own
+            // wrapping still runs on whatever a Text is given, using the real
+            // font metrics rather than wrapTitleLines' textWidth() estimate — a
+            // single multi-line Text let it silently re-flow across the line
+            // boundaries we'd already chosen (that's what turned "Morning" into
+            // "Morni" / "n" / "g"). As separate elements, RN can clip an
+            // individual line if our estimate ran a hair wide, but it can't
+            // merge or re-split across lines we've already decided on. The
+            // block's overflow: hidden + fixed height still does the vertical
+            // cutting — this only stops horizontal re-wrapping within a line.
+            <View style={{ flexShrink: 1 }}>
+              {titleLines.map((line, i) => (
+                <Text
+                  key={i}
+                  style={[styles.title, { fontSize, lineHeight: titleLineHeight }]}
+                  numberOfLines={1}
+                  ellipsizeMode="clip"
+                >
+                  {line}
+                </Text>
+              ))}
+            </View>
+          )}
           {timeLabel && (
-            <Text style={[styles.time, { fontSize, lineHeight: titleLineHeight }]} numberOfLines={1}>
+            // Same backstop as the title above: the spare/textWidth() checks that
+            // chose timeLabel are an estimate, so 'clip' guards against that
+            // estimate being a hair optimistic rather than ever showing "…".
+            <Text
+              style={[styles.time, { fontSize, lineHeight: titleLineHeight }]}
+              numberOfLines={1}
+              ellipsizeMode="clip"
+            >
               {timeLabel}
             </Text>
           )}
@@ -358,6 +484,7 @@ export function EventBlock({
                   lineHeight: Math.round(quantityFontSize * TITLE_LINE_RATIO),
                 }]}
                 numberOfLines={1}
+                ellipsizeMode="clip"
               >
                 {quantityLabel}
               </Text>
@@ -365,6 +492,7 @@ export function EventBlock({
                 <Text
                   style={[styles.units, { fontSize, lineHeight: titleLineHeight, marginLeft: UNITS_GAP }]}
                   numberOfLines={1}
+                  ellipsizeMode="clip"
                 >
                   {unitsLabel}
                 </Text>

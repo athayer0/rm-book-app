@@ -7,9 +7,22 @@ import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUt
 import { EventBlock } from './EventBlock';
 import { formatTime } from '../utils/dateUtils';
 import { Svg, Polygon } from 'react-native-svg';
-import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE } from '../constants/eventSizes';
+import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
 
-const TIME_COL_WIDTH = 52;
+// Both columns' vertical rulers (hour lines in eventCol, hour labels in timeCol)
+// are anchored off this single offset, so they can't drift apart from having
+// been tuned independently.
+const GRID_TOP_OFFSET = 16;
+// Height of the box an hour label is vertically centered within, straddling
+// its line — centering (rather than a hardcoded nudge) makes the alignment
+// insensitive to font metrics.
+const HOUR_LABEL_HEIGHT = 20;
+// Gap the label box leaves before the line (matches fullLine's own -8 left
+// extension, so the box's right edge lands exactly at the line's start). The
+// box is centered (not right-aligned) within this narrowed width, so
+// "9 AM" -> "10 AM" grows the same amount on both sides instead of eating
+// into the gap on one side.
+const HOUR_LABEL_GAP_TO_LINE = 8;
 const VERTICAL_EDGE_ZONE = 70;
 const AUTOSCROLL_TICK_MS = 30;
 const AUTOSCROLL_MIN_SPEED = 100; // px/sec, right at the zone boundary
@@ -64,7 +77,7 @@ function gridHourLabel(hour: number): string {
 
 export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect, bounceEnabled = true }: Props) {
   const Colors = useColors();
-  const styles = useMemo(() => makeStyles(Colors, slotHeight), [Colors, slotHeight]);
+  const styles = useMemo(() => makeStyles(Colors), [Colors]);
 
   const SLOT_HEIGHT = slotHeight;
   const DRAG_SLOT_HEIGHT = slotHeight / 2;
@@ -237,14 +250,17 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
         onScrollEndDrag={(e) => onScrollSettle?.(e.nativeEvent.contentOffset.y)}
       >
         <View style={styles.grid}>
-          <Pressable style={styles.timeCol} onPress={(e) => handleSlotTap(e.nativeEvent.locationY)}>
+          <Pressable style={[styles.timeCol, { height: totalHeight + GRID_TOP_OFFSET }]} onPress={(e) => handleSlotTap(e.nativeEvent.locationY)}>
             {HOURS.map((hour, i) => {
               const hourLineY = i * SLOT_HEIGHT * 2;
               const nearLine = Math.abs(timeIndicatorY - hourLineY) <= HIDE_NEAR_PX;
               const nearLabel = Math.abs((timeIndicatorY - NOW_LABEL_TOP_OFFSET) - hourLineY) <= HIDE_NEAR_PX;
               const nearIndicator = showTimeIndicator && (nearLine || nearLabel);
               return (
-                <View key={hour} style={styles.hourLabel}>
+                <View
+                  key={hour}
+                  style={[styles.hourLabel, { top: GRID_TOP_OFFSET + hourLineY - HOUR_LABEL_HEIGHT / 2 }]}
+                >
                   <Text style={[styles.hourText, nearIndicator && { opacity: 0 }]}>
                     {gridHourLabel(hour)}
                   </Text>
@@ -337,7 +353,7 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   );
 }
 
-function makeStyles(C: ColorPalette, SLOT_HEIGHT: number) {
+function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     scroll: {
       flex: 1,
@@ -350,25 +366,25 @@ function makeStyles(C: ColorPalette, SLOT_HEIGHT: number) {
     },
     timeCol: {
       width: TIME_COL_WIDTH,
-      paddingTop: 11,
-      paddingRight: 8,
+      position: 'relative',
     },
     hourLabel: {
-      height: SLOT_HEIGHT * 2,
-      justifyContent: 'flex-start',
-      alignItems: 'flex-end',
-      paddingRight: 8,
+      position: 'absolute',
+      left: 0,
+      width: TIME_COL_WIDTH - HOUR_LABEL_GAP_TO_LINE,
+      height: HOUR_LABEL_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     hourText: {
       fontSize: 11,
       color: C.textLight,
       fontWeight: '500',
-      transform: [{ translateY: -6 }],
     },
     eventCol: {
       flex: 1,
       position: 'relative',
-      marginTop: 16,
+      marginTop: GRID_TOP_OFFSET,
     },
     fullLine: {
       position: 'absolute',
