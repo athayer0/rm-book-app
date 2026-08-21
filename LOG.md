@@ -44,7 +44,7 @@ FEATURES
 [x] event notifs by type
 [x] add more personalization to onboarding (different event and goal color schemes)
 [x] add a bit of bounciness to scrolling past the vertical edeges on the calendar
-[ ] add spanish 
+[x] add spanish 
 
 [ ] add other languages (portuguese french tagalog mandarin etc)
 

@@ -549,6 +549,8 @@
     "resetQuickAddBody": "Esto restaurará los tipos e íconos de añadido rápido predeterminados. Esto no se puede deshacer.",
     "themeColors": {
       "sectionTitle": "COLORES DEL TEMA",
+      "colorScheme": "Esquema de colores",
+      "customScheme": "Personalizado",
       "customizeColors": "Personalizar colores"
     },
     "eventSize": {
@@ -557,12 +559,19 @@
     },
     "eventTypes": {
       "sectionTitle": "TIPOS DE EVENTO",
+      "colorScheme": "Esquema de colores",
+      "customScheme": "Personalizado",
       "resetColors": "Restablecer colores predeterminados",
       "resetDurations": "Restablecer duraciones predeterminadas",
       "resetEventTypes": "Restablecer tipos de evento predeterminados"
     },
     "eventBubble": {
       "sectionTitle": "BURBUJA DE EVENTO +"
+    },
+    "goals": {
+      "sectionTitle": "METAS",
+      "colorScheme": "Esquema de colores",
+      "customScheme": "Personalizado"
     },
     "dailyReview": {
       "sectionTitle": "REVISIÓN DIARIA"

@@ -549,6 +549,8 @@
     "resetQuickAddBody": "This will restore the default quick-add types and icons. This cannot be undone.",
     "themeColors": {
       "sectionTitle": "THEME COLORS",
+      "colorScheme": "Color Scheme",
+      "customScheme": "Custom",
       "customizeColors": "Customize Colors"
     },
     "eventSize": {
@@ -557,12 +559,19 @@
     },
     "eventTypes": {
       "sectionTitle": "EVENT TYPES",
+      "colorScheme": "Color Scheme",
+      "customScheme": "Custom",
       "resetColors": "Reset Colors to Default",
       "resetDurations": "Reset Default Durations to Default",
       "resetEventTypes": "Reset Event Types to Default"
     },
     "eventBubble": {
       "sectionTitle": "EVENT BUBBLE +"
+    },
+    "goals": {
+      "sectionTitle": "GOALS",
+      "colorScheme": "Color Scheme",
+      "customScheme": "Custom"
     },
     "dailyReview": {
       "sectionTitle": "DAILY REVIEW"

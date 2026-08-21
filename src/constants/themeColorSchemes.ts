@@ -187,6 +187,22 @@ export const STATUS_COLOR_SCHEMES: StatusColorScheme[] = [
   },
 ];
 
+/**
+ * The three primary/secondary/tertiary dots every scheme chip shows —
+ * shared by the onboarding Colors page and the Settings screen's Color
+ * Scheme row, so the preview is computed in one place rather than each
+ * picker inventing its own.
+ */
+export function schemeChipDots(schemeId: string, isDark: boolean): string[] {
+  const scheme = THEME_COLOR_SCHEMES.find(s => s.id === schemeId);
+  if (!scheme) return [];
+  return [
+    scheme.themeColor,
+    isDark ? scheme.secondaryColorDark : scheme.secondaryColorLight,
+    isDark ? scheme.tertiaryColorDark : scheme.tertiaryColorLight,
+  ];
+}
+
 /** Whether `draft` matches a known theme scheme exactly, for seeding the picker's selected chip. */
 export function matchThemeColorScheme(draft: {
   themeColor: string;

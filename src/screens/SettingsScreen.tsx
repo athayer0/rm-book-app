@@ -10,6 +10,16 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeConfig, EventTypeLabels, DEFAULT_THEME_COLOR } from '../constants/colors';
 import { THEME_COLOR_ROWS, type ThemeColorRowKey } from '../constants/themeColorRows';
+import {
+  THEME_COLOR_SCHEMES, STATUS_COLOR_SCHEMES,
+  matchThemeColorScheme, schemeChipDots,
+  type ThemeColorScheme,
+} from '../constants/themeColorSchemes';
+import {
+  EVENT_COLOR_SCHEMES, GOAL_COLOR_SCHEMES, matchEventColorScheme, matchGoalColorScheme, SCHEME_PREVIEW_DOTS,
+  type EventColorScheme, type GoalColorScheme,
+} from '../constants/colorSchemes';
+import { DEFAULT_GOALS } from '../constants/defaultGoals';
 import { EventSizes, EVENT_SIZE_OPTIONS, resolveEventSize, eventSizePercent } from '../constants/eventSizes';
 import { ColorPickerSheet } from '../components/ColorPickerSheet';
 import { DropdownMenu, DropdownItem, Collapsible, MENU_ITEM_HEIGHT } from '../components/DropdownMenu';
@@ -77,7 +87,7 @@ function isStockBuiltInType(d: EventTypeDefinition): boolean {
 // tracking its own independent boolean.
 type DropdownKey =
   | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'language' | 'dailyReviewTime' | 'eventReminderLead'
-  | 'colors' | 'method';
+  | 'colorScheme' | 'colors' | 'eventColorScheme' | 'goalColorScheme' | 'method';
 
 /**
  * The dropdowns that open in the flow and push the rows below them down, rather
@@ -97,7 +107,10 @@ export function SettingsScreen() {
   const { t } = useTranslation();
 
   const { settings, updateSettings } = useSettings();
-  const { resetAll, resetBuiltInDefinitions, definitions: goalDefinitions } = useWeeklyGoals();
+  const {
+    resetAll, resetBuiltInDefinitions,
+    definitions: goalDefinitions, updateDefinitions: updateGoalDefinitions,
+  } = useWeeklyGoals();
   const {
     definitions: eventTypeDefinitions,
     updateDefinitions: updateEventTypeDefinitions,
@@ -119,6 +132,12 @@ export function SettingsScreen() {
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
   // Primary always shows; secondary/tertiary show only their current-theme variant.
   const visibleColorRows = THEME_COLOR_ROWS.filter(row => !row.mode || row.mode === (isDark ? 'dark' : 'light'));
+  // Which named scheme, if any, the current theme colours match exactly —
+  // null once any row has been hand-edited away from a scheme's values.
+  // Matched on the theme-colour fields only, same as onboarding's
+  // themeSchemeId, even though picking a scheme also carries its status
+  // colours along (see applyColorScheme below).
+  const selectedSchemeId = matchThemeColorScheme(settings);
   const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
   const eventReminderScrollEdges = useScrollEdges();
   // Which theme colour the picker sheet is editing, if any.
@@ -214,6 +233,30 @@ export function SettingsScreen() {
     if (settings.dailyReviewEnabled) await scheduleDailyReview(hour, minute, t);
   }
 
+  // Sets every THEME_COLOR_ROWS field at once — both light and dark variants,
+  // regardless of which one is currently on screen — plus the same-id status
+  // scheme, mirroring onboarding's selectThemeScheme. A scheme is one
+  // identity across primary/secondary/tertiary/status, not a partial pick.
+  function applyColorScheme(scheme: ThemeColorScheme) {
+    const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    updateSettings({
+      themeColor: scheme.themeColor,
+      secondaryColorLight: scheme.secondaryColorLight,
+      secondaryColorDark: scheme.secondaryColorDark,
+      tertiaryColorLight: scheme.tertiaryColorLight,
+      tertiaryColorDark: scheme.tertiaryColorDark,
+      ...(statusScheme ? {
+        statusCompletedColorLight: statusScheme.statusCompletedColorLight,
+        statusCompletedColorDark: statusScheme.statusCompletedColorDark,
+        statusFailedColorLight: statusScheme.statusFailedColorLight,
+        statusFailedColorDark: statusScheme.statusFailedColorDark,
+        statusPendingColorLight: statusScheme.statusPendingColorLight,
+        statusPendingColorDark: statusScheme.statusPendingColorDark,
+      } : {}),
+    });
+    setOpenDropdown(null);
+  }
+
   function handleResetWeek() {
     Alert.alert(
       t('settingsScreen.resetWeekTitle'),
@@ -243,6 +286,40 @@ export function SettingsScreen() {
   // A type is "customized" by what it resolves to, not by whether it has an
   // override: one set back to the stock value by hand has nothing to reset.
   const customizedColorTypes = EVENT_TYPES.filter(t => effectiveColor(t) !== EventColors[t]);
+
+  // Which named event-color scheme, if any, every built-in id's effective
+  // color currently matches — over DEFAULT_EVENT_TYPES rather than the
+  // (possibly narrower) EVENT_TYPES list, same as onboarding's
+  // resolvedEventColors, so a deleted built-in doesn't block the match.
+  const resolvedEventColors = Object.fromEntries(
+    DEFAULT_EVENT_TYPES.map(d => [d.id, effectiveColor(d.id)]),
+  );
+  const selectedEventSchemeId = matchEventColorScheme(resolvedEventColors);
+
+  // Overwrites only the built-in ids a scheme covers — a custom event type
+  // has no entry in scheme.colors and keeps whatever color it was given,
+  // same contract EVENT_COLOR_SCHEMES documents for the onboarding picker.
+  function applyEventColorScheme(scheme: EventColorScheme) {
+    updateSettings({ eventTypeColors: { ...settings.eventTypeColors, ...scheme.colors } });
+    setOpenDropdown(null);
+  }
+
+  // Same idea, over goal ids' own `color` field rather than a settings map —
+  // goalDefinitions is the live, already-merged list, so a built-in def is
+  // rewritten in place with the scheme's color and everything else about it
+  // (target, icon, goal link) untouched; a custom goal has no entry in
+  // scheme.colors and passes through unchanged.
+  const resolvedGoalColors = Object.fromEntries(
+    DEFAULT_GOALS.map(d => [d.id, goalDefinitions.find(x => x.id === d.id)?.color ?? d.color]),
+  );
+  const selectedGoalSchemeId = matchGoalColorScheme(resolvedGoalColors);
+
+  function applyGoalColorScheme(scheme: GoalColorScheme) {
+    updateGoalDefinitions(goalDefinitions.map(d => (
+      scheme.colors[d.id] ? { ...d, color: scheme.colors[d.id] } : d
+    )));
+    setOpenDropdown(null);
+  }
 
   // Types with no duration to offer at all have nothing to be customized —
   // effectiveMinutes is already null for them.
@@ -477,17 +554,55 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Theme Colors — see THEME_COLOR_ROWS for what each one drives.
-            Collapsed behind one summary row (dot strip previews every
-            currently-visible one),
-            expanding into the same indented dropdown-item list Schedule
-            Hours and Contact Method use. Each item still opens its own
-            picker panel underneath, exactly as before. */}
-        {/* No lift for `colors`: no backdrop goes up for it, so there is
-            nothing for the section to need lifting over. */}
-        <View style={styles.section}>
+        {/* Theme Colors — two rows. Color Scheme picks one of the five named
+            looks in one shot (theme + status colours together, see
+            applyColorScheme); Customize Colors is the per-row editor,
+            unchanged from before — see THEME_COLOR_ROWS for what each row
+            drives. */}
+        {/* Only Color Scheme needs the section lift: it's the one row here
+            that floats a menu over its sibling. Customize Colors pushes the
+            rows below it down in the flow instead, so it needs no backdrop. */}
+        <View style={[styles.section, elevatedDropdown === 'colorScheme' && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>{t('settingsScreen.themeColors.sectionTitle')}</Text>
           <View style={styles.card}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'colorScheme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => toggleDropdown('colorScheme')}
+              >
+                <Text style={styles.rowLabel}>{t('settingsScreen.themeColors.colorScheme')}</Text>
+                <Text style={styles.rowValue}>
+                  {selectedSchemeId
+                    ? t(`colorSchemes.${selectedSchemeId}`, { defaultValue: THEME_COLOR_SCHEMES.find(s => s.id === selectedSchemeId)?.label })
+                    : t('settingsScreen.themeColors.customScheme')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'colorScheme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'colorScheme'}>
+                {THEME_COLOR_SCHEMES.map((scheme, i, arr) => (
+                  <DropdownItem
+                    key={scheme.id}
+                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
+                    selected={selectedSchemeId === scheme.id}
+                    showSeparator={i < arr.length - 1}
+                    leading={
+                      <View style={styles.schemeDotsRow}>
+                        {schemeChipDots(scheme.id, isDark).map((color, di) => (
+                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
+                        ))}
+                      </View>
+                    }
+                    onPress={() => applyColorScheme(scheme)}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+
             <TouchableOpacity
               style={[styles.row, openDropdown !== 'colors' && styles.rowLast]}
               onPress={() => toggleDropdown('colors')}
@@ -572,10 +687,51 @@ export function SettingsScreen() {
             both live inside the "Customize" sheet now, per type. Colors and
             durations used to have their own screens listing every type flat;
             those are gone, but their bulk "Reset to Default" actions stay
-            here alongside a reset for the type list itself. */}
-        <View style={styles.section}>
+            here alongside a reset for the type list itself. Color Scheme,
+            like the one on Theme Colors, applies one of the five named
+            palettes to every built-in type's color in one shot — see
+            applyEventColorScheme. */}
+        <View style={[styles.section, elevatedDropdown === 'eventColorScheme' && styles.sectionFloating]}>
           <Text style={styles.sectionTitle}>{t('settingsScreen.eventTypes.sectionTitle')}</Text>
           <View style={styles.card}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'eventColorScheme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => toggleDropdown('eventColorScheme')}
+              >
+                <Text style={styles.rowLabel}>{t('settingsScreen.eventTypes.colorScheme')}</Text>
+                <Text style={styles.rowValue}>
+                  {selectedEventSchemeId
+                    ? t(`colorSchemes.${selectedEventSchemeId}`, { defaultValue: EVENT_COLOR_SCHEMES.find(s => s.id === selectedEventSchemeId)?.label })
+                    : t('settingsScreen.eventTypes.customScheme')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'eventColorScheme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'eventColorScheme'}>
+                {EVENT_COLOR_SCHEMES.map((scheme, i, arr) => (
+                  <DropdownItem
+                    key={scheme.id}
+                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
+                    selected={selectedEventSchemeId === scheme.id}
+                    showSeparator={i < arr.length - 1}
+                    leading={
+                      <View style={styles.schemeDotsRow}>
+                        {(SCHEME_PREVIEW_DOTS[scheme.id] ?? []).map((color, di) => (
+                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
+                        ))}
+                      </View>
+                    }
+                    onPress={() => applyEventColorScheme(scheme)}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
               <Text style={styles.rowLabel}>{t('settingsScreen.customize')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
@@ -659,6 +815,54 @@ export function SettingsScreen() {
                 color={quickAddIsDefault ? Colors.border : Colors.textLight}
               />
             </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Goals — no other screen or tab of their own (see GRAIN /
+            EditGoalsModal etc.), so Color Scheme is the one goal-wide
+            setting that lives here: applies one of the five named palettes
+            to every built-in goal's color in one shot, same shape as the
+            Theme Colors and Event Types rows above. */}
+        <View style={[styles.section, elevatedDropdown === 'goalColorScheme' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.goals.sectionTitle')}</Text>
+          <View style={styles.card}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'goalColorScheme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={[styles.row, styles.rowLast]}
+                onPress={() => toggleDropdown('goalColorScheme')}
+              >
+                <Text style={styles.rowLabel}>{t('settingsScreen.goals.colorScheme')}</Text>
+                <Text style={styles.rowValue}>
+                  {selectedGoalSchemeId
+                    ? t(`colorSchemes.${selectedGoalSchemeId}`, { defaultValue: GOAL_COLOR_SCHEMES.find(s => s.id === selectedGoalSchemeId)?.label })
+                    : t('settingsScreen.goals.customScheme')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'goalColorScheme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'goalColorScheme'}>
+                {GOAL_COLOR_SCHEMES.map((scheme, i, arr) => (
+                  <DropdownItem
+                    key={scheme.id}
+                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
+                    selected={selectedGoalSchemeId === scheme.id}
+                    showSeparator={i < arr.length - 1}
+                    leading={
+                      <View style={styles.schemeDotsRow}>
+                        {(SCHEME_PREVIEW_DOTS[scheme.id] ?? []).map((color, di) => (
+                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
+                        ))}
+                      </View>
+                    }
+                    onPress={() => applyGoalColorScheme(scheme)}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
           </View>
         </View>
 
@@ -1172,6 +1376,18 @@ function makeStyles(C: ColorPalette) {
       height: 10,
       borderRadius: 5,
       marginLeft: 4,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    // Color Scheme menu item's leading preview — three dots for
+    // theme/secondary/tertiary, ahead of the label. Owns its own right
+    // margin, per DropdownItem's `leading` contract.
+    schemeDotsRow: { flexDirection: 'row', marginRight: 10 },
+    schemeDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: 3,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
     },

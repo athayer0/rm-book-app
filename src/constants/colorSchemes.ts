@@ -332,6 +332,10 @@ export const SCHEME_PREVIEW_DOTS: Record<string, string[]> = {
   classic: ['#E05C6B', '#E8980E', '#1E8449', '#2979FF', '#9B59B6'],
   marine: ['#A97723', '#179660', '#55ABE7', '#124CAF', '#082C68'],
   sunset: ['#D83F31', '#DD7A40', '#3F5E8D', '#5B2A8C', '#D04395'],
-  amazon: ['#5C3319', '#4F9A3C', '#A8D89C', '#479E90', '#3B5FC4'],
+  // Two river-browns (church's darkest, meal's mid-step), two canopy greens
+  // (work's mid-step, temple's light-step), and prayer's teal read as
+  // turquoise here — the scheme's three defining families, without the
+  // blackwater-blue family also competing for a slot.
+  amazon: ['#5C3319', '#A87532', '#4F9A3C', '#A8D89C', '#479E90'],
   wildflower: ['#E0C468', '#5FA37E', '#93B8E0', '#B8688A', '#D98CA3'],
 };

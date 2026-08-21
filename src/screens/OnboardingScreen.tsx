@@ -23,7 +23,7 @@ import {
 import { THEME_COLOR_ROWS, type ThemeColorSettingKey } from '../constants/themeColorRows';
 import {
   THEME_COLOR_SCHEMES, STATUS_COLOR_SCHEMES,
-  matchThemeColorScheme,
+  matchThemeColorScheme, schemeChipDots,
   type ThemeColorScheme,
 } from '../constants/themeColorSchemes';
 import { useSettings, AppSettings } from '../hooks/useSettings';
@@ -180,23 +180,6 @@ function buildThemeColorDraft(settings: AppSettings): Record<ThemeColorSettingKe
   return Object.fromEntries(
     THEME_COLOR_ROWS.map(row => [row.settingKey, settings[row.settingKey]]),
   ) as Record<ThemeColorSettingKey, string>;
-}
-
-/**
- * The three primary/secondary/tertiary dots every scheme chip shows,
- * including the Event Types page's — EVENT_COLOR_SCHEMES and
- * GOAL_COLOR_SCHEMES share their ids with THEME_COLOR_SCHEMES (the same
- * five identities), so this is the one place that look is computed rather
- * than each picker inventing its own preview.
- */
-function schemeChipDots(schemeId: string, isDark: boolean): string[] {
-  const scheme = THEME_COLOR_SCHEMES.find(s => s.id === schemeId);
-  if (!scheme) return [];
-  return [
-    scheme.themeColor,
-    isDark ? scheme.secondaryColorDark : scheme.secondaryColorLight,
-    isDark ? scheme.tertiaryColorDark : scheme.tertiaryColorLight,
-  ];
 }
 
 export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
