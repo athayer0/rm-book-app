@@ -569,6 +569,9 @@ alter table settings
 alter table settings
   add column if not exists
   language text default 'en';
+alter table settings
+  add column if not exists
+  time_format text default '12h';
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

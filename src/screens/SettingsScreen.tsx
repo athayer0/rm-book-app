@@ -42,7 +42,7 @@ import { MAPS_APP_OPTIONS } from '../utils/mapUtils';
 import { CONTACT_METHODS, DEFAULT_CONTACT_METHOD, DEFAULT_METHOD_CHOICES } from '../constants/contactMethods';
 import { GoalIcon } from '../components/GoalIcon';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
-import { formatTime, parseTimeString, periodLabel, localizeTime } from '../utils/dateUtils';
+import { formatTime, parseTimeString, displayTime, hourOnlyLabel } from '../utils/dateUtils';
 import { EVENT_REMINDER_MINUTE_OPTIONS, eventReminderLabel } from '../constants/eventReminders';
 import { scheduleDailyReview } from '../lib/notifications';
 import { useNotificationToggles } from '../hooks/useNotificationToggles';
@@ -56,12 +56,6 @@ const END_HOUR_OPTIONS = [21, 22, 23, 24];
 // than a whole one, same as the status picker's list, so what's left says
 // "more below" without needing a visible scrollbar to say it.
 const EVENT_REMINDER_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
-
-function hourLabel(h: number, language: 'en' | 'es'): string {
-  if (h === 0 || h === 24) return `12 ${periodLabel('AM', language)}`;
-  if (h === 12) return `12 ${periodLabel('PM', language)}`;
-  return h < 12 ? `${h} ${periodLabel('AM', language)}` : `${h - 12} ${periodLabel('PM', language)}`;
-}
 
 // Whether a built-in type's editable fields still match what it ships with —
 // used to grey out "Reset Event Types to Default" when there is nothing to
@@ -86,7 +80,7 @@ function isStockBuiltInType(d: EventTypeDefinition): boolean {
 // at a time — opening one closes whichever else was open, rather than each
 // tracking its own independent boolean.
 type DropdownKey =
-  | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'language' | 'dailyReviewTime' | 'eventReminderLead'
+  | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'language' | 'timeFormat' | 'dailyReviewTime' | 'eventReminderLead'
   | 'colorScheme' | 'colors' | 'eventColorScheme' | 'goalColorScheme' | 'method';
 
 /**
@@ -554,6 +548,41 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* Time Format — same shape as Language above: a floating two-option picker. */}
+        <View style={[styles.section, elevatedDropdown === 'timeFormat' && styles.sectionFloating]}>
+          <Text style={styles.sectionTitle}>{t('settings.timeFormat.sectionTitle')}</Text>
+          <View style={styles.card}>
+            <View style={[styles.fieldRow, elevatedDropdown === 'timeFormat' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={[styles.row, styles.rowLast]}
+                onPress={() => toggleDropdown('timeFormat')}
+              >
+                <Text style={styles.rowLabel}>{t('settings.timeFormat.label')}</Text>
+                <Text style={styles.rowValue}>
+                  {settings.timeFormat === '24h' ? t('settings.timeFormat.military') : t('settings.timeFormat.standard')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'timeFormat' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'timeFormat'}>
+                {(['12h', '24h'] as const).map((timeFormat, i, arr) => (
+                  <DropdownItem
+                    key={timeFormat}
+                    label={timeFormat === '24h' ? t('settings.timeFormat.military') : t('settings.timeFormat.standard')}
+                    selected={settings.timeFormat === timeFormat}
+                    showSeparator={i < arr.length - 1}
+                    onPress={() => { updateSettings({ timeFormat }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+          </View>
+        </View>
+
         {/* Theme Colors — two rows. Color Scheme picks one of the five named
             looks in one shot (theme + status colours together, see
             applyColorScheme); Customize Colors is the per-row editor,
@@ -890,7 +919,7 @@ export function SettingsScreen() {
                 >
                   <Text style={styles.rowLabel}>{t('settingsScreen.time')}</Text>
                   <Text style={styles.rowValue}>
-                    {localizeTime(formatTime(settings.dailyReviewHour, settings.dailyReviewMinute), settings.language)}
+                    {displayTime(formatTime(settings.dailyReviewHour, settings.dailyReviewMinute), settings.language, settings.timeFormat)}
                   </Text>
                   <Ionicons
                     name={openDropdown === 'dailyReviewTime' ? 'chevron-up' : 'chevron-down'}
@@ -1007,7 +1036,7 @@ export function SettingsScreen() {
                 onPress={() => toggleDropdown('hourStart')}
               >
                 <Text style={styles.rowLabel}>{t('addEditEvent.startTime')}</Text>
-                <Text style={styles.rowValue}>{hourLabel(settings.gridStartHour, settings.language)}</Text>
+                <Text style={styles.rowValue}>{hourOnlyLabel(settings.gridStartHour, settings.language, settings.timeFormat)}</Text>
                 <Ionicons
                   name={openDropdown === 'hourStart' ? 'chevron-up' : 'chevron-down'}
                   size={16}
@@ -1019,7 +1048,7 @@ export function SettingsScreen() {
                 {START_HOUR_OPTIONS.map((h, i) => (
                   <DropdownItem
                     key={h}
-                    label={hourLabel(h, settings.language)}
+                    label={hourOnlyLabel(h, settings.language, settings.timeFormat)}
                     selected={settings.gridStartHour === h}
                     showSeparator={i < START_HOUR_OPTIONS.length - 1}
                     onPress={() => { updateSettings({ gridStartHour: h }); setOpenDropdown(null); }}
@@ -1034,7 +1063,7 @@ export function SettingsScreen() {
                 onPress={() => toggleDropdown('hourEnd')}
               >
                 <Text style={styles.rowLabel}>{t('addEditEvent.endTime')}</Text>
-                <Text style={styles.rowValue}>{hourLabel(settings.gridEndHour, settings.language)}</Text>
+                <Text style={styles.rowValue}>{hourOnlyLabel(settings.gridEndHour, settings.language, settings.timeFormat)}</Text>
                 <Ionicons
                   name={openDropdown === 'hourEnd' ? 'chevron-up' : 'chevron-down'}
                   size={16}
@@ -1046,7 +1075,7 @@ export function SettingsScreen() {
                 {END_HOUR_OPTIONS.map((h, i) => (
                   <DropdownItem
                     key={h}
-                    label={hourLabel(h, settings.language)}
+                    label={hourOnlyLabel(h, settings.language, settings.timeFormat)}
                     selected={settings.gridEndHour === h}
                     showSeparator={i < END_HOUR_OPTIONS.length - 1}
                     onPress={() => { updateSettings({ gridEndHour: h }); setOpenDropdown(null); }}

@@ -5,7 +5,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { CalendarEvent, EventStatus, computeEventLayout } from '../utils/eventUtils';
 import { EventBlock } from './EventBlock';
-import { formatTime, periodLabel } from '../utils/dateUtils';
+import { formatTime, hourOnlyLabel } from '../utils/dateUtils';
 import { useSettings } from '../hooks/useSettings';
 import { Svg, Polygon } from 'react-native-svg';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
@@ -68,12 +68,6 @@ interface Props {
   // Off while an event is being dragged, so the drag's own autoscroll-near-edge
   // logic isn't fighting a simultaneous rubber-band overscroll.
   bounceEnabled?: boolean;
-}
-
-function gridHourLabel(hour: number, language: 'en' | 'es'): string {
-  if (hour === 0 || hour === 24) return `12 ${periodLabel('AM', language)}`;
-  if (hour === 12) return `12 ${periodLabel('PM', language)}`;
-  return hour < 12 ? `${hour} ${periodLabel('AM', language)}` : `${hour - 12} ${periodLabel('PM', language)}`;
 }
 
 export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect, bounceEnabled = true }: Props) {
@@ -227,7 +221,9 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   const NOW_LABEL_TOP_OFFSET = 15;
   const HIDE_ABOVE_PX = NOW_LABEL_TOP_OFFSET + HIDE_MARGIN_PX;
   const HIDE_BELOW_PX = HIDE_MARGIN_PX;
-  const timeLabel = `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
+  const timeLabel = settings.timeFormat === '24h'
+    ? `${String(nowH).padStart(2, '0')}:${String(nowM).padStart(2, '0')}`
+    : `${nowH % 12 || 12}:${String(nowM).padStart(2, '0')}`;
 
   function handleSlotTap(locationY: number) {
     // Tapping empty space already does nothing in select mode (onTapEmpty is a
@@ -272,7 +268,7 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
                   style={[styles.hourLabel, { top: GRID_TOP_OFFSET + hourLineY - HOUR_LABEL_HEIGHT / 2 }]}
                 >
                   <Text style={[styles.hourText, nearIndicator && { opacity: 0 }]}>
-                    {gridHourLabel(hour, settings.language)}
+                    {hourOnlyLabel(hour, settings.language, settings.timeFormat)}
                   </Text>
                 </View>
               );

@@ -8,7 +8,7 @@ import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../con
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
-import { localizeTime } from '../utils/dateUtils';
+import { displayTime } from '../utils/dateUtils';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
@@ -332,8 +332,8 @@ export function EventBlock({
   // Localized before either the width math or the render below — "a.m."/"p.m."
   // isn't the same length as "AM"/"PM", so the fit check has to measure
   // whatever's actually going to be drawn, not the stored English form.
-  const displayStart = localizeTime(event.startTime, settings.language);
-  const displayEnd = localizeTime(event.endTime, settings.language);
+  const displayStart = displayTime(event.startTime, settings.language, settings.timeFormat);
+  const displayEnd = displayTime(event.endTime, settings.language, settings.timeFormat);
   const bothLabel = `${displayStart} – ${displayEnd}`;
   const timeLabel = !titleFitsOneLine ? null
     : hasEndTime(event) && spare >= textWidth(bothLabel, fontSize) ? bothLabel

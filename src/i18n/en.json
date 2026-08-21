@@ -198,6 +198,12 @@
       "label": "Language",
       "english": "English",
       "spanish": "Español"
+    },
+    "timeFormat": {
+      "sectionTitle": "TIME FORMAT",
+      "label": "Format",
+      "standard": "12-hour",
+      "military": "24-hour"
     }
   },
   "contactMethods": {

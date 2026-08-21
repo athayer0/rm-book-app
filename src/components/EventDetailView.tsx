@@ -24,7 +24,7 @@ import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
-import { localizeTime } from '../utils/dateUtils';
+import { displayTime } from '../utils/dateUtils';
 
 interface Props {
   /**
@@ -318,8 +318,8 @@ export function EventDetailView({
           <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.whenIcon} />
           <Text style={styles.value}>
             {isCheckboxType(event.type) || !hasEndTime(event)
-              ? localizeTime(event.startTime, settings.language)
-              : `${localizeTime(event.startTime, settings.language)} – ${localizeTime(event.endTime, settings.language)}`}
+              ? displayTime(event.startTime, settings.language, settings.timeFormat)
+              : `${displayTime(event.startTime, settings.language, settings.timeFormat)} – ${displayTime(event.endTime, settings.language, settings.timeFormat)}`}
           </Text>
         </View>
         {event.recurring && (

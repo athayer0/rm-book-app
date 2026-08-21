@@ -39,6 +39,7 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
   convert_progress: {},
   settings: {
     weekStart: 'week_start',
+    timeFormat: 'time_format',
     themeColor: 'theme_color',
     secondaryColorLight: 'secondary_color_light',
     secondaryColorDark: 'secondary_color_dark',
@@ -97,7 +98,7 @@ const COLUMNS: Record<string, string[]> = {
     'user_id', 'id', 'completed', 'updated_at', 'deleted_at',
   ],
   settings: [
-    'user_id', 'week_start', 'theme', 'language', 'theme_color',
+    'user_id', 'week_start', 'theme', 'language', 'time_format', 'theme_color',
     'secondary_color_light', 'secondary_color_dark',
     'tertiary_color_light', 'tertiary_color_dark',
     'grid_start_hour', 'grid_end_hour',

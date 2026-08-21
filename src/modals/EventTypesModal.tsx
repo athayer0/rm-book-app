@@ -10,7 +10,7 @@ import type { ColorPalette } from '../constants/colors';
 import { EventColors, DEFAULT_GOAL_COLOR } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { DEFAULT_GOAL_SPLIT_TIME, EventTypeDefinition, eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
-import { localizeTime } from '../utils/dateUtils';
+import { displayTime } from '../utils/dateUtils';
 import { GoalDefinition, goalDisplayLabel } from '../constants/defaultGoals';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
@@ -575,7 +575,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                       activeOpacity={0.7}
                     >
                       <Text style={styles.rowLabel}>{t('eventTypesModal.switchesAt')}</Text>
-                      <Text style={styles.rowValue}>{localizeTime(splitTime, settings.language)}</Text>
+                      <Text style={styles.rowValue}>{displayTime(splitTime, settings.language, settings.timeFormat)}</Text>
                       <Ionicons
                         name={cutoffOpen ? 'chevron-up' : 'chevron-down'}
                         size={16}
@@ -594,12 +594,12 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                     <Text style={styles.rowHint}>
                       {lateGoal
                         ? t('eventTypesModal.splitHintWithEvening', {
-                          time: localizeTime(splitTime, settings.language),
+                          time: displayTime(splitTime, settings.language, settings.timeFormat),
                           morning: linkedGoal?.label ? goalDisplayLabel(linkedGoal, t) : t('eventTypesModal.theMorningGoal'),
                           evening: lateGoal.label ? goalDisplayLabel(lateGoal, t) : t('eventTypesModal.theEveningGoal'),
                         })
                         : t('eventTypesModal.splitHintNoEvening', {
-                          time: localizeTime(splitTime, settings.language),
+                          time: displayTime(splitTime, settings.language, settings.timeFormat),
                           morning: linkedGoal?.label ? goalDisplayLabel(linkedGoal, t) : t('eventTypesModal.theMorningGoal'),
                         })}
                     </Text>

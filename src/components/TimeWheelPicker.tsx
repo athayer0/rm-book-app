@@ -17,7 +17,8 @@ const PAD = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
 // below catches up, can't run a short list (hours, minutes) off the edge.
 const REPEAT = 9;
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 1); // 1-12
+const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1); // 1-12
+const HOURS_24 = Array.from({ length: 24 }, (_, i) => i); // 0-23
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5); // :00, :05, ... :55
 const PERIODS: ('AM' | 'PM')[] = ['AM', 'PM'];
 
@@ -123,17 +124,22 @@ interface Props {
 }
 
 /**
- * The classic three-column spinner: hour, minute (in 5-minute steps), AM/PM.
- * Hour and minute wrap continuously (55 rolls to 0, 12 rolls to 1); AM/PM is
- * only ever the two values, so it stays a bounded column. Each column commits
- * independently the moment it settles, so there's no separate "Done" —
- * closing the picker is the caller's job, same as the other inline pickers in
- * this form.
+ * The classic spinner: hour, minute (in 5-minute steps), and — in 12-hour
+ * mode — AM/PM. Hour and minute wrap continuously (55 rolls to 0, 12 rolls to
+ * 1); AM/PM is only ever the two values, so it stays a bounded column. Each
+ * column commits independently the moment it settles, so there's no separate
+ * "Done" — closing the picker is the caller's job, same as the other inline
+ * pickers in this form.
+ *
+ * Military time drops the AM/PM column and spins the hour wheel 0-23 instead
+ * of 1-12 — the value it reads and writes is always the canonical "9:05 AM"
+ * form regardless, same as everywhere else in the app (see displayTime).
  */
 export function TimeWheelPicker({ value, onChange }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
+  const is24h = settings.timeFormat === '24h';
 
   const { hour: hour24, minute } = parseTimeString(value);
   const hour12 = hour24 % 12 || 12;
@@ -142,9 +148,13 @@ export function TimeWheelPicker({ value, onChange }: Props) {
   // seeded elsewhere (a contact's real call time, old data) might not be.
   const roundedMinute = (Math.round(minute / 5) * 5) % 60;
 
-  function commit(h12: number, m: number, p: 'AM' | 'PM') {
+  function commit12(h12: number, m: number, p: 'AM' | 'PM') {
     let h = h12 % 12;
     if (p === 'PM') h += 12;
+    onChange(formatTime(h, m));
+  }
+
+  function commit24(h: number, m: number) {
     onChange(formatTime(h, m));
   }
 
@@ -152,29 +162,52 @@ export function TimeWheelPicker({ value, onChange }: Props) {
     <View style={styles.panel}>
       <View style={styles.columns}>
         <View style={styles.selectionWindow} pointerEvents="none" />
-        <Wheel
-          items={HOURS}
-          value={hour12}
-          renderLabel={h => String(h)}
-          onSettle={h => commit(h, roundedMinute, period)}
-          styles={styles}
-          circular
-        />
-        <Wheel
-          items={MINUTES}
-          value={roundedMinute}
-          renderLabel={m => String(m).padStart(2, '0')}
-          onSettle={m => commit(hour12, m, period)}
-          styles={styles}
-          circular
-        />
-        <Wheel
-          items={PERIODS}
-          value={period}
-          renderLabel={p => periodLabel(p, settings.language)}
-          onSettle={p => commit(hour12, roundedMinute, p)}
-          styles={styles}
-        />
+        {is24h ? (
+          <>
+            <Wheel
+              items={HOURS_24}
+              value={hour24}
+              renderLabel={h => String(h).padStart(2, '0')}
+              onSettle={h => commit24(h, roundedMinute)}
+              styles={styles}
+              circular
+            />
+            <Wheel
+              items={MINUTES}
+              value={roundedMinute}
+              renderLabel={m => String(m).padStart(2, '0')}
+              onSettle={m => commit24(hour24, m)}
+              styles={styles}
+              circular
+            />
+          </>
+        ) : (
+          <>
+            <Wheel
+              items={HOURS_12}
+              value={hour12}
+              renderLabel={h => String(h)}
+              onSettle={h => commit12(h, roundedMinute, period)}
+              styles={styles}
+              circular
+            />
+            <Wheel
+              items={MINUTES}
+              value={roundedMinute}
+              renderLabel={m => String(m).padStart(2, '0')}
+              onSettle={m => commit12(hour12, m, period)}
+              styles={styles}
+              circular
+            />
+            <Wheel
+              items={PERIODS}
+              value={period}
+              renderLabel={p => periodLabel(p, settings.language)}
+              onSettle={p => commit12(hour12, roundedMinute, p)}
+              styles={styles}
+            />
+          </>
+        )}
       </View>
     </View>
   );

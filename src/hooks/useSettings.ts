@@ -35,6 +35,8 @@ export interface AppSettings {
   weekStart: 'sunday' | 'monday';
   theme: 'light' | 'dark' | 'system';
   language: 'en' | 'es';
+  /** Whether times are drawn as "9:05 PM" or military "21:05". Display only — stored times never change shape. */
+  timeFormat: '12h' | '24h';
   /** Drives `primary` — the header band and everything else tinted with it. */
   themeColor: string;
   /** Drives `accent` (Save/Done/EDIT, goal counts) — light and dark set independently. */
@@ -85,6 +87,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   weekStart: 'monday',
   theme: 'light',
   language: 'en',
+  timeFormat: '12h',
   themeColor: DEFAULT_THEME_COLOR,
   secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
   secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,

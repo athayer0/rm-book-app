@@ -72,6 +72,33 @@ export function parseTimeString(timeStr: string): { hour: number; minute: number
   return { hour, minute };
 }
 
+export type TimeFormat = '12h' | '24h';
+
+/** A "9:05 AM"-form time string rewritten as zero-padded 24-hour "21:05". */
+export function to24HourTime(timeStr: string): string {
+  const { hour, minute } = parseTimeString(timeStr);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * A "9:05 AM"-form time string exactly as it should be drawn on screen —
+ * localized AM/PM (see localizeTime) in 12-hour mode, or a bare 24-hour
+ * "21:05" once the user turns on military time. Display only, same as
+ * localizeTime: the stored value and everything parseTimeString reads never
+ * change shape.
+ */
+export function displayTime(timeStr: string, language: 'en' | 'es', timeFormat: TimeFormat = '12h'): string {
+  return timeFormat === '24h' ? to24HourTime(timeStr) : localizeTime(timeStr, language);
+}
+
+/** The hour-only axis label ("9 AM" / "21:00") shared by TimeGrid and the schedule-hours picker. */
+export function hourOnlyLabel(hour: number, language: 'en' | 'es', timeFormat: TimeFormat = '12h'): string {
+  if (timeFormat === '24h') return `${String(hour % 24).padStart(2, '0')}:00`;
+  if (hour === 0 || hour === 24) return `12 ${periodLabel('AM', language)}`;
+  if (hour === 12) return `12 ${periodLabel('PM', language)}`;
+  return hour < 12 ? `${hour} ${periodLabel('AM', language)}` : `${hour - 12} ${periodLabel('PM', language)}`;
+}
+
 /**
  * The next half-hour mark on or after `now`, in the "9:30 AM" form the event
  * modal speaks. 9:29 gives 9:30 and 9:31 gives 10:00; a time already sitting on

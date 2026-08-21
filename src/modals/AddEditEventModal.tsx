@@ -24,7 +24,7 @@ import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
 import { SheetModal } from '../components/SheetModal';
-import { addMinutesToTimeString, parseTimeString, weekdayInitial, localizeTime } from '../utils/dateUtils';
+import { addMinutesToTimeString, parseTimeString, weekdayInitial, displayTime } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { usePeople, Person } from '../hooks/usePeople';
@@ -699,7 +699,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             <View style={styles.column}>
               <Text style={styles.label}>{t('addEditEvent.startTime')}</Text>
               <TouchableOpacity style={styles.picker} onPress={() => togglePicker('start')}>
-                <Text style={styles.pickerText}>{localizeTime(startTime, settings.language)}</Text>
+                <Text style={styles.pickerText}>{displayTime(startTime, settings.language, settings.timeFormat)}</Text>
                 <Ionicons name={showStartPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
               </TouchableOpacity>
             </View>
@@ -730,7 +730,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                   )}
                 </View>
                 <TouchableOpacity style={styles.picker} onPress={() => togglePicker('end')}>
-                  <Text style={styles.pickerText}>{localizeTime(endTime, settings.language)}</Text>
+                  <Text style={styles.pickerText}>{displayTime(endTime, settings.language, settings.timeFormat)}</Text>
                   <Ionicons name={showEndPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textLight} />
                 </TouchableOpacity>
               </View>
