@@ -69,3 +69,4 @@ POST 1.0.0
 [ ] add friends and districts, be able to add events to their calendars
 [ ] add snapchat map and ping friends 
 [ ] ki for doing something with one of your friends
+[ ] add some sort of streak feature
