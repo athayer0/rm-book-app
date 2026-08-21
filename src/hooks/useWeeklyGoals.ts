@@ -165,7 +165,7 @@ export function useWeeklyGoals() {
       // updates columns present in the payload, and a restored built-in (spread
       // from DEFAULT_GOALS, which never carries the key) would otherwise omit
       // `removed` entirely and leave the server's stale `true` in place forever.
-      await enqueueUpsert('goal_definitions', def.id, { ...def, removed: def.removed ?? null, user_id: user.id });
+      await enqueueUpsert('goal_definitions', def.id, { ...def, removed: def.removed ?? false, user_id: user.id });
     }
   }, [defsState, user]);
 

@@ -138,6 +138,18 @@ const NULLABLE_COLUMNS: Record<string, string[]> = {
   event_type_definitions: ['goal_id', 'late_goal_id', 'goal_split_time'],
 };
 
+/**
+ * Columns that are `not null` server-side, with the value to substitute if a
+ * caller's row still has `null` there. Covers not just future callers but
+ * ops already sitting in the persisted sync queue from before a caller was
+ * fixed — toRow runs at send time, so this heals them too without a retry
+ * ever needing to know why the value was wrong.
+ */
+const NOT_NULL_DEFAULTS: Record<string, Record<string, unknown>> = {
+  goal_definitions: { removed: false },
+  event_type_definitions: { removed: false },
+};
+
 function invert(map: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
 }
@@ -162,6 +174,13 @@ export function toRow(
     const column = fieldMap[key] ?? key;
     if (columns && !columns.includes(column)) continue;
     row[column] = value === undefined ? null : value;
+  }
+
+  const notNullDefaults = NOT_NULL_DEFAULTS[table];
+  if (notNullDefaults) {
+    for (const [column, fallback] of Object.entries(notNullDefaults)) {
+      if (row[column] === null) row[column] = fallback;
+    }
   }
   return row;
 }

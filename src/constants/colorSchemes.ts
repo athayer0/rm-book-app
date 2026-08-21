@@ -28,33 +28,36 @@ export interface GoalColorScheme {
 /**
  * `classic` is built from the live tables rather than re-typed, so the
  * "leave it as it ships" option can never drift from what it's describing.
+ * `other` is a fixed neutral grey in every scheme (the same `#8F8F8F`
+ * Classic itself uses) rather than a shade in any family below — it's the
+ * catch-all for events that aren't really any of the named types, so it
+ * stays visually "uncategorized" no matter which look is picked.
  *
- * Amazon is three families — river-brown (church, meal, prayer), a
- * six-step canopy green (activity, contact, work, service, exercise, task),
- * and blackwater/morpho blue (temple, travel, school) — plus scripture's
- * teal and date/other's olive-haze pair as holdover accents, sitting in the
- * gaps between families rather than a fourth and fifth family of their own.
- * Sunset and Marine are each
- * even families rather than an abstract hue rule: Sunset is five families
- * of three — burnt orange (church, work, contact), gold (activity, task,
- * date), red (travel, meal, exercise), navy (temple, service, school), and
- * magenta (prayer, scripture, other); Marine is four families — beige
- * (travel, task, meal, contact), light blue (scripture, school, other,
- * date), navy blue (service, temple, work, church), and dark green (prayer,
- * activity, exercise) — each family its own lightness/saturation ladder
- * rather than a warm/cool mix. Wildflower is a muted pink/green/blue/yellow
- * garden mix.
+ * Every non-Classic scheme is still built from families — Amazon's three
+ * (river-brown, canopy green, blackwater/morpho blue, plus scripture's teal
+ * and date's olive-haze as holdover accents), Sunset's five (burnt orange,
+ * gold, red, navy, magenta), Marine's four (beige/gold, dark green, light
+ * blue, navy blue), Wildflower's four (pink, gold, green, blue) — but in
+ * every one of them the *ids* are assigned by ascending hue across the
+ * church/travel/meal/... list rather than grouped by family, the same
+ * spectrum-by-position Classic itself reads as (see the note on EventColors
+ * in colors.ts). So church no longer means "this scheme's orange/pink/blue
+ * family lead" the way it does in EventColors — it means "lowest hue this
+ * scheme has, other than the browns/pinks that sort to the very end the
+ * same way Classic's task/exercise and Sunset's magenta pair do." Each
+ * scheme's own comment below says which family a given id landed in.
  *
- * Within a scheme, colours that share a family are stepped along one ladder
- * rather than picked independently, so two greens that would otherwise land
- * close enough to blur together instead read as two clearly different
- * shades of the same family. Sunset, Marine, and Wildflower step lightness/
- * saturation only, holding each family to one constant hue; Amazon spreads
- * its families' hues evenly across their steps too (river-browns 18°-42°,
- * canopy greens 95°-145°, blackwater/morpho blues 195°-230°), so a family
- * reads as a small gradient — bark down to river-sand, forest floor up to
- * sunlit canopy, river depths up to morpho-butterfly blue — rather than one
- * hue repeated at different brightnesses.
+ * Within a scheme, colours that share a family are still stepped along one
+ * lightness/saturation ladder rather than picked independently, so two
+ * greens that would otherwise land close enough to blur together instead
+ * read as two clearly different shades of the same family — that grouping
+ * just no longer lines up with id order. Sunset, Marine, and Wildflower
+ * hold each family to one constant hue; Amazon spreads its families' hues
+ * evenly across their steps too (river-browns 18°-42°, canopy greens
+ * 95°-145°, blackwater/morpho blues 195°-230°), so a family reads as a
+ * small gradient — bark down to river-sand, forest floor up to sunlit
+ * canopy, river depths up to morpho-butterfly blue — rather than one hue
+ * repeated at different brightnesses.
  */
 export const EVENT_COLOR_SCHEMES: EventColorScheme[] = [
   {
@@ -63,131 +66,148 @@ export const EVENT_COLOR_SCHEMES: EventColorScheme[] = [
     colors: { ...EventColors },
   },
   {
-    // Four families of three or four, each its own lightness ladder rather
-    // than independently-picked shades: beige (travel darkest, task, meal,
-    // contact lightest/golden), light blue (scripture darkest, school —
-    // also the theme's primary — other, date lightest/palest, also the
-    // theme's tertiary-dark lift), navy blue (service near-black, temple —
-    // also the theme's tertiary — work, church lightest), and dark green
-    // (prayer darkest, activity, exercise lightest). The theme scheme's
-    // secondary is its own aquamarine rather than a shade from this beige
-    // family. Every colour's saturation is pushed well up from the original
-    // muted set — lightness untouched, so the ladders above (and each
-    // family's ordering along them) are unchanged, just louder.
+    // The same four families as before (beige/gold, dark green, light
+    // blue, navy blue, each its own lightness ladder) — reassigned across
+    // the 14 non-grey ids so the *list*, read in the same church/travel/
+    // meal/... order EventColors above is declared in, runs warm-to-cool
+    // like Classic's does: gold/beige lowest-hue first (church through
+    // activity), then the greens (date through work), then the blues
+    // (temple through exercise, ramping through the navy family into
+    // scripture's near-black) — a spectrum by position rather than by
+    // family membership. other, last in that order, isn't part of the
+    // spectrum at all — it's the fixed neutral grey every scheme uses; see
+    // the top-of-file note.
     id: 'marine',
     label: 'Marine',
     colors: {
-      church: '#124CAF',
-      travel: '#7E5B1B',
+      church: '#E8BF7D',
+      travel: '#A97723',
       meal: '#DBA74C',
-      activity: '#127D50',
-      date: '#9BCFF2',
-      contact: '#E8BF7D',
-      work: '#0D3C8C',
-      temple: '#082C68',
+      activity: '#7E5B1B',
+      date: '#0D643F',
+      contact: '#179660',
+      work: '#127D50',
+      temple: '#9BCFF2',
       school: '#55ABE7',
-      service: '#051C43',
-      prayer: '#0D643F',
-      scripture: '#6680CC',
-      task: '#A97723',
-      exercise: '#179660',
-      other: '#73B6E7',
+      service: '#73B6E7',
+      prayer: '#082C68',
+      scripture: '#051C43',
+      task: '#0D3C8C',
+      exercise: '#124CAF',
+      other: '#8F8F8F',
     },
   },
   {
-    // Five families of three, each its own lightness ladder rather than
-    // independently-picked shades: burnt orange (church the primary shade,
-    // work darker, contact lighter), gold (activity the secondary shade,
-    // task darker/mustard, date lighter/pale), red (travel darkest, meal
-    // mid, exercise brightest), navy (service near-black, temple mid —
-    // also the theme's tertiary — school lightest), and magenta (other
-    // darkest/plum, scripture mid, prayer brightest). church/activity/
-    // temple double as the theme scheme's primary/secondary/tertiary below,
-    // so the two pages read as one identity rather than two color choices
-    // that happen to share a name.
+    // The same muted garden mix as before — gold, green, blue, pink — with
+    // the 14 non-grey ids reassigned in ascending-hue order: gold leads
+    // (church, travel, meal), green next (activity through work), blue
+    // after that (temple through prayer), and the pinks land last
+    // (scripture, task, exercise) — the same tail spot the magenta family
+    // sits in for Sunset and Marine, since pink is the highest-hue family
+    // this scheme has.
+    id: 'wildflower',
+    label: 'Wildflower',
+    colors: {
+      church: '#B79A4E',
+      travel: '#ECD488',
+      meal: '#E0C468',
+      activity: '#92C49E',
+      date: '#7FB88F',
+      contact: '#5FA37E',
+      work: '#4F7A63',
+      temple: '#93B8E0',
+      school: '#5E7FA8',
+      service: '#3F5C82',
+      prayer: '#6B93C2',
+      scripture: '#B8688A',
+      task: '#D98CA3',
+      exercise: '#C97C91',
+      other: '#8F8F8F',
+    },
+  },
+  {
+    // A sixth family now: activity's dark rust (`#783A17`, the brownest of
+    // the burnt-orange trio) was recoloured into a fresh indigo/purple
+    // (`#5B2A8C`, hue 270°) rather than reused from elsewhere, sitting
+    // right in the ~55° gap between the navy family (~216°) and the
+    // magenta family (~325°) — a bridge colour, not a member of either.
+    // Reassigned across the 14 non-grey ids in ascending-hue order same as
+    // before: church/travel/meal still hold the reds (unaffected, all
+    // lower-hue than the swap), activity/date/contact the burnt oranges,
+    // work/temple/school the golds, school/service/prayer the navy trio,
+    // scripture the new indigo (its hue places it right after navy, exactly
+    // the bridge it was designed to be), and task/exercise the magentas,
+    // unchanged at the tail.
     id: 'sunset',
     label: 'Sunset',
     colors: {
-      church: '#B8571E',
-      travel: '#6E1A12',
-      meal: '#A5281D',
-      activity: '#E3AE1C',
-      date: '#EDC55A',
-      contact: '#DD7A40',
-      work: '#783A17',
-      temple: '#263D5E',
-      school: '#3F5E8D',
+      church: '#A5281D',
+      travel: '#D83F31',
+      meal: '#6E1A12',
+      activity: '#DD7A40',
+      date: '#B8571E',
+      contact: '#EDC55A',
+      work: '#E3AE1C',
+      temple: '#A07C18',
+      school: '#263D5E',
       service: '#121E30',
-      prayer: '#D04395',
-      scripture: '#A92371',
-      task: '#A07C18',
-      exercise: '#D83F31',
-      other: '#6D1749',
+      prayer: '#3F5E8D',
+      scripture: '#5B2A8C',
+      task: '#A92371',
+      exercise: '#D04395',
+      other: '#8F8F8F',
     },
   },
   {
-    // travel and task are a blue and a green rather than two of five
-    // browns, each a shade the scheme didn't already have, which leaves
-    // three families instead of one flat brown/green split: river-brown
-    // (church, meal, prayer), a six-step canopy-green ladder (service's
-    // near-black forest floor up through contact's dappled light green,
-    // task slotted in at the lighter end), and blackwater/morpho blue
-    // (temple, travel, school). Every family's hue is spread evenly across
-    // its own steps rather than held constant — browns 18°-42°, greens
-    // 95°-145°, blues 195°-230°, each ~12-15° apart — so hue does as much
-    // of the telling-apart as lightness does, and the three families
-    // themselves land roughly a third of the wheel apart (brown/green/
-    // blue). scripture and date/other used to be a stark orchid purple and
-    // two flat, barely-saturated greys sitting outside all three families —
-    // scripture now sits in the ~50° gap between the green and blue
-    // families instead (a teal accent, still clearly its own hue), and
-    // date/other now sit in the ~50° gap between brown and green (a light
-    // and a medium olive-haze pair) rather than the near-brown, washed-out
-    // grey they used to read as.
+    // River-brown is four now rather than three — one of the six canopy
+    // greens (the old date, `#7CB86A`) was recoloured into a fresh brown
+    // (`#A87532`, hue 34°) rather than reused from elsewhere, filling the
+    // gap between travel's 29° and meal's 40° so all four still read as one
+    // evenly-stepped ladder rather than three plus an outlier — leaving a
+    // five-step canopy green. Reassigned across the 14 non-grey ids in
+    // ascending-hue order same as before: church/travel/meal/activity now
+    // hold the four river-browns, date the olive-haze accent (bumped down a
+    // slot by the new brown), contact through service the five-step green
+    // family, prayer the teal accent, and scripture/task/exercise the
+    // blackwater/morpho blues.
     id: 'amazon',
     label: 'Amazon',
     colors: {
       church: '#5C3319',
-      travel: '#2F6E85',
-      meal: '#8F5A28',
-      activity: '#4F9A3C',
+      travel: '#8F5A28',
+      meal: '#A87532',
+      activity: '#C99A3E',
       date: '#CCCFAA',
-      contact: '#A8D89C',
-      work: '#2C5B1E',
-      temple: '#1D4A54',
-      school: '#3B5FC4',
-      service: '#1E3B17',
-      prayer: '#C99A3E',
-      scripture: '#479E90',
-      task: '#7CB86A',
-      exercise: '#357E28',
-      other: '#858958',
-    },
-  },
-  {
-    id: 'wildflower',
-    label: 'Wildflower',
-    colors: {
-      church: '#D98CA3',
-      travel: '#5E7FA8',
-      meal: '#E0C468',
-      activity: '#7FB88F',
-      date: '#ECD488',
-      contact: '#92C49E',
-      work: '#4F7A63',
-      temple: '#6B93C2',
-      school: '#93B8E0',
-      service: '#3F5C82',
-      prayer: '#C97C91',
-      scripture: '#B8688A',
-      task: '#B79A4E',
-      exercise: '#5FA37E',
-      other: '#C4A8B4',
+      contact: '#2C5B1E',
+      work: '#4F9A3C',
+      temple: '#A8D89C',
+      school: '#1E3B17',
+      service: '#357E28',
+      prayer: '#479E90',
+      scripture: '#1D4A54',
+      task: '#2F6E85',
+      exercise: '#3B5FC4',
+      other: '#8F8F8F',
     },
   },
 ];
 
-/** Same five moods as EVENT_COLOR_SCHEMES, tuned separately for the eight goal ids. */
+/**
+ * Same five moods as EVENT_COLOR_SCHEMES, tuned separately for the eight
+ * goal ids. Classic is trivially itself; every other scheme's set of eight
+ * colours is assigned to ids by matching each colour to whichever goal's
+ * Classic colour it's the closest overall match for (hue, saturation, and
+ * lightness together, in Lab space — not hue alone, so a light muted colour
+ * doesn't get matched to a dark vivid one just because they share a hue
+ * family) — a single global best-fit assignment across all eight, so two
+ * colours can't both claim the same closest goal. The colours themselves
+ * are unchanged from each scheme's own tuning; only which id holds which
+ * one moved. Because it's an optimum over the whole set rather than eight
+ * independent nearest-matches, a given pair isn't always what you'd guess
+ * from that pair alone — a colour can lose its individually-closest goal to
+ * whichever other colour is a better fit there, if that leaves the
+ * remaining colours better off overall.
+ */
 export const GOAL_COLOR_SCHEMES: GoalColorScheme[] = [
   {
     id: 'classic',
@@ -195,99 +215,85 @@ export const GOAL_COLOR_SCHEMES: GoalColorScheme[] = [
     colors: Object.fromEntries(DEFAULT_GOALS.map(g => [g.id, g.color])),
   },
   {
-    // Same four families as the event scheme (light blue, navy blue, dark
-    // green, beige), but tuned fresh rather than lifted straight from
-    // EVENT_COLOR_SCHEMES: goal cards are a bigger, flatter swatch than an
-    // event dot, so the muted/near-black event shades read as dull here.
-    // Saturation is pushed up across the board — further still than the
-    // original tuning, same as the event scheme's own bump — and the
-    // light-blue/navy trios are spread further apart in lightness (16/26/42
-    // for navy, 52/60/72 for light blue) so the three-of-a-family goals
-    // stay obviously distinct instead of three near-identical blues.
     id: 'marine',
     label: 'Marine',
     colors: {
-      morning_prayer: '#80C2EF',
-      nightly_prayer: '#0A2147',
-      times_exercised: '#17A067',
-      personal_study: '#2195E9',
-      total_dates: '#1E56B9',
-      service_hours: '#143570',
-      church_hours: '#A07222',
-      temple_attendance: '#48A6EA',
+      morning_prayer: '#B8961C',
+      nightly_prayer: '#1E4A94',
+      times_exercised: '#735420',
+      personal_study: '#3288C7',
+      total_dates: '#1C8C5D',
+      service_hours: '#0F2D61',
+      church_hours: '#28B87B',
+      // Swapped in from THEME_COLOR_SCHEMES.marine's primary.
+      temple_attendance: '#399BE0',
     },
   },
   {
-    // Same five families as the event scheme (gold, navy, red, burnt
-    // orange, magenta), tuned fresh rather than lifted straight from
-    // EVENT_COLOR_SCHEMES — see the note on Marine above for why. The three
-    // navy goals (nightly_prayer/service_hours/temple_attendance) spread
-    // from near-black up to a genuinely bright periwinkle instead of three
-    // shades that all read as "dark blue."
+    id: 'wildflower',
+    label: 'Wildflower',
+    colors: {
+      morning_prayer: '#E0C65C',
+      nightly_prayer: '#4B84D2',
+      // Midpoint (average RGB) between the dark yellow this used to be
+      // (`#736017`) and morning_prayer's gold (`#E0C65C`) — a lighter,
+      // slightly less saturated yellow than either.
+      times_exercised: '#AA933A',
+      personal_study: '#83ABE2',
+      total_dates: '#D6517E',
+      service_hours: '#20793E',
+      church_hours: '#9E2E53',
+      temple_attendance: '#2E9E53',
+    },
+  },
+  {
     id: 'sunset',
     label: 'Sunset',
     colors: {
       morning_prayer: '#EFBE39',
-      nightly_prayer: '#193257',
+      nightly_prayer: '#2D4E80',
       times_exercised: '#D15D1A',
-      personal_study: '#D02589',
+      personal_study: '#5B2A8C',
       total_dates: '#E62B19',
-      service_hours: '#2D4E80',
+      service_hours: '#193257',
       church_hours: '#952318',
       temple_attendance: '#557FBE',
     },
   },
   {
-    // Same families as the event scheme (nightly_prayer/total_dates/
-    // church_hours river-brown, times_exercised/service_hours canopy
-    // green, temple_attendance blackwater blue), tuned fresh rather than
-    // lifted straight from EVENT_COLOR_SCHEMES — see the note on Marine
-    // above for why, but with each hue pulled back onto the event scheme's
-    // own family ladder rather than picked independently: the brown trio
-    // already landed on church/meal/prayer's own hues (23°/29°/40°) so it's
-    // untouched, but times_exercised and temple_attendance had drifted off
-    // exercise's and temple's hues and are pulled back in line with them
-    // here. morning_prayer keeps the family EVENT_COLOR_SCHEMES gives it (a
-    // warm neutral rather than a brown — canopy mist rather than bark) but
-    // with enough saturation to read as a colour instead of a grey.
-    // personal_study used to be a stark orchid purple sitting outside every
-    // family; it's a teal now, on the same hue as the event scheme's
-    // scripture (in the green/blue gap), pushed more saturated the way
-    // every other goal here is — goal cards are a bigger, flatter swatch
-    // than an event dot, so the same restraint reads as dull rather than
-    // gentle here.
+    // These eight colours started as a direct lift out of
+    // EVENT_COLOR_SCHEMES.amazon — two blues (scripture, exercise), two
+    // light greens (temple, work), two dark greens (school, contact), and
+    // two browns (church, travel), skipping the family's middle members
+    // (task's blue, service's green, meal/activity's gold-leaning browns)
+    // and the teal/olive-haze accents and grey `other` entirely, since none
+    // of those are clearly one of the four requested groups — but every hue
+    // has since been pushed roughly +12% saturation/+15% value from that
+    // baseline (capped at 92% value), since the direct lift read flat and
+    // muddy at goal-card size the same way every other scheme's event
+    // colours would if used unmodified (see the top-of-file note on why
+    // goal cards get their own tuning). Assigned to ids by the same
+    // global-optimal, full-color-distance match to Classic's own colours
+    // used for the other schemes (run against the original un-brightened
+    // values, before this bump) — so a couple of pairs (times_exercised
+    // landing on a green instead of one of the two browns, in particular)
+    // aren't the single closest match for that one goal alone, only the
+    // best fit once every other goal's match is accounted for too.
     id: 'amazon',
     label: 'Amazon',
     colors: {
-      morning_prayer: '#B8A576',
-      nightly_prayer: '#D4A62E',
-      times_exercised: '#41A82F',
-      personal_study: '#42BDA8',
-      total_dates: '#D0812A',
-      service_hours: '#3A8C24',
-      church_hours: '#8F4A1E',
-      temple_attendance: '#2488A4',
-    },
-  },
-  {
-    // Same pink/green/blue/yellow garden mix as the event scheme, but with
-    // saturation pushed well past the event scheme's muted-garden pastels —
-    // goal cards are a bigger, flatter swatch than an event dot, so the
-    // same restraint reads as dull rather than gentle here. The three blue
-    // goals (nightly_prayer/personal_study/temple_attendance) spread from a
-    // deep dusk blue up to a bright sky blue instead of three shades that
-    // all read as "medium blue."
-    id: 'wildflower',
-    label: 'Wildflower',
-    colors: {
-      morning_prayer: '#E0C65C',
-      nightly_prayer: '#274F86',
-      times_exercised: '#2E9E53',
-      personal_study: '#4B84D2',
-      total_dates: '#D6517E',
-      service_hours: '#20793E',
-      church_hours: '#9E2E53',
-      temple_attendance: '#83ABE2',
+      // Nudged a couple degrees off Sunset's own morning_prayer/
+      // nightly_prayer (`#EFBE39`/`#2D4E80`) rather than copied exactly, so
+      // the two schemes' prayer pair read as the same colour at a glance
+      // without one scheme literally duplicating the other's hex values.
+      morning_prayer: '#E8C03C',
+      nightly_prayer: '#2D4A7A',
+      times_exercised: '#33811B',
+      personal_study: '#28611A',
+      total_dates: '#B5671D',
+      service_hours: '#1C697A',
+      church_hours: '#823F14',
+      temple_attendance: '#479E90',
     },
   },
 ];
@@ -311,3 +317,21 @@ export function matchGoalColorScheme(resolved: Record<string, string>): string |
   );
   return match?.id ?? null;
 }
+
+/**
+ * The five dots every scheme's chip shows on the Event Types and Goals
+ * onboarding pages — hand-picked from EVENT_COLOR_SCHEMES rather than
+ * computed (the old approach picked whichever colours landed closest to
+ * five target hues, which could land on an odd or unrepresentative pick),
+ * and shared by both chip renderers so "Marine" shows the same five dots on
+ * both pages instead of two different algorithmic samples of two different
+ * colour sets. Picked to read as that scheme's identity at a glance: the
+ * families it's built from, not an evenly-spaced rainbow sample.
+ */
+export const SCHEME_PREVIEW_DOTS: Record<string, string[]> = {
+  classic: ['#E05C6B', '#E8980E', '#1E8449', '#2979FF', '#9B59B6'],
+  marine: ['#A97723', '#179660', '#55ABE7', '#124CAF', '#082C68'],
+  sunset: ['#D83F31', '#DD7A40', '#3F5E8D', '#5B2A8C', '#D04395'],
+  amazon: ['#5C3319', '#4F9A3C', '#A8D89C', '#479E90', '#3B5FC4'],
+  wildflower: ['#E0C468', '#5FA37E', '#93B8E0', '#B8688A', '#D98CA3'],
+};

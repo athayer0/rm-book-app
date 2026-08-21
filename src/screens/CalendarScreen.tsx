@@ -405,8 +405,9 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
         style={[styles.ghostOverlay, { left: ghostX - ghostWidth * 0.25, top: topPx, width: ghostWidth }]}
         pointerEvents="none"
       >
-        <View style={[styles.ghostBlock, { backgroundColor: Colors.card, borderLeftColor: color, height }]}>
+        <View style={[styles.ghostBlock, { backgroundColor: Colors.card, height }]}>
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: color + '55' }]} />
+          <View style={[styles.ghostAccentBar, { backgroundColor: color }]} />
           <Text style={[styles.ghostTitle, { color: Colors.text, fontSize: eventFontSize }]} numberOfLines={1}>{title}</Text>
         </View>
       </View>
@@ -776,11 +777,19 @@ function makeStyles(C: ColorPalette) {
     // instead of on the grid, so only whichever block ends up bottom-most looks
     // lifted. Flat reads as one moving selection rather than an uneven stack.
     ghostBlock: {
-      borderLeftWidth: 3,
       borderRadius: 4,
-      paddingHorizontal: 8,
+      paddingLeft: 11,
+      paddingRight: 8,
       paddingVertical: 4,
       justifyContent: 'flex-start',
+      overflow: 'hidden',
+    },
+    ghostAccentBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 3,
     },
     ghostTitle: {
       fontSize: 13,

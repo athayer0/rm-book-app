@@ -14,7 +14,9 @@ import { LightColors, DarkColors, type ColorPalette } from '../constants/colors'
 import { DEFAULT_EVENT_TYPES } from '../constants/eventTypeDefaults';
 import { DEFAULT_GOALS } from '../constants/defaultGoals';
 import {
-  EVENT_COLOR_SCHEMES, GOAL_COLOR_SCHEMES,
+  EVENT_COLOR_SCHEMES, GOAL_COLOR_SCHEMES, SCHEME_PREVIEW_DOTS,
+  matchEventColorScheme, matchGoalColorScheme,
+  type EventColorScheme, type GoalColorScheme,
 } from '../constants/colorSchemes';
 import { THEME_COLOR_ROWS, type ThemeColorSettingKey } from '../constants/themeColorRows';
 import {
@@ -49,11 +51,13 @@ interface Props {
 }
 
 // Welcome, then Colors (primary/secondary/tertiary plus the three status
-// colours — every event type and goal drawn afterward reads its dot/icon
-// tint off whatever's picked here), then Event Types (which both the goal
-// list and the starter schedule below it read from), then two pages for
-// Home — a preview of a goal card and its graph, then the goal picker —
-// then Calendar, then two pages for People — a preview of a person card
+// colours — picking one here also seeds a matching default for the Event
+// Types and Goals pages' own colour pickers below, though each can still be
+// overridden independently once you get there), then Event Types (its own
+// scheme picker, which both the goal list and the starter schedule below it
+// read from), then two pages for Home — a preview of a goal card and its
+// graph, then the goal picker with its own scheme picker too — then
+// Calendar, then two pages for People — a preview of a person card
 // (a recent convert) and their covenant path, then importing from contacts —
 // then Settings, then a closing page. Pages are written inline below rather
 // than data-driven, since several of them hold interactive state a generic
@@ -65,6 +69,12 @@ interface Props {
 // makes Skip a shortcut to the end rather than a cancel: whatever was already
 // chosen on earlier pages still takes effect.
 const TOTAL_PAGES = 10;
+// Indices into the page order above — named rather than left as magic
+// numbers at their one call site (the auto-scroll-into-view effect below),
+// since that's the one place page order actually has to be known by number
+// instead of just written inline.
+const GOALS_PAGE_INDEX = 3;
+const EVENT_TYPES_PAGE_INDEX = 5;
 
 // Shared between the Theme grid's width math below and styles.page/
 // schemeGridRow — kept as named constants rather than two copies of the
@@ -228,19 +238,36 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     [isDark, draftThemeColors],
   );
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
-  // Which chip is highlighted in each of the two scheme pickers — derived
-  // from draftThemeColors on open/replay (see the reset effect) and updated
-  // locally on tap so the chip and the preview swatches change together.
-  // Status colors and goal colors aren't pickers of their own — picking a
-  // theme scheme carries its same-id status scheme along (selectThemeScheme
-  // below), and its same-id event scheme and goal scheme along
-  // (draftEventColor/draftGoalColor/commitAndComplete below) — so there's
-  // exactly one choice for a person to make instead of three that could
-  // disagree. null means "leave built-in colors as they already are" —
-  // only set once the user actually taps a chip, so replaying onboarding
-  // never clobbers colors someone already customized just because a page
-  // was scrolled past.
+  // Which chip is highlighted in each of the three scheme pickers — derived
+  // from draftThemeColors/live definitions on open/replay (see the reset
+  // effect) and updated locally on tap so the chip and the preview swatches
+  // change together. null means "leave built-in colors as they already
+  // are" — only set once the user actually taps a chip (or a Colors chip
+  // seeds a default, see selectThemeScheme), so replaying onboarding never
+  // clobbers colors someone already customized just because a page was
+  // scrolled past.
+  //
+  // Status colors aren't a picker of their own — picking a theme scheme
+  // carries its same-id status scheme along (selectThemeScheme below), since
+  // there's no page here to preview them against and no reason to let those
+  // three disagree with the app's tint. Event and goal colors are different:
+  // each has its own page with a real list of rows to preview against, so
+  // each gets its own independent picker (eventColorSchemeId/
+  // goalColorSchemeId below) — selectThemeScheme seeds both with its own id
+  // as a starting default, but tapping a chip on the Event Types or Goals
+  // page overrides only that one.
   const [themeSchemeId, setThemeSchemeId] = useState<string | null>(null);
+  const [eventColorSchemeId, setEventColorSchemeId] = useState<string | null>(null);
+  const [goalColorSchemeId, setGoalColorSchemeId] = useState<string | null>(null);
+  // The Event Types/Goals scheme rows scroll (unlike the Colors page's fixed
+  // grid), so the active chip can land off-screen — picked on Colors, or on
+  // replay of an account whose scheme is the scheme list's last entry. These
+  // refs plus each chip's measured x (schemeChipLayouts effect below) are
+  // what bring it back into view on arrival.
+  const eventSchemeRowRef = useRef<ScrollView>(null);
+  const goalSchemeRowRef = useRef<ScrollView>(null);
+  const [eventChipX, setEventChipX] = useState<Record<string, number>>({});
+  const [goalChipX, setGoalChipX] = useState<Record<string, number>>({});
   const [wantsSchedule, setWantsSchedule] = useState(true);
   const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('student');
   const [draftDailyReview, setDraftDailyReview] = useState(false);
@@ -280,6 +307,20 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
       setDraftThemeColors(themeColorDraft);
       setThemeSchemeId(matchThemeColorScheme(themeColorDraft));
 
+      // Seeded independently from live data rather than from themeSchemeId
+      // above — a replay should show whichever event/goal scheme is
+      // actually active, even if it no longer matches the current theme
+      // (e.g. the theme was changed from Settings without touching colors).
+      const resolvedEventColors = Object.fromEntries(
+        DEFAULT_EVENT_TYPES.map(d => [d.id, eventTypeColor(d.id, settings.eventTypeColors)]),
+      );
+      setEventColorSchemeId(matchEventColorScheme(resolvedEventColors));
+
+      const resolvedGoalColors = Object.fromEntries(
+        DEFAULT_GOALS.map(d => [d.id, definitions.find(x => x.id === d.id)?.color ?? d.color]),
+      );
+      setGoalColorSchemeId(matchGoalColorScheme(resolvedGoalColors));
+
       setWantsSchedule(true);
       setScheduleKind('student');
 
@@ -293,6 +334,26 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
       setExampleCompletedMilestones(new Set(EXAMPLE_MILESTONES_DEFAULT_COMPLETE));
     }
   }, [visible]);
+
+  // Brings the active scheme chip into view whenever its page is the one on
+  // screen — landing on Event Types/Goals with the scheme picked on Colors
+  // (or matched from a replay) sitting off the end of the row otherwise, the
+  // same way it would if the active chip changed while already on the page.
+  // Waits on the chip's measured x rather than an index-times-width guess,
+  // since chips size to their label/dots rather than a fixed width.
+  useEffect(() => {
+    if (page !== EVENT_TYPES_PAGE_INDEX || !eventColorSchemeId) return;
+    const x = eventChipX[eventColorSchemeId];
+    if (x === undefined) return;
+    eventSchemeRowRef.current?.scrollTo({ x: Math.max(0, x - SCHEME_GRID_GAP), animated: true });
+  }, [page, eventColorSchemeId, eventChipX]);
+
+  useEffect(() => {
+    if (page !== GOALS_PAGE_INDEX || !goalColorSchemeId) return;
+    const x = goalChipX[goalColorSchemeId];
+    if (x === undefined) return;
+    goalSchemeRowRef.current?.scrollTo({ x: Math.max(0, x - SCHEME_GRID_GAP), animated: true });
+  }, [page, goalColorSchemeId, goalChipX]);
 
   if (!visible) return null;
 
@@ -313,8 +374,14 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   // Carries the same-id status scheme along with the theme scheme, so
   // completed/failed/pending always match whichever look was just picked
   // instead of being a separate choice — see the note on themeSchemeId above.
+  // Also seeds eventColorSchemeId/goalColorSchemeId to the same id, since
+  // Colors is the first of the three pickers a person reaches — that's only
+  // a default, not a lock: selectEventScheme/selectGoalScheme below can
+  // still override either one independently once its own page is reached.
   function selectThemeScheme(scheme: ThemeColorScheme) {
     setThemeSchemeId(scheme.id);
+    setEventColorSchemeId(scheme.id);
+    setGoalColorSchemeId(scheme.id);
     const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.id);
     setDraftThemeColors(prev => ({
       ...prev,
@@ -332,6 +399,17 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
         statusPendingColorDark: statusScheme.statusPendingColorDark,
       } : {}),
     }));
+  }
+
+  // The Event Types and Goals pages' own pickers — independent of each
+  // other and of themeSchemeId once tapped, see the note on themeSchemeId
+  // above.
+  function selectEventScheme(scheme: EventColorScheme) {
+    setEventColorSchemeId(scheme.id);
+  }
+
+  function selectGoalScheme(scheme: GoalColorScheme) {
+    setGoalColorSchemeId(scheme.id);
   }
 
   // The Theme picker on the Colors page: a static 3-then-2 grid rather than
@@ -363,12 +441,71 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     );
   }
 
+  // The Event Types and Goals pages' pickers: a horizontal scroll rather
+  // than the Colors page's fixed grid, since there's no reason to reserve a
+  // full page height for them here — they sit above each page's existing
+  // row list instead. Both chip renderers read the same hand-picked
+  // SCHEME_PREVIEW_DOTS (sourced only from EVENT_COLOR_SCHEMES, never the
+  // goal colours) rather than computing dots from whichever colour map the
+  // page is otherwise about, so "Marine" looks like the same five dots
+  // whether you're looking at it here or on the Goals page below.
+  function renderEventSchemeChip(scheme: EventColorScheme) {
+    const active = eventColorSchemeId === scheme.id;
+    const dots = SCHEME_PREVIEW_DOTS[scheme.id] ?? [];
+    return (
+      <TouchableOpacity
+        key={scheme.id}
+        style={[styles.schemeChip, active && styles.schemeChipActive]}
+        onPress={() => selectEventScheme(scheme)}
+        onLayout={e => {
+          const x = e.nativeEvent.layout.x;
+          setEventChipX(prev => (prev[scheme.id] === x ? prev : { ...prev, [scheme.id]: x }));
+        }}
+      >
+        <View style={styles.schemeDots}>
+          {dots.map((c, i) => (
+            <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
+          ))}
+        </View>
+        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  function renderGoalSchemeChip(scheme: GoalColorScheme) {
+    const active = goalColorSchemeId === scheme.id;
+    // Same SCHEME_PREVIEW_DOTS as renderEventSchemeChip above, keyed off
+    // this goal scheme's id — deliberately not derived from `scheme.colors`
+    // (the goal palette), so this chip's dots match the event chip's
+    // exactly rather than sampling a different eight-colour set.
+    const dots = SCHEME_PREVIEW_DOTS[scheme.id] ?? [];
+    return (
+      <TouchableOpacity
+        key={scheme.id}
+        style={[styles.schemeChip, active && styles.schemeChipActive]}
+        onPress={() => selectGoalScheme(scheme)}
+        onLayout={e => {
+          const x = e.nativeEvent.layout.x;
+          setGoalChipX(prev => (prev[scheme.id] === x ? prev : { ...prev, [scheme.id]: x }));
+        }}
+      >
+        <View style={styles.schemeDots}>
+          {dots.map((c, i) => (
+            <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
+          ))}
+        </View>
+        <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{scheme.label}</Text>
+      </TouchableOpacity>
+    );
+  }
+
   // The Home preview page's graph, drawn with the same visual grammar as
   // GoalGraph (dashed y-axis gridlines with value labels, translucent goal
   // bars, coloured line+dots) but over EXAMPLE_COUNTS rather than a live
   // PeriodDataReader — see the note on those constants above. `color` follows
-  // draftGoalColor so the preview repaints with whatever scheme was just
-  // picked on the Colors page.
+  // draftGoalColor so the preview repaints with whatever scheme is picked on
+  // the Goals page (or, before that page is reached, whatever Colors seeded
+  // as its default).
   function renderExampleGraph(color: string) {
     const svgW = exampleChartWidth;
     const svgH = EXAMPLE_TOP_PAD + EXAMPLE_CHART_H + EXAMPLE_BOTTOM_PAD;
@@ -479,17 +616,14 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
   // Previews the chosen scheme in the lists below each picker without
   // touching settings/definitions until commitAndComplete — same draft
-  // pattern as every other choice on this screen. Linked to themeSchemeId
-  // rather than a picker of its own — see the note on themeSchemeId above.
+  // pattern as every other choice on this screen.
   function draftEventColor(id: string): string {
-    const scheme = EVENT_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
+    const scheme = EVENT_COLOR_SCHEMES.find(s => s.id === eventColorSchemeId);
     return scheme?.colors[id] ?? eventTypeColor(id, settings.eventTypeColors);
   }
 
-  // Linked to themeSchemeId rather than a picker of its own — see the note
-  // on themeSchemeId above.
   function draftGoalColor(id: string, fallback: string): string {
-    const scheme = GOAL_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
+    const scheme = GOAL_COLOR_SCHEMES.find(s => s.id === goalColorSchemeId);
     return scheme?.colors[id] ?? fallback;
   }
 
@@ -517,7 +651,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     onDismiss();
 
     try {
-      const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
+      const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === eventColorSchemeId);
       // Merged locally rather than read back from settings after the write
       // below: updateSettings won't have re-rendered this closure yet, and
       // the starter schedule needs the chosen colors immediately, not after
@@ -526,7 +660,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
         ? { ...settings.eventTypeColors, ...eventScheme.colors }
         : settings.eventTypeColors;
 
-      const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === themeSchemeId);
+      const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === goalColorSchemeId);
 
       // Written first and awaited before anything else below: this is what
       // the header, tab bar, and Home's own useColors() read the instant
@@ -649,6 +783,15 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
               Select the goals you would like to track. Add, edit, or remove goals anytime from
               Home → Edit Goals.
             </Text>
+            <ScrollView
+              ref={goalSchemeRowRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.schemeRow}
+              contentContainerStyle={styles.schemeRowContent}
+            >
+              {GOAL_COLOR_SCHEMES.map(renderGoalSchemeChip)}
+            </ScrollView>
             <View style={styles.card}>
               {DEFAULT_GOALS.map((def, i, arr) => {
                 const color = draftGoalColor(def.id, def.color);
@@ -721,6 +864,15 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
             <Text style={styles.body}>
               Select the types of events that you would like to use on the Calendar page.
             </Text>
+            <ScrollView
+              ref={eventSchemeRowRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.schemeRow}
+              contentContainerStyle={styles.schemeRowContent}
+            >
+              {EVENT_COLOR_SCHEMES.map(renderEventSchemeChip)}
+            </ScrollView>
             <View style={styles.card}>
               {DEFAULT_EVENT_TYPES.map((def, i, arr) => {
                 const color = draftEventColor(def.id);
@@ -1139,6 +1291,11 @@ function makeStyles(C: ColorPalette) {
     schemeGrid: { width: '100%', marginTop: 24, gap: SCHEME_GRID_GAP },
     schemeGridRow: { flexDirection: 'row', gap: SCHEME_GRID_GAP },
     schemeGridRowCenter: { justifyContent: 'center' },
+    // The Event Types/Goals pickers, by contrast, do scroll — they sit above
+    // a page that already has its own card below, so there's no room to
+    // spare for a wrapped grid the way the Colors page has.
+    schemeRow: { width: '100%', flexGrow: 0, marginTop: 24 },
+    schemeRowContent: { gap: 10, paddingHorizontal: 2 },
     toggleRow: {
       flexDirection: 'row',
       alignItems: 'center',

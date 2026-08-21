@@ -39,29 +39,42 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
   },
   {
-    // Light blue primary, aquamarine secondary, navy blue tertiary. Tertiary
-    // lifts to date's palest light blue in dark mode, the way Classic's navy
-    // lifts to a pale blue; secondary lifts the same way, a deeper
-    // aquamarine in light mode reading as pale aquamarine once the
-    // background goes dark.
+    // Light blue primary (swapped in from GOAL_COLOR_SCHEMES.marine's
+    // temple_attendance), aquamarine secondary, navy blue tertiary. Tertiary
+    // lifts to a pale light blue in dark mode, the way Classic's navy lifts
+    // to a pale blue; secondary lifts the same way, a deeper aquamarine in
+    // light mode reading as pale aquamarine once the background goes dark.
     id: 'marine',
     label: 'Marine',
-    themeColor: '#399BE0',
+    themeColor: '#2F729E',
     secondaryColorLight: '#1FA98C',
     secondaryColorDark: '#4DDBB5',
     tertiaryColorLight: '#1C3154',
     tertiaryColorDark: '#AFCBDE',
   },
   {
-    // Burnt orange primary, gold secondary, navy tertiary — the same three
-    // colours as the event scheme's church/activity/temple, lifting to
-    // school's lighter navy in dark mode, the way Classic's navy lifts to a
-    // pale blue.
+    // Pink/green/blue, the same muted-garden mix as the Wildflower scheme.
+    id: 'wildflower',
+    label: 'Wildflower',
+    themeColor: '#B8688A',
+    secondaryColorLight: '#7FB88F',
+    secondaryColorDark: '#7FB88F',
+    tertiaryColorLight: '#3F5C82',
+    tertiaryColorDark: '#93B8E0',
+  },
+  {
+    // Burnt orange primary, magenta secondary, navy tertiary — primary and
+    // tertiary still the burnt-orange/navy families the event scheme's
+    // Sunset uses (colorSchemes.ts), though not tied to any specific id
+    // there since that scheme's ids are ordered by hue rather than fixed to
+    // a family; secondary is the event scheme's own exercise colour, its
+    // magenta family. Lifts to a lighter navy in dark mode, the way
+    // Classic's navy lifts to a pale blue.
     id: 'sunset',
     label: 'Sunset',
     themeColor: '#B8571E',
-    secondaryColorLight: '#E3AE1C',
-    secondaryColorDark: '#E3AE1C',
+    secondaryColorLight: '#D04395',
+    secondaryColorDark: '#D04395',
     tertiaryColorLight: '#263D5E',
     tertiaryColorDark: '#3F5E8D',
   },
@@ -82,16 +95,6 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     secondaryColorDark: '#D4A62E',
     tertiaryColorLight: '#3C7A3F',
     tertiaryColorDark: '#5FAE63',
-  },
-  {
-    // Pink/green/blue, the same muted-garden mix as the Wildflower scheme.
-    id: 'wildflower',
-    label: 'Wildflower',
-    themeColor: '#B8688A',
-    secondaryColorLight: '#7FB88F',
-    secondaryColorDark: '#7FB88F',
-    tertiaryColorLight: '#3F5C82',
-    tertiaryColorDark: '#93B8E0',
   },
 ];
 
@@ -147,6 +150,18 @@ export const STATUS_COLOR_SCHEMES: StatusColorScheme[] = [
     statusPendingColorDark: '#FAC032',
   },
   {
+    // Classic's green nudged toward a muted sage, red nudged a shade
+    // warmer/pinker, amber nudged toward a softer gold.
+    id: 'wildflower',
+    label: 'Wildflower',
+    statusCompletedColorLight: '#267D3A',
+    statusCompletedColorDark: '#54AF67',
+    statusFailedColorLight: '#B03F5A',
+    statusFailedColorDark: '#DD7F95',
+    statusPendingColorLight: '#E4B021',
+    statusPendingColorDark: '#ECC554',
+  },
+  {
     // Classic's green nudged toward olive/yellow-green so it still sits
     // beside the horizon's fiery reds and golds, red nudged a touch more
     // orange, amber nudged a touch richer/deeper gold.
@@ -169,18 +184,6 @@ export const STATUS_COLOR_SCHEMES: StatusColorScheme[] = [
     statusFailedColorDark: '#E77766',
     statusPendingColorLight: '#E9A508',
     statusPendingColorDark: '#FAC032',
-  },
-  {
-    // Classic's green nudged toward a muted sage, red nudged a shade
-    // warmer/pinker, amber nudged toward a softer gold.
-    id: 'wildflower',
-    label: 'Wildflower',
-    statusCompletedColorLight: '#267D3A',
-    statusCompletedColorDark: '#54AF67',
-    statusFailedColorLight: '#B03F5A',
-    statusFailedColorDark: '#DD7F95',
-    statusPendingColorLight: '#E4B021',
-    statusPendingColorDark: '#ECC554',
   },
 ];
 

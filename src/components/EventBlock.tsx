@@ -286,12 +286,15 @@ export function EventBlock({
           {
             top,
             height,
-            borderLeftWidth: isBackup ? 0 : BLOCK.accentWidth,
-            borderLeftColor: isBackup ? 'transparent' : event.color,
             left: `${columnOffset * 100}%` as any,
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
-            paddingLeft: isBackup ? 8 : BLOCK.paddingLeft,
+            // The accent used to be a borderLeftWidth/borderLeftColor pair, but a
+            // border only on one side fights borderRadius on the corners it
+            // doesn't touch — the right corners rendered square. Drawn as its own
+            // view instead (below), clipped by the block's own overflow: hidden,
+            // so paddingLeft now reserves room for that view rather than a border box.
+            paddingLeft: isBackup ? 8 : BLOCK.accentWidth + BLOCK.paddingLeft,
             paddingRight: gutter,
             paddingVertical: blockPadding,
           },
@@ -301,6 +304,9 @@ export function EventBlock({
         onStartShouldSetResponder={() => true}
       >
         <View style={[styles.blockTint, { backgroundColor: event.color + BLOCK.tintAlpha }]} />
+        {!isBackup && (
+          <View style={[styles.accentBar, { width: BLOCK.accentWidth, backgroundColor: event.color }]} />
+        )}
         {isBackup && (
           <View style={[styles.backupBar, { backgroundColor: event.color + '40', height }]}>
             {Array.from({ length: stripeCount }).map((_, i) => (
@@ -413,13 +419,18 @@ function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     block: {
       position: 'absolute',
-      borderLeftWidth: BLOCK.accentWidth,
       borderRadius: BLOCK.borderRadius,
       paddingLeft: 6,
       paddingRight: BLOCK.paddingRight,
       paddingVertical: 3,
       overflow: 'hidden',
       backgroundColor: C.card,
+    },
+    accentBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
     },
     blockInline: {
       position: 'relative',
