@@ -46,22 +46,23 @@ FEATURES
 [x] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [x] add spanish 
 
-
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
 [x] swiping time spacing calendar bug? idk what causes it, if its an expo issue or a problem w the code
 [ ] use the app for a day and find bugs
 
 DEPLOYMENT TASKS
-[ ] Choose an official name and make support email. Then, be able to sign in/make an account with apple and google (and facebook?)
-[ ] widget for sm idk (requires apple dev license)
-[ ] change color and home setup to avoid copyright
+[ ] buy the $99 license
+[ ] Choose an official name and make support email
+[ ] add sign in/make an account with apple and google (and facebook?)
+[ ] tip $5
 [ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
+[ ] app icon and app store pics
+[ ] change color and home setup to avoid copyright?
 [ ] security audit
-[ ] dont get sued
+[ ] privacy policy (dont get sued)
 [ ] deploy to google play store
 [ ] deploy to app store
-[ ] tip $5
 
 POST 1.0.0
 [ ] FIGURE OUT THE MONEY MAKER $$$ (canvas sync for grades, ai agent, slack style see your data past 90 days)
