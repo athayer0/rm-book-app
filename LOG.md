@@ -49,12 +49,14 @@ FEATURES
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
 [x] swiping time spacing calendar bug? idk what causes it, if its an expo issue or a problem w the code
+[ ] calendar swiping flash is back
+[ ] 
 [ ] use the app for a day and find bugs
 
 DEPLOYMENT TASKS
-[ ] buy the $99 license
-[ ] Choose an official name and make support email
-[ ] add sign in/make an account with apple and google (and facebook?)
+[x] buy the $99 license
+[x] Choose an official name and make support email
+[x] add sign in/make an account with apple and google (and facebook?)
 [ ] tip $5
 [ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
 [ ] app icon and app store pics

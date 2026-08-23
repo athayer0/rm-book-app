@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "RM Book",
-    "slug": "rm-book",
+    "name": "Compi",
+    "slug": "compi",
     "version": "1.0.0",
+    "scheme": "compi",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,9 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.aaronthayer.compi",
       "supportsTablet": true,
       "infoPlist": {
-        "NSContactsUsageDescription": "Allow RM Book to access your contacts to import people into your list."
+        "NSContactsUsageDescription": "Allow Compi to access your contacts to import people into your list.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -40,7 +43,22 @@
           "icon": "./assets/icon.png",
           "color": "#1B5E3F"
         }
-      ]
-    ]
+      ],
+      "expo-web-browser",
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.150594044412-4nddrri65036mnq6i3bkpp108imdv042"
+        }
+      ],
+      "expo-font"
+    ],
+    "owner": "athayer0",
+    "extra": {
+      "eas": {
+        "projectId": "1c95a4fa-01cf-4919-aa17-d5fcc6917a01"
+      }
+    }
   }
 }

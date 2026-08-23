@@ -1271,7 +1271,7 @@ export function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>{t('settingsScreen.appName')}</Text>
-              <Text style={styles.rowValue}>RM Book</Text>
+              <Text style={styles.rowValue}>Compi</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>{t('settingsScreen.version')}</Text>

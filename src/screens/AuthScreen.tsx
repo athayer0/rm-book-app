@@ -1,28 +1,46 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Text,
   TextInput,
   TouchableOpacity,
+  View,
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Alert,
+  useColorScheme,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
+import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
 import { useColors } from '../hooks/useColors';
+import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 
 export function AuthScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
+  const { settings } = useSettings();
+  const systemScheme = useColorScheme();
+  const isDark =
+    settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+    }
+  }, []);
 
   const handleSubmit = async () => {
     if (!email || !password) {
@@ -45,12 +63,23 @@ export function AuthScreen() {
     }
   };
 
+  const handleOAuth = async (provider: OAuthProvider) => {
+    setOauthLoading(provider);
+    try {
+      await signInWithProvider(provider);
+    } catch (err) {
+      Alert.alert(t('auth.errorTitle'), err instanceof Error ? err.message : String(err));
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>RM Book</Text>
+      <Text style={styles.title}>Compi</Text>
       <Text style={styles.subtitle}>
         {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
       </Text>
@@ -96,6 +125,47 @@ export function AuthScreen() {
             : t('auth.haveAccount')}
         </Text>
       </TouchableOpacity>
+
+      <View style={styles.dividerRow}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>{t('auth.or')}</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity
+        style={styles.oauthButton}
+        onPress={() => handleOAuth('google')}
+        disabled={oauthLoading !== null}
+      >
+        {oauthLoading === 'google' ? (
+          <ActivityIndicator color={Colors.text} />
+        ) : (
+          <>
+            <Ionicons name="logo-google" size={20} color={Colors.text} style={styles.oauthIcon} />
+            <Text style={styles.oauthButtonText}>{t('auth.continueWithGoogle')}</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      {appleAvailable && (
+        oauthLoading === 'apple' ? (
+          <View style={styles.oauthButton}>
+            <ActivityIndicator color={Colors.text} />
+          </View>
+        ) : (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={
+              isDark
+                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+            }
+            cornerRadius={10}
+            style={styles.appleButton}
+            onPress={() => handleOAuth('apple')}
+          />
+        )
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -148,6 +218,45 @@ function makeStyles(C: ColorPalette) {
       color: C.control,
       textAlign: 'center',
       fontSize: 14,
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 28,
+      marginBottom: 16,
+    },
+    dividerLine: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.border,
+    },
+    dividerText: {
+      color: C.textLight,
+      fontSize: 13,
+      marginHorizontal: 12,
+    },
+    oauthButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 12,
+    },
+    oauthIcon: {
+      marginRight: 10,
+    },
+    appleButton: {
+      height: 50,
+      marginBottom: 12,
+    },
+    oauthButtonText: {
+      color: C.text,
+      fontSize: 16,
+      fontWeight: '600',
     },
   });
 }

@@ -11,7 +11,7 @@
     "next": "Next",
     "getStarted": "Get Started",
     "welcome": {
-      "title": "Welcome to RM Book",
+      "title": "Welcome to Compi",
       "body": "Your companion for the next chapter. Let's take a quick look around: Home for your goals, Calendar to log your days, People for those who matter most, and Settings to make it yours."
     },
     "colors": {
@@ -138,8 +138,8 @@
   },
   "notificationToggles": {
     "disabledTitle": "Notifications Disabled",
-    "dailyReviewBody": "Enable notifications for RM Book in your device settings to use the daily review reminder.",
-    "eventRemindersBody": "Enable notifications for RM Book in your device settings to use event reminders."
+    "dailyReviewBody": "Enable notifications for Compi in your device settings to use the daily review reminder.",
+    "eventRemindersBody": "Enable notifications for Compi in your device settings to use event reminders."
   },
   "phoneUtils": {
     "cantPlaceCallTitle": "Can’t place the call",
@@ -166,7 +166,10 @@
     "signIn": "Sign In",
     "createAccount": "Create Account",
     "needAccount": "Don't have an account? Sign up",
-    "haveAccount": "Already have an account? Sign in"
+    "haveAccount": "Already have an account? Sign in",
+    "or": "or",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple"
   },
   "common": {
     "save": "Save",
