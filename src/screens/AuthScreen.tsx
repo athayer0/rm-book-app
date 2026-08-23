@@ -11,14 +11,15 @@ import {
   Alert,
   useColorScheme,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { GoogleLogo } from '../components/GoogleLogo';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
 import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
+import { AuthSkeleton } from '../components/AuthSkeleton';
 
 export function AuthScreen() {
   const Colors = useColors();
@@ -35,10 +36,18 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  // isAvailableAsync() is the one piece of this screen's first paint that
+  // isn't ready synchronously — without gating on it, the Apple button pops
+  // in a beat after everything else and shifts what's below it. Non-iOS never
+  // runs the check, so it starts already "checked" there.
+  const [appleChecked, setAppleChecked] = useState(Platform.OS !== 'ios');
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
-      AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+      AppleAuthentication.isAvailableAsync().then((available) => {
+        setAppleAvailable(available);
+        setAppleChecked(true);
+      });
     }
   }, []);
 
@@ -77,6 +86,8 @@ export function AuthScreen() {
       setOauthLoading(null);
     }
   };
+
+  if (!appleChecked) return <AuthSkeleton />;
 
   return (
     <KeyboardAvoidingView
@@ -140,7 +151,7 @@ export function AuthScreen() {
         style={styles.oauthButton}
         onPress={() => handleOAuth('google')}
       >
-        <Ionicons name="logo-google" size={20} color={Colors.text} style={styles.oauthIcon} />
+        <GoogleLogo size={18} style={styles.oauthIcon} />
         <Text style={styles.oauthButtonText}>{t('auth.continueWithGoogle')}</Text>
       </TouchableOpacity>
 
@@ -226,13 +237,15 @@ function makeStyles(C: ColorPalette) {
       fontSize: 13,
       marginHorizontal: 12,
     },
+    // Google's own button spec, not the app's theme — see the googleButton*
+    // token comments in constants/colors.ts.
     oauthButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: C.card,
+      backgroundColor: C.googleButtonBg,
       borderWidth: 1,
-      borderColor: C.border,
+      borderColor: C.googleButtonBorder,
       borderRadius: 10,
       padding: 14,
       marginBottom: 12,
@@ -245,9 +258,9 @@ function makeStyles(C: ColorPalette) {
       marginBottom: 12,
     },
     oauthButtonText: {
-      color: C.text,
+      color: C.googleButtonText,
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: '500',
     },
   });
 }

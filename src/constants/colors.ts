@@ -127,6 +127,13 @@ export const LightColors = {
   // Deliberately stronger than `shadow` (which lifts a card by a hair): a menu
   // reads as detached from the page, not merely raised off it.
   menuShadow: 'rgba(0,0,0,0.28)',
+  // Google's own brand colours for the "Continue with Google" button (their
+  // published button-asset spec), not derived from `primary`/`card`/`border` —
+  // like Apple's button, this one is required to stay neutral and unbranded by
+  // the app's own theme so it stays recognizable across every app that uses it.
+  googleButtonBg: '#FFFFFF',
+  googleButtonBorder: '#747775',
+  googleButtonText: '#1F1F1F',
 };
 
 export const DarkColors: typeof LightColors = {
@@ -197,6 +204,10 @@ export const DarkColors: typeof LightColors = {
   menuBorder: 'rgba(255,255,255,0.16)',
   menuPressedBg: 'rgba(255,255,255,0.09)',
   menuShadow: 'rgba(0,0,0,0.70)',
+  // Google's dark-theme button spec — see the light-mode note.
+  googleButtonBg: '#131314',
+  googleButtonBorder: '#8E918F',
+  googleButtonText: '#E3E3E3',
 };
 
 export type ColorPalette = typeof LightColors;
