@@ -48,7 +48,7 @@ export async function detachPersonFromEvents(personId: string, userId?: string):
 
 export function useCalendarEvents() {
   const { user } = useAuth();
-  const { value: events, current, write, reload } = useStoredState<CalendarEvent[]>(CALENDAR_EVENTS_KEY, EMPTY);
+  const { value: events, current, write, reload, loaded } = useStoredState<CalendarEvent[]>(CALENDAR_EVENTS_KEY, EMPTY);
   const {
     planStatusMove, syncStatusMove,
     planStatusCarve, syncStatusCarve,
@@ -279,6 +279,6 @@ export function useCalendarEvents() {
   return {
     events, addEvent, updateEvent, updateOccurrence, updateFromDate,
     deleteEvent, deleteOccurrence, deleteFromDate,
-    getForDate, deleteAllEvents, deleteEventsOfType, reload,
+    getForDate, deleteAllEvents, deleteEventsOfType, reload, loaded,
   };
 }

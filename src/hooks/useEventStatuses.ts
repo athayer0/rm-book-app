@@ -11,7 +11,7 @@ const EMPTY: EventStatusMap = {};
 
 export function useEventStatuses() {
   const { user } = useAuth();
-  const { value: statuses, current, write, reload } = useStoredState<EventStatusMap>(EVENT_STATUSES_KEY, EMPTY);
+  const { value: statuses, current, write, reload, loaded } = useStoredState<EventStatusMap>(EVENT_STATUSES_KEY, EMPTY);
 
   const getStatus = useCallback(
     (eventId: string, dateStr: string): EventStatus | undefined => statuses[statusKey(eventId, dateStr)],
@@ -178,6 +178,6 @@ export function useEventStatuses() {
   return {
     statuses, getStatus, setStatus, planStatusMove, syncStatusMove,
     planStatusCarve, syncStatusCarve, planStatusBulkCarve, syncStatusBulkCarve,
-    reload,
+    reload, loaded,
   };
 }

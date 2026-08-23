@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Alert,
+  View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +35,8 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
+  // See HomeScreen for why this is the hook and not the <SafeAreaView> component.
+  const insets = useSafeAreaInsets();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showEventModal, setShowEventModal] = useState(false);
@@ -449,7 +452,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
       <View style={styles.header} onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerDate}>{format(selectedDate, datePattern('monthDay', settings.language), { locale: dateFnsLocale(settings.language) })}</Text>
@@ -499,6 +502,11 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
       />
 
       <View style={styles.gridContainer}>
+        {/* No loading gate needed: while events aren't loaded yet, `events` is
+            just its empty initial value, and DayPager/TimeGrid already render
+            that as a plain, event-free grid — exactly the look this gap
+            should have, with no separate placeholder to build or keep in
+            sync with the real thing. */}
         <DayPager
           selectedDate={selectedDate}
           onChangeDate={(dir) => setSelectedDate(d => addDays(d, dir))}
@@ -640,7 +648,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
         }
         onClose={() => setShowEventModal(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

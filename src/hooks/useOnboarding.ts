@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { HAS_ONBOARDED_KEY } from '../constants/storageKeys';
-import { useStoredState } from './useStoredState';
+import { useSettings } from './useSettings';
 
 type OnboardingContextValue = {
   replay: () => void;
@@ -35,15 +34,30 @@ export function useOnboardingFinishing(): boolean {
  * Owns whether the welcome flow is on screen. `ready` gates the first-run
  * check on the same signal AppRoot uses to leave its splash screen, so
  * onboarding never appears over a loading spinner or a half-synced app.
+ *
+ * `hasOnboarded` lives in `settings` (synced per-account via Supabase), not a
+ * device-local key — this is account state, not device state: onboarding
+ * seeds real account data (starter event types, goals, settings), so signing
+ * out and back in, or signing in on a second device, must not replay it.
  */
 export function useOnboardingState(ready: boolean) {
-  const { value: hasOnboarded, write, loaded } = useStoredState<boolean>(HAS_ONBOARDED_KEY, false);
+  const { settings, updateSettings, loaded } = useSettings();
   const [visible, setVisible] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
   useEffect(() => {
-    if (ready && loaded && !hasOnboarded) setVisible(true);
-  }, [ready, loaded, hasOnboarded]);
+    // Forced hidden whenever `ready` drops, not just left alone: sign-out
+    // clears local settings (see AuthContext.signOut) before the session
+    // itself updates, so `hasOnboarded` can go transiently false while
+    // `ready` is still true. Without this branch `visible` latches true from
+    // that instant and is never told to turn back off, so it carries straight
+    // through into the next sign-in even once the real value comes back true.
+    if (!ready) {
+      setVisible(false);
+      return;
+    }
+    if (loaded && !settings.hasOnboarded) setVisible(true);
+  }, [ready, loaded, settings.hasOnboarded]);
 
   /**
    * Hides the modal and marks onboarding done immediately, without waiting
@@ -57,10 +71,10 @@ export function useOnboardingState(ready: boolean) {
    * back on itself.
    */
   const dismiss = useCallback(() => {
-    write(() => true);
+    updateSettings({ hasOnboarded: true });
     setVisible(false);
     setFinishing(true);
-  }, [write]);
+  }, [updateSettings]);
 
   const finish = useCallback(() => setFinishing(false), []);
 

@@ -81,6 +81,8 @@ export interface AppSettings {
    * still gets reminders until someone opts it out.
    */
   eventReminderExcludedTypeIds: string[];
+  /** Whether this account has completed (or skipped) the welcome flow. */
+  hasOnboarded: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -124,6 +126,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   eventReminderEnabled: false,
   eventReminderMinutes: 5,
   eventReminderExcludedTypeIds: [],
+  hasOnboarded: false,
 };
 
 type SettingsContextValue = {

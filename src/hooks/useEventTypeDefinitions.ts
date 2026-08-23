@@ -64,6 +64,7 @@ type EventTypeDefinitionsContextValue = {
   updateDefinitions: (defs: EventTypeDefinition[]) => Promise<void>;
   resetBuiltInDefinitions: () => Promise<void>;
   reload: () => Promise<void>;
+  loaded: boolean;
 };
 
 // Same shape mergeWithDefaults(EMPTY_DEFS) would produce, so a consumer that
@@ -80,6 +81,10 @@ export const EventTypeDefinitionsContext = createContext<EventTypeDefinitionsCon
   updateDefinitions: async () => {},
   resetBuiltInDefinitions: async () => {},
   reload: async () => {},
+  // Matches DEFAULT_DEFINITIONS' own reasoning above: a consumer rendering
+  // outside the provider sees a complete, ready-to-use shape, not a
+  // provisional one.
+  loaded: true,
 });
 
 /**
@@ -156,7 +161,7 @@ export function useEventTypeDefinitionsState(): EventTypeDefinitionsContextValue
     await defsState.reload();
   }, [defsState]);
 
-  return { definitions, byId, customLinks, updateDefinitions, resetBuiltInDefinitions, reload };
+  return { definitions, byId, customLinks, updateDefinitions, resetBuiltInDefinitions, reload, loaded: defsState.loaded };
 }
 
 export function useEventTypeDefinitions(): EventTypeDefinitionsContextValue {

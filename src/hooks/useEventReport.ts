@@ -20,8 +20,8 @@ import { usePeople } from './usePeople';
  * whoever it was with out of 'Potential Dates'.
  */
 export function useEventReport() {
-  const { getStatus, setStatus } = useEventStatuses();
-  const { people, updatePerson } = usePeople();
+  const { getStatus, setStatus, loaded: statusesLoaded } = useEventStatuses();
+  const { people, updatePerson, loaded: peopleLoaded } = usePeople();
 
   const report = useCallback(
     async (occurrence: CalendarEvent, status: EventStatus | undefined) => {
@@ -44,5 +44,5 @@ export function useEventReport() {
     [setStatus, people, updatePerson],
   );
 
-  return { getStatus, report };
+  return { getStatus, report, loaded: statusesLoaded && peopleLoaded };
 }

@@ -12,14 +12,17 @@ import { useEventTypeDefinitions } from './useEventTypeDefinitions';
  * status, which returns the occurrence to the backlog.
  */
 export function useUnreported() {
-  const { events } = useCalendarEvents();
-  const { getStatus, report } = useEventReport();
-  const { byId: eventTypeById } = useEventTypeDefinitions();
+  const { events, loaded: eventsLoaded } = useCalendarEvents();
+  const { getStatus, report, loaded: reportLoaded } = useEventReport();
+  const { byId: eventTypeById, loaded: typeDefsLoaded } = useEventTypeDefinitions();
 
   const unreported = useMemo(
     () => findUnreportedOccurrences(events, getStatus, new Date(), eventTypeById),
     [events, getStatus, eventTypeById],
   );
 
-  return { unreported, count: unreported.length, report, statusOf: getStatus };
+  return {
+    unreported, count: unreported.length, report, statusOf: getStatus,
+    loaded: eventsLoaded && reportLoaded && typeDefsLoaded,
+  };
 }

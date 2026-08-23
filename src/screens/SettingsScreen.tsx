@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert, TextInput, Platform, useColorScheme, Switch, Pressable,
+  Alert, TextInput, Platform, useColorScheme, Switch, Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,6 +100,8 @@ export function SettingsScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
+  // See HomeScreen for why this is the hook and not the <SafeAreaView> component.
+  const insets = useSafeAreaInsets();
 
   const { settings, updateSettings } = useSettings();
   const {
@@ -457,7 +460,7 @@ export function SettingsScreen() {
   const colorSheetRow = THEME_COLOR_ROWS.find(row => row.key === colorSheet);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('settingsScreen.title')}</Text>
       </View>
@@ -1328,7 +1331,7 @@ export function SettingsScreen() {
         onUpdateDefinitions={updateEventTypeDefinitions}
       />
       <EventReminderTypesModal visible={eventSheet === 'reminderTypes'} onClose={() => setEventSheet(null)} />
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -64,6 +64,10 @@ export function AuthScreen() {
   };
 
   const handleOAuth = async (provider: OAuthProvider) => {
+    // No loading UI on these buttons (per design) — this guard is only to
+    // stop a double-tap from opening two native sign-in sheets at once, not
+    // to drive any visual state.
+    if (oauthLoading) return;
     setOauthLoading(provider);
     try {
       await signInWithProvider(provider);
@@ -135,36 +139,23 @@ export function AuthScreen() {
       <TouchableOpacity
         style={styles.oauthButton}
         onPress={() => handleOAuth('google')}
-        disabled={oauthLoading !== null}
       >
-        {oauthLoading === 'google' ? (
-          <ActivityIndicator color={Colors.text} />
-        ) : (
-          <>
-            <Ionicons name="logo-google" size={20} color={Colors.text} style={styles.oauthIcon} />
-            <Text style={styles.oauthButtonText}>{t('auth.continueWithGoogle')}</Text>
-          </>
-        )}
+        <Ionicons name="logo-google" size={20} color={Colors.text} style={styles.oauthIcon} />
+        <Text style={styles.oauthButtonText}>{t('auth.continueWithGoogle')}</Text>
       </TouchableOpacity>
 
       {appleAvailable && (
-        oauthLoading === 'apple' ? (
-          <View style={styles.oauthButton}>
-            <ActivityIndicator color={Colors.text} />
-          </View>
-        ) : (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-            buttonStyle={
-              isDark
-                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={10}
-            style={styles.appleButton}
-            onPress={() => handleOAuth('apple')}
-          />
-        )
+        <AppleAuthentication.AppleAuthenticationButton
+          buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+          buttonStyle={
+            isDark
+              ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+              : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+          }
+          cornerRadius={10}
+          style={styles.appleButton}
+          onPress={() => handleOAuth('apple')}
+        />
       )}
     </KeyboardAvoidingView>
   );

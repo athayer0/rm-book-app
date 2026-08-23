@@ -78,9 +78,9 @@ export function useWeeklyGoals() {
   const offsetsState = useStoredState<WeeklyCounts>(countsKey, EMPTY);
   const targetsState = useStoredState<WeeklyGoals>(targetsKey, EMPTY);
 
-  const { events } = useCalendarEvents();
-  const { getStatus } = useEventStatuses();
-  const { customLinks } = useEventTypeDefinitions();
+  const { events, loaded: eventsLoaded } = useCalendarEvents();
+  const { getStatus, loaded: statusesLoaded } = useEventStatuses();
+  const { customLinks, loaded: typeDefsLoaded } = useEventTypeDefinitions();
 
   const definitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_GOALS;
   const goals = targetsState.value;
@@ -229,5 +229,12 @@ export function useWeeklyGoals() {
     await syncTarget(id, wk, value);
   }, [targetsState, syncTarget, weekKey]);
 
-  return { definitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek };
+  // Everything `counts`/`definitions`/`goals` are derived from — a screen
+  // gating its render on this can trust the numbers it shows the instant it
+  // stops being true, rather than the first (wrong) values these compute to
+  // off each hook's still-empty initial state.
+  const loaded = defsState.loaded && offsetsState.loaded && targetsState.loaded
+    && eventsLoaded && statusesLoaded && typeDefsLoaded;
+
+  return { definitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek, loaded };
 }

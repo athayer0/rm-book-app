@@ -55,8 +55,8 @@ export function PersonTimelineTab({ personId }: Props) {
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
   const { settings } = useSettings();
-  const { events, updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate } = useCalendarEvents();
-  const { getStatus, report } = useEventReport();
+  const { events, updateEvent, updateOccurrence, updateFromDate, deleteOccurrence, deleteFromDate, loaded: eventsLoaded } = useCalendarEvents();
+  const { getStatus, report, loaded: reportLoaded } = useEventReport();
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
 
   // The calendar's own density, so a block here is the same size as the one it
@@ -100,13 +100,17 @@ export function PersonTimelineTab({ personId }: Props) {
         overScrollMode="never"
       >
         {total === 0 ? (
-          <View style={styles.empty}>
-            <Ionicons name="calendar-outline" size={48} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>{t('personTimeline.noEventsYet')}</Text>
-            <Text style={styles.emptyText}>
-              {t('personTimeline.emptyHint')}
-            </Text>
-          </View>
+          // Blank rather than the "no events" message while still loading —
+          // same reasoning as PeopleScreen's empty state.
+          eventsLoaded && reportLoaded && (
+            <View style={styles.empty}>
+              <Ionicons name="calendar-outline" size={48} color={Colors.textLight} />
+              <Text style={styles.emptyTitle}>{t('personTimeline.noEventsYet')}</Text>
+              <Text style={styles.emptyText}>
+                {t('personTimeline.emptyHint')}
+              </Text>
+            </View>
+          )
         ) : (
           groups.map(group => (
             <View key={group.dateStr} style={styles.group}>

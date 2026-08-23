@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, TextInput, Pressable, Alert,
+  TextInput, Pressable, Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -63,8 +64,10 @@ export function PeopleScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
+  // See HomeScreen for why this is the hook and not the <SafeAreaView> component.
+  const insets = useSafeAreaInsets();
 
-  const { people, addPerson, updatePerson, deletePerson, reload } = usePeople();
+  const { people, addPerson, updatePerson, deletePerson, reload, loaded: peopleLoaded } = usePeople();
   const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
@@ -168,7 +171,7 @@ export function PeopleScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}>
+    <View style={[styles.safe, { paddingTop: insets.top }]} onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}>
       <View
         style={styles.header}
         onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
@@ -335,13 +338,18 @@ export function PeopleScreen() {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
-          <View style={styles.empty}>
-            <Ionicons name="people-outline" size={48} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>{isFiltered ? t('people.noMatches') : t('people.noPeopleYet')}</Text>
-            <Text style={styles.emptyText}>
-              {isFiltered ? t('people.tryDifferentSearch') : t('people.tapToAdd')}
-            </Text>
-          </View>
+          // Blank rather than the "no people" message while still loading —
+          // that message asserts a real fact about the account (nobody's been
+          // added yet), which isn't known to be true until peopleLoaded.
+          peopleLoaded && (
+            <View style={styles.empty}>
+              <Ionicons name="people-outline" size={48} color={Colors.textLight} />
+              <Text style={styles.emptyTitle}>{isFiltered ? t('people.noMatches') : t('people.noPeopleYet')}</Text>
+              <Text style={styles.emptyText}>
+                {isFiltered ? t('people.tryDifferentSearch') : t('people.tapToAdd')}
+              </Text>
+            </View>
+          )
         ) : (
           rows.map((row, index) =>
             row.kind === 'header' ? (
@@ -380,7 +388,7 @@ export function PeopleScreen() {
         visible={showImportModal}
         onClose={() => setShowImportModal(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

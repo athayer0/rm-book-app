@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, useColorScheme,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, useColorScheme,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -25,17 +26,30 @@ import { useOnboardingFinishing } from '../hooks/useOnboarding';
 
 export function HomeScreen({ navigation, route }: any) {
   const Colors = useColors();
+  // useSafeAreaInsets() reads the already-resolved value from SafeAreaProvider's
+  // JS context immediately on mount. The <SafeAreaView> *component* instead does
+  // its own independent native measurement on every mount, which lags a frame or
+  // two behind — that's what was showing as the header growing taller right after
+  // opening a tab. See HomeLoadingScreen for the same pattern.
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
   const { settings } = useSettings();
   const systemScheme = useColorScheme();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
 
-  const { definitions, counts, goals, updateDefinitions, reload } = useWeeklyGoals();
-  const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly } = useMonthlyGoals();
-  const { count: unreportedCount } = useUnreported();
+  const { definitions, counts, goals, updateDefinitions, reload, loaded: weeklyLoaded } = useWeeklyGoals();
+  const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly, loaded: monthlyLoaded } = useMonthlyGoals();
+  const { count: unreportedCount, loaded: unreportedLoaded } = useUnreported();
   const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
   const onboardingFinishing = useOnboardingFinishing();
+  // Covers the same gap onboardingFinishing does (see HomeSkeleton) but for a
+  // plain first mount: each hook's own useStoredState only starts its
+  // AsyncStorage read once this screen mounts, so for a beat after sign-in or
+  // an app restart, counts/goals/unreportedCount all sit at their empty
+  // initial values — real zeros, not "not loaded yet" — and would otherwise
+  // render as a confidently wrong 0/0 before the real numbers pop in.
+  const dataLoaded = weeklyLoaded && monthlyLoaded && unreportedLoaded;
 
   useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
   const [editVisible, setEditVisible] = useState(false);
@@ -122,13 +136,13 @@ export function HomeScreen({ navigation, route }: any) {
   }, [route?.params?.openUnreported]);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('home.title')}</Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {onboardingFinishing ? (
+        {onboardingFinishing || !dataLoaded ? (
           <HomeSkeleton />
         ) : (
           <>
@@ -230,7 +244,7 @@ export function HomeScreen({ navigation, route }: any) {
         visible={unreportedVisible}
         onClose={() => { setUnreportedVisible(false); reload(); }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

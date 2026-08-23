@@ -45,9 +45,9 @@ export function useMonthlyGoals() {
   const offsetsState = useStoredState<MonthlyCounts>(countsKey, EMPTY);
   const targetsState = useStoredState<MonthlyGoals>(targetsKey, EMPTY);
 
-  const { events } = useCalendarEvents();
-  const { getStatus } = useEventStatuses();
-  const { customLinks } = useEventTypeDefinitions();
+  const { events, loaded: eventsLoaded } = useCalendarEvents();
+  const { getStatus, loaded: statusesLoaded } = useEventStatuses();
+  const { customLinks, loaded: typeDefsLoaded } = useEventTypeDefinitions();
 
   const goals = targetsState.value;
 
@@ -122,5 +122,9 @@ export function useMonthlyGoals() {
     await syncTarget(id, mk, value);
   }, [targetsState, syncTarget, monthKey]);
 
-  return { counts, goals, reload, getMonthData, saveCountForMonth, saveGoalForMonth };
+  // Same reasoning as useWeeklyGoals' loaded — see there.
+  const loaded = offsetsState.loaded && targetsState.loaded
+    && eventsLoaded && statusesLoaded && typeDefsLoaded;
+
+  return { counts, goals, reload, getMonthData, saveCountForMonth, saveGoalForMonth, loaded };
 }

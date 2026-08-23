@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, View } from 'react-native';
+import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,8 @@ import { SettingsContext, useSettings, useSettingsState } from './src/hooks/useS
 import { EventTypeDefinitionsContext, useEventTypeDefinitionsState } from './src/hooks/useEventTypeDefinitions';
 import { OnboardingContext, useOnboardingState } from './src/hooks/useOnboarding';
 import { useCalendarEvents } from './src/hooks/useCalendarEvents';
+import { AuthSkeleton } from './src/components/AuthSkeleton';
+import { HomeLoadingScreen } from './src/components/HomeLoadingScreen';
 import {
   requestNotificationPermissions, scheduleDailyReview, cancelDailyReview, isDailyReviewResponse,
   syncEventReminders, clearEventReminders, eventReminderResponseData,
@@ -25,14 +27,6 @@ import {
 
 /** How long to wait on the initial sync before showing the app anyway. */
 const SYNC_TIMEOUT_MS = 8000;
-
-function Splash() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator />
-    </View>
-  );
-}
 
 function openUnreportedFromNotification() {
   if (navigationRef.isReady()) {
@@ -57,7 +51,7 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
 }
 
 function AppRoot() {
-  const { session, user, loading } = useAuth();
+  const { session, user, loading, signingOut } = useAuth();
   const { settings, loaded: settingsLoaded } = useSettings();
   const { events } = useCalendarEvents();
   const { t } = useTranslation();
@@ -227,8 +221,14 @@ function AppRoot() {
   }, [synced]);
 
   if (loading) return null;
+  // Checked ahead of `!session`: the session doesn't go null until partway
+  // through AuthContext's signOut() (it drains the queue first, while still
+  // authenticated), so without this the screen open when "Sign Out" was
+  // tapped would otherwise sit there, unresponsive-looking, for that whole
+  // round trip before jumping straight to AuthScreen.
+  if (signingOut) return <AuthSkeleton />;
   if (!session) return <AuthScreen />;
-  if (!synced) return <Splash />;
+  if (!synced) return <HomeLoadingScreen />;
   return (
     <OnboardingContext.Provider value={{ replay: onboarding.replay, finishing: onboarding.finishing }}>
       <AppNavigation />
@@ -267,7 +267,13 @@ function EventTypeDefinitionsProvider({ children }: { children: React.ReactNode 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+      {/* initialMetrics: without it, SafeAreaProvider doesn't know the real
+          insets until the native module reports them a frame or two after
+          first mount — every header sized off useSafeAreaInsets()/SafeAreaView
+          renders as if there's no notch/status-bar inset for that first
+          frame, then jumps taller once the real value arrives. This constant
+          is read synchronously at import time, so it's available immediately. */}
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <StatusBar style="light" />
         <AuthProvider>
           <SettingsProvider>

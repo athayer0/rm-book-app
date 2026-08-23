@@ -528,6 +528,12 @@ create table if not exists settings (
   -- AppSettings.eventReminderExcludedTypeIds.
   event_reminder_excluded_type_ids jsonb
     default '[]'::jsonb,
+  -- Whether this account has completed (or skipped) the
+  -- welcome flow -- see AppSettings.hasOnboarded. Synced
+  -- per-account on purpose: onboarding seeds real account
+  -- data, so it must not replay on a second device or after
+  -- a sign-out/sign-in, only for a genuinely fresh account.
+  has_onboarded boolean default false,
   updated_at timestamptz default now()
 );
 alter table settings
@@ -582,6 +588,9 @@ alter table settings
 alter table settings
   add column if not exists
   time_format text default '12h';
+alter table settings
+  add column if not exists
+  has_onboarded boolean default false;
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;

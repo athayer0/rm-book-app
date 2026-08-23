@@ -45,6 +45,18 @@ FEATURES
 [x] add more personalization to onboarding (different event and goal color schemes)
 [x] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [x] add spanish 
+[ ] be able to turn off auto contact event
+[ ] change dark mode light mode automatically in onboarding
+[ ] swipe down the menus to close them
+[ ] extend end hour to 2am
+[ ] add x to event select menu on empty space tap
+[ ] make color scheme changing more intuitive
+[ ] hard press ki to edit, quick press to increment
+[ ] make the menu x tap area bigger
+[ ] expand icon pool
+[ ] spectrum color selector is a lil laggy
+[ ] event reporting in a more intuitive
+[ ] hold bottom or top of event to extend the time up and down
 
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)

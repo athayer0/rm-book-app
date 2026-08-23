@@ -37,7 +37,7 @@ const EMPTY: Person[] = [];
 
 export function usePeople() {
   const { user } = useAuth();
-  const { value: people, write, reload } = useStoredState<Person[]>(PEOPLE_KEY, EMPTY);
+  const { value: people, write, reload, loaded } = useStoredState<Person[]>(PEOPLE_KEY, EMPTY);
 
   const push = useCallback(
     async (row: Person | undefined) => {
@@ -71,5 +71,5 @@ export function usePeople() {
     await deleteConvertProgress(id, user?.id);
   }, [write, user]);
 
-  return { people, addPerson, updatePerson, deletePerson, reload };
+  return { people, addPerson, updatePerson, deletePerson, reload, loaded };
 }
