@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, useWindowDimensions,
 } from 'react-native';
@@ -123,10 +123,13 @@ export function ColorPickerSheet({ visible, color, title, defaultColor, onCancel
     setTab('grid');
   }, [visible]);
 
-  function pick(hex: string) {
+  // Stable identity: this reaches the memoized `GridPanel` as a prop, and a
+  // fresh function every render would defeat that memo just as surely as a
+  // changing `selected` would.
+  const pick = useCallback((hex: string) => {
     Haptics.selectionAsync();
     setHsv(hexToHsv(hex));
-  }
+  }, []);
 
   return (
     <BottomSheet
@@ -177,6 +180,18 @@ export function ColorPickerBody({
 }) {
   const { t } = useTranslation();
   const showReset = !!defaultColor && normalizeHex(defaultColor) !== draft;
+
+  // `draft` changes on every drag frame while the spectrum tab is being
+  // dragged, but the grid panel is hidden then. `GridPanel` is memoized below,
+  // and memoizing only pays off if the *value* passed in stays put too, not
+  // just the pixels on screen — so freeze it to the grid's own last-known
+  // colour while the other tab is active. That makes the 90-swatch grid do
+  // zero reconciliation work during a spectrum drag, which is what was making
+  // the drag itself feel laggy: every touch-move was competing with a full
+  // grid re-render it didn't need. It catches back up to `draft` the instant
+  // the grid tab is current.
+  const gridSelectedRef = useRef(draft);
+  if (tab === 'grid') gridSelectedRef.current = draft;
 
   return (
     <>
@@ -229,7 +244,7 @@ export function ColorPickerBody({
           field would come back unmeasured for a frame. */}
       <View style={styles.panel}>
         <View style={[styles.panelPage, tab !== 'grid' && styles.panelHidden]} pointerEvents={tab === 'grid' ? 'auto' : 'none'}>
-          <GridPanel styles={styles} selected={draft} onPick={onPick} />
+          <GridPanel styles={styles} selected={gridSelectedRef.current} onPick={onPick} />
         </View>
         <View style={[styles.panelPage, tab !== 'spectrum' && styles.panelHidden]} pointerEvents={tab === 'spectrum' ? 'auto' : 'none'}>
           <SpectrumPanel styles={styles} hsv={hsv} draft={draft} onChange={onChangeHsv} />
@@ -241,7 +256,7 @@ export function ColorPickerBody({
 
 /* ---------------------------------------------------------------- Grid tab */
 
-function GridPanel({
+const GridPanel = memo(function GridPanel({
   styles, selected, onPick,
 }: {
   styles: Styles;
@@ -295,7 +310,7 @@ function GridPanel({
       )}
     </View>
   );
-}
+});
 
 /* ------------------------------------------------------------ Spectrum tab */
 
@@ -323,20 +338,7 @@ function SpectrumPanel({
     <View style={styles.spectrumWrap}>
       <View style={styles.field} {...field.panHandlers} onLayout={field.onLayout}>
         <View style={styles.fieldFill} pointerEvents="none">
-          <Svg width="100%" height="100%">
-            <Defs>
-              <LinearGradient id={`sat-${uid}`} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#FFFFFF" />
-                <Stop offset="1" stopColor={pure} />
-              </LinearGradient>
-              <LinearGradient id={`val-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="1" stopColor="#000000" stopOpacity="1" />
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill={`url(#sat-${uid})`} />
-            <Rect x="0" y="0" width="100%" height="100%" fill={`url(#val-${uid})`} />
-          </Svg>
+          <FieldGradient uid={uid} pure={pure} />
         </View>
         <View
           pointerEvents="none"
@@ -353,16 +355,7 @@ function SpectrumPanel({
 
       <View style={styles.strip} {...hue.panHandlers} onLayout={hue.onLayout}>
         <View style={styles.stripFill} pointerEvents="none">
-          <Svg width="100%" height="100%">
-            <Defs>
-              <LinearGradient id={`hue-${uid}`} x1="0" y1="0" x2="1" y2="0">
-                {HUE_STOPS.map((stop, i) => (
-                  <Stop key={i} offset={i / (HUE_STOPS.length - 1)} stopColor={stop} />
-                ))}
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill={`url(#hue-${uid})`} />
-          </Svg>
+          <HueGradient uid={uid} />
         </View>
         <View
           pointerEvents="none"
@@ -375,6 +368,48 @@ function SpectrumPanel({
     </View>
   );
 }
+
+/**
+ * Dragging the field only ever changes `s`/`v` (thumb position); dragging the
+ * hue strip is what changes `pure`. Split out and memoized so a field drag —
+ * the common case, and the one people notice lag on — doesn't rebuild either
+ * gradient's `Defs`/`Stop` tree every frame just to reposition a thumb that's
+ * drawn entirely outside these components. `HueGradient` never changes at all
+ * once mounted, since `uid` is stable for the picker's lifetime.
+ */
+const FieldGradient = memo(function FieldGradient({ uid, pure }: { uid: string; pure: string }) {
+  return (
+    <Svg width="100%" height="100%">
+      <Defs>
+        <LinearGradient id={`sat-${uid}`} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="1" stopColor={pure} />
+        </LinearGradient>
+        <LinearGradient id={`val-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#000000" stopOpacity="0" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="1" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#sat-${uid})`} />
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#val-${uid})`} />
+    </Svg>
+  );
+});
+
+const HueGradient = memo(function HueGradient({ uid }: { uid: string }) {
+  return (
+    <Svg width="100%" height="100%">
+      <Defs>
+        <LinearGradient id={`hue-${uid}`} x1="0" y1="0" x2="1" y2="0">
+          {HUE_STOPS.map((stop, i) => (
+            <Stop key={i} offset={i / (HUE_STOPS.length - 1)} stopColor={stop} />
+          ))}
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#hue-${uid})`} />
+    </Svg>
+  );
+});
 
 /**
  * A thumb's `left`/`top` is its centre, offset back by its own radius via a
