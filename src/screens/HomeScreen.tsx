@@ -23,6 +23,8 @@ import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
 import { GoalGrain, GRAIN } from '../utils/goalGrain';
 import { useUnreported } from '../hooks/useUnreported';
 import { useOnboardingFinishing } from '../hooks/useOnboarding';
+import { getWeekKey, getMonthKey } from '../utils/dateUtils';
+import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 
 export function HomeScreen({ navigation, route }: any) {
   const Colors = useColors();
@@ -38,8 +40,8 @@ export function HomeScreen({ navigation, route }: any) {
   const systemScheme = useColorScheme();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
 
-  const { definitions, counts, goals, updateDefinitions, reload, loaded: weeklyLoaded } = useWeeklyGoals();
-  const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly, loaded: monthlyLoaded } = useMonthlyGoals();
+  const { definitions, counts, goals, updateDefinitions, reload, saveCountForWeek, loaded: weeklyLoaded } = useWeeklyGoals();
+  const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly, saveCountForMonth, loaded: monthlyLoaded } = useMonthlyGoals();
   const { count: unreportedCount, loaded: unreportedLoaded } = useUnreported();
   const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
   const onboardingFinishing = useOnboardingFinishing();
@@ -79,11 +81,32 @@ export function HomeScreen({ navigation, route }: any) {
     setGoalsVisible(true);
   }
 
-  // A card tap opens that goal's editor directly rather than the counts/targets
-  // sheet openGoals leads to.
+  // A hard press opens that goal's editor directly rather than the
+  // counts/targets sheet openGoals leads to; a plain tap on either side of a
+  // card instead steps the count by one (below).
   function openGoalEditor(id: string) {
     setEditGoalId(id);
     setEditVisible(true);
+  }
+
+  function incrementWeekGoal(id: string) {
+    const total = Math.min(MAX_GOAL_VALUE, (counts[id] ?? 0) + 1);
+    saveCountForWeek(id, getWeekKey(), total);
+  }
+
+  function decrementWeekGoal(id: string) {
+    const total = Math.max(0, (counts[id] ?? 0) - 1);
+    saveCountForWeek(id, getWeekKey(), total);
+  }
+
+  function incrementMonthGoal(id: string) {
+    const total = Math.min(MAX_GOAL_VALUE, (monthlyCounts[id] ?? 0) + 1);
+    saveCountForMonth(id, getMonthKey(), total);
+  }
+
+  function decrementMonthGoal(id: string) {
+    const total = Math.max(0, (monthlyCounts[id] ?? 0) - 1);
+    saveCountForMonth(id, getMonthKey(), total);
   }
 
   function startGoalReorder() {
@@ -163,7 +186,9 @@ export function HomeScreen({ navigation, route }: any) {
                 counts={counts}
                 goals={goals}
                 grain="week"
-                onPressGoal={openGoalEditor}
+                onDecrementGoal={decrementWeekGoal}
+                onIncrementGoal={incrementWeekGoal}
+                onLongPressGoal={openGoalEditor}
                 reorderActive={reorderActive}
                 tappedIds={weekTaps}
                 onTapGoal={tapWeekGoal}
@@ -178,7 +203,9 @@ export function HomeScreen({ navigation, route }: any) {
                 counts={monthlyCounts}
                 goals={monthlyGoals}
                 grain="month"
-                onPressGoal={openGoalEditor}
+                onDecrementGoal={decrementMonthGoal}
+                onIncrementGoal={incrementMonthGoal}
+                onLongPressGoal={openGoalEditor}
                 reorderActive={reorderActive}
                 tappedIds={monthTaps}
                 onTapGoal={tapMonthGoal}

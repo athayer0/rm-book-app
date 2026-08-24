@@ -15,7 +15,12 @@ interface Props {
   goals: WeeklyGoals;
   /** Which grid this is — drives both visibility and position, independently of the other grain. */
   grain: GoalGrain;
-  onPressGoal?: (id: string) => void;
+  /** Tap on a card's left/icon side (outside reorder mode): decrements its count by one. */
+  onDecrementGoal?: (id: string) => void;
+  /** Tap on a card's right/label side (outside reorder mode): increments its count by one. */
+  onIncrementGoal?: (id: string) => void;
+  /** Hard press on either side of a card (outside reorder mode): opens that goal's editor. */
+  onLongPressGoal?: (id: string) => void;
   compact?: boolean;
   /**
    * Tap-to-number reorder mode (see HomeScreen): every visible card shows a
@@ -29,7 +34,7 @@ interface Props {
 }
 
 export function GoalGrid({
-  definitions, counts, goals, grain, onPressGoal, compact, reorderActive, tappedIds, onTapGoal,
+  definitions, counts, goals, grain, onDecrementGoal, onIncrementGoal, onLongPressGoal, compact, reorderActive, tappedIds, onTapGoal,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -56,7 +61,9 @@ export function GoalGrid({
                   count={counts[def.id] ?? 0}
                   // The grid only ever shows the current week, which never resolves to null.
                   goal={resolveGoal(goals[def.id], false) ?? 0}
-                  onPress={reorderActive ? () => onTapGoal?.(def.id) : () => onPressGoal?.(def.id)}
+                  onDecrement={() => (reorderActive ? onTapGoal?.(def.id) : onDecrementGoal?.(def.id))}
+                  onIncrement={() => (reorderActive ? onTapGoal?.(def.id) : onIncrementGoal?.(def.id))}
+                  onLongPress={reorderActive ? undefined : () => onLongPressGoal?.(def.id)}
                   compact={compact}
                 />
                 {reorderActive && (
