@@ -277,6 +277,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               <TouchableOpacity
                 onPress={onClose}
                 style={styles.closeBtn}
+                hitSlop={{ top: 12, bottom: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.close')}
               >
@@ -301,6 +302,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
               <TouchableOpacity
                 onPress={handleCancel}
                 style={styles.closeBtn}
+                hitSlop={{ top: 12, bottom: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel={person ? t('common.back') : t('common.close')}
               >

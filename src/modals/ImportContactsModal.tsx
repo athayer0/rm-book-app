@@ -181,10 +181,11 @@ export function ImportContactsModal({ visible, onClose }: Props) {
         <TouchableOpacity
           onPress={onClose}
           style={styles.closeBtn}
+          hitSlop={{ top: 12, bottom: 12 }}
           accessibilityRole="button"
           accessibilityLabel={t('common.close')}
         >
-          <Ionicons name="close" size={22} color={Colors.textSecondary} />
+          <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
         <View style={styles.headerLabels}>
           <Text style={styles.headerTitle}>{t('importContacts.title')}</Text>
@@ -383,7 +384,7 @@ function makeStyles(C: ColorPalette) {
     headerLabels: { alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
     headerCount: { fontSize: 12, color: C.textSecondary, marginTop: 2 },
-    closeBtn: { width: 60, alignItems: 'flex-start' },
+    closeBtn: { width: 48, alignItems: 'flex-start' },
     done: { fontSize: 16, fontWeight: '600', color: C.accent },
     doneDisabled: { color: C.textLight },
     body: { flex: 1, backgroundColor: C.background },

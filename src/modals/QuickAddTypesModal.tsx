@@ -67,8 +67,8 @@ export function QuickAddTypesModal({ visible, onClose }: Props) {
   return (
     <SheetModal visible={visible} onClose={onClose}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={8}>
-          <Ionicons name="close" size={22} color={Colors.textSecondary} />
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12 }}>
+          <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('quickAddTypes.title')}</Text>
         <View style={styles.closeBtn} />
@@ -171,7 +171,7 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: C.text, textAlign: 'center' },
-    closeBtn: { width: 44, alignItems: 'flex-start' },
+    closeBtn: { width: 48, alignItems: 'flex-start' },
     scroll: {
       flex: 1,
       backgroundColor: C.background,

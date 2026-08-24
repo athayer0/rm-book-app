@@ -548,6 +548,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               <TouchableOpacity
                 onPress={onClose}
                 style={styles.closeBtn}
+                hitSlop={{ top: 12, bottom: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.close')}
               >
@@ -572,6 +573,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               <TouchableOpacity
                 onPress={handleCancel}
                 style={styles.closeBtn}
+                hitSlop={{ top: 12, bottom: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel={event ? t('common.back') : t('common.close')}
               >

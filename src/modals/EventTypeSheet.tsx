@@ -3,6 +3,7 @@ import {
   Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { TAB_BAR_HEIGHT } from '../constants/layout';
 import { useColors } from '../hooks/useColors';
@@ -86,7 +87,16 @@ export function EventTypeSheet({ visible, onSelect, onClose }: Props) {
       <View style={[styles.center, { paddingTop: TAB_BAR_HEIGHT }]} pointerEvents="box-none">
         <Pressable style={styles.cardOuter} onPress={() => {}}>
           <DropdownMenu open={visible} variant="inline">
-            <Text style={styles.title}>{t('addEditEvent.newEventTitle')}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{t('addEditEvent.newEventTitle')}</Text>
+              <Pressable
+                style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
+                onPress={onClose}
+                hitSlop={8}
+              >
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
             {/* Sized to show all fifteen types at once on any normal phone —
                 this is meant to be glanced at and tapped, not scrolled through.
                 The ScrollView is only a ceiling for the rare device too short
@@ -132,14 +142,25 @@ function makeStyles(C: ColorPalette) {
       zIndex: 201,
     },
     cardOuter: { width: '100%', maxWidth: 340 },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingLeft: 14,
+      paddingRight: 8,
+      paddingTop: 10,
+      paddingBottom: 8,
+    },
     title: {
       fontSize: 15,
       fontWeight: '700',
       color: C.text,
-      paddingHorizontal: 14,
-      paddingTop: 14,
-      paddingBottom: 8,
     },
+    // padding 4 (32×32) + hitSlop 8 on the Pressable = 48×48 effective tap area.
+    closeBtn: { padding: 4 },
+    // Matches TouchableOpacity's default activeOpacity (0.2) so this X dims
+    // the same way every other close button in the app does on press.
+    closeBtnPressed: { opacity: 0.2 },
     dot: { width: 16, height: 16, borderRadius: 8, marginRight: 12 },
   });
 }

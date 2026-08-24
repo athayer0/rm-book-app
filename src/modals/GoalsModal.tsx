@@ -56,11 +56,11 @@ export function GoalsModal({ visible, onClose, definitions, initialGrain = 'week
     <SheetModal visible={visible} onClose={onClose}>
       <View style={styles.flex}>
         <View style={styles.header} pointerEvents={editing ? 'none' : 'auto'}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="close" size={22} color={Colors.textSecondary} />
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12 }}>
+            <Ionicons name="close" size={24} color={Colors.textSecondary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('goalsModal.title')}</Text>
-          <View style={{ width: 44 }} />
+          <View style={{ width: 48 }} />
         </View>
 
         <SheetTabs
@@ -117,6 +117,6 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
-    closeBtn: { width: 44, alignItems: 'flex-start' },
+    closeBtn: { width: 48, alignItems: 'flex-start' },
   });
 }

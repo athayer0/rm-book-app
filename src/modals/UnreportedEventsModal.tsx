@@ -66,8 +66,8 @@ export function UnreportedEventsModal({ visible, onClose }: Props) {
   return (
     <SheetModal visible={visible} onClose={onClose}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
-          <Ionicons name="close" size={22} color={Colors.textSecondary} />
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12 }}>
+          <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
         <View style={styles.headerLabels}>
           <Text style={styles.headerTitle}>{t('unreportedEvents.title')}</Text>
@@ -151,7 +151,7 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.card,
     },
     closeBtn: {
-      width: 44,
+      width: 48,
       alignItems: 'flex-start',
     },
     headerLabels: {

@@ -359,11 +359,11 @@ export function EditGoalsModal({
     <SheetModal visible={visible} onClose={handleClose}>
       <View style={styles.flexFill} onStartShouldSetResponderCapture={dismissKeyboardUnlessNameField}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={22} color={Colors.textSecondary} />
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12 }}>
+          <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('editGoals.title')}</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 48 }} />
       </View>
 
       <ScrollView
@@ -681,7 +681,7 @@ function makeStyles(C: ColorPalette) {
       color: C.text,
     },
     closeBtn: {
-      width: 60,
+      width: 48,
       alignItems: 'flex-start',
     },
     scroll: {
