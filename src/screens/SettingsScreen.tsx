@@ -1096,7 +1096,7 @@ export function SettingsScreen() {
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'method' && styles.fieldRowOpen]}>
               <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
+                style={styles.row}
                 onPress={() => toggleDropdown('method')}
               >
                 <View style={styles.methodIcon}>
@@ -1135,6 +1135,15 @@ export function SettingsScreen() {
                   />
                 ))}
               </DropdownMenu>
+            </View>
+            <View style={[styles.row, styles.rowLast]}>
+              <Text style={styles.rowLabel}>{t('settingsScreen.autoOpenContactReport')}</Text>
+              <Switch
+                value={settings.autoOpenContactReport}
+                onValueChange={value => updateSettings({ autoOpenContactReport: value })}
+                trackColor={{ true: Colors.control }}
+                thumbColor={Colors.white}
+              />
             </View>
           </View>
         </View>

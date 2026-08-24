@@ -45,8 +45,8 @@ FEATURES
 [x] add more personalization to onboarding (different event and goal color schemes)
 [x] add a bit of bounciness to scrolling past the vertical edeges on the calendar
 [x] add spanish 
-[ ] be able to turn off auto contact event
-[ ] change dark mode light mode automatically in onboarding
+[x] be able to turn off auto contact event
+[x] change dark mode light mode automatically in onboarding
 [ ] swipe down the menus to close them
 [ ] extend end hour to 2am
 [ ] add x to event select menu on empty space tap
@@ -62,7 +62,6 @@ BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
 [x] swiping time spacing calendar bug? idk what causes it, if its an expo issue or a problem w the code
 [ ] calendar swiping flash is back
-[ ] 
 [ ] use the app for a day and find bugs
 
 DEPLOYMENT TASKS

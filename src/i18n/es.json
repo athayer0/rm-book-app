@@ -525,6 +525,7 @@
     "notifications": "Notificaciones",
     "time": "Hora",
     "defaultContactMethod": "MÉTODO DE CONTACTO PREDETERMINADO",
+    "autoOpenContactReport": "Crear evento tras el contacto",
     "preferredMapsApp": "APP DE MAPAS PREFERIDA",
     "account": "CUENTA",
     "signOutTitle": "Cerrar sesión",

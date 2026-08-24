@@ -63,6 +63,8 @@ export interface AppSettings {
   defaultCountryCode: string;
   /** What a new contact event's method starts as. Dates keep their own list. */
   defaultContactMethod: string;
+  /** Whether leaving the app to call/text/WhatsApp/Messenger someone pops the Contact report draft on return. */
+  autoOpenContactReport: boolean;
   /** iOS only — Android opens addresses in Google Maps regardless. */
   mapsApp: MapsApp;
   /** Whether the daily local notification reminding the user to report events is scheduled. */
@@ -119,6 +121,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   eventSize: DEFAULT_EVENT_SIZE,
   defaultCountryCode: '+1',
   defaultContactMethod: DEFAULT_CONTACT_METHOD,
+  autoOpenContactReport: true,
   mapsApp: DEFAULT_MAPS_APP,
   dailyReviewEnabled: false,
   dailyReviewHour: 22,

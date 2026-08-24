@@ -159,10 +159,11 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
    * Reaches here from the display view, which is where the call, message and map
    * buttons live — the form is for changing a number, not for using it. Only a
    * person who already exists gets the note: the draft attaches them by id, and
-   * an unsaved new person has none yet.
+   * an unsaved new person has none yet. Skipped entirely when the owner has
+   * turned off the Contact report popup in Settings.
    */
   function contactVia(method: string, open: () => void) {
-    if (person) noteAttempt(method);
+    if (person && settings.autoOpenContactReport) noteAttempt(method);
     open();
   }
 

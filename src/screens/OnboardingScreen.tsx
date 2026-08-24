@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal, View, Text, Image, ScrollView, TouchableOpacity, Switch,
-  StyleSheet, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent,
+  StyleSheet, useWindowDimensions, useColorScheme, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
 import { format } from 'date-fns';
 import { Svg, Rect, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
@@ -11,7 +11,6 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { applyThemeColorOverrides } from '../hooks/useColors';
-import { useIsDark } from '../hooks/useIsDark';
 import { LightColors, DarkColors, type ColorPalette } from '../constants/colors';
 import { DEFAULT_EVENT_TYPES } from '../constants/eventTypeDefaults';
 import { DEFAULT_GOALS } from '../constants/defaultGoals';
@@ -183,7 +182,6 @@ function buildThemeColorDraft(settings: AppSettings): Record<ThemeColorSettingKe
 }
 
 export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
-  const isDark = useIsDark();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -198,6 +196,14 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
 
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
+
+  // Drives the whole onboarding flow's own light/dark look, independent of
+  // useIsDark()/live settings — picking a pill on the Settings page should
+  // repaint the flow immediately, not wait for commitAndComplete() to write
+  // it. Declared ahead of Colors below so it's in scope there.
+  const [draftTheme, setDraftTheme] = useState<AppSettings['theme']>('system');
+  const systemScheme = useColorScheme();
+  const isDark = draftTheme === 'dark' || (draftTheme === 'system' && systemScheme === 'dark');
 
   // Every field below is a draft: nothing here writes to storage until
   // commitAndComplete() runs. Each is seeded from the live data on open (see
@@ -258,7 +264,6 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('student');
   const [draftDailyReview, setDraftDailyReview] = useState(false);
   const [draftEventReminders, setDraftEventReminders] = useState(false);
-  const [draftTheme, setDraftTheme] = useState<AppSettings['theme']>('system');
   const [draftWeekStart, setDraftWeekStart] = useState<AppSettings['weekStart']>('sunday');
 
   const [showImport, setShowImport] = useState(false);

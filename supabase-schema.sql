@@ -515,6 +515,10 @@ create table if not exists settings (
   default_country_code text default '+1',
   default_contact_method text
     default 'phone',
+  -- Whether leaving the app to call/text/WhatsApp/Messenger
+  -- someone pops the Contact report draft on return -- see
+  -- AppSettings.autoOpenContactReport.
+  auto_open_contact_report boolean default true,
   -- iOS only: which app an address opens in.
   -- Android always uses Google Maps.
   maps_app text default 'apple',
@@ -591,6 +595,9 @@ alter table settings
 alter table settings
   add column if not exists
   has_onboarded boolean default false;
+alter table settings
+  add column if not exists
+  auto_open_contact_report boolean default true;
 alter table settings enable row level security;
 drop policy if exists "users own their settings"
   on settings;
