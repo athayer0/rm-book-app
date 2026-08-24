@@ -17,9 +17,12 @@ const EMPTY_DEFS: EventTypeDefinition[] = [];
  * seeds the pre-existing goal wiring (temple, church, ...) as each type's
  * default link, same as `def` supplies any other unset field.
  *
- * A removed type (built-in or custom) is a tombstone, not an absent row —
- * dropping it here is what stops a built-in from reappearing on the next
- * read, since `builtIns` below is always regenerated from DEFAULT_EVENT_TYPES.
+ * Tombstones (`removed: true`) are kept in this result, not filtered out — a
+ * built-in is always regenerated fresh from DEFAULT_EVENT_TYPES here, so a
+ * caller that filters removed rows out before round-tripping the list back
+ * through updateDefinitions would silently drop the tombstone and resurrect
+ * it on the next read. Filter at the display call site instead (see
+ * `definitions` below).
  *
  * The same "absent key falls back to the default" rule is why unlinking stores
  * `null` rather than `undefined`: a spread only overrides keys that are present,
@@ -54,11 +57,15 @@ function mergeWithDefaults(storedDefs: EventTypeDefinition[]): EventTypeDefiniti
   const customs = storedDefs
     .filter(d => !d.builtIn)
     .map(d => ({ ...d, reportStyle: d.reportStyle ?? 'status' }));
-  return [...builtIns, ...customs].filter(d => !d.removed);
+  return [...builtIns, ...customs];
 }
 
 type EventTypeDefinitionsContextValue = {
   definitions: EventTypeDefinition[];
+  // Unfiltered — includes removed tombstones. The edit basis for
+  // EventTypesModal / ReorderEventTypesModal, which round-trip it back
+  // through updateDefinitions; see mergeWithDefaults' comment.
+  allDefinitions: EventTypeDefinition[];
   byId: Record<string, EventTypeDefinition>;
   customLinks: CustomTypeLinks;
   updateDefinitions: (defs: EventTypeDefinition[]) => Promise<void>;
@@ -76,6 +83,7 @@ const DEFAULT_BY_ID = Object.fromEntries(DEFAULT_DEFINITIONS.map(d => [d.id, d])
 
 export const EventTypeDefinitionsContext = createContext<EventTypeDefinitionsContextValue>({
   definitions: DEFAULT_DEFINITIONS,
+  allDefinitions: DEFAULT_DEFINITIONS,
   byId: DEFAULT_BY_ID,
   customLinks: {},
   updateDefinitions: async () => {},
@@ -106,10 +114,13 @@ export function useEventTypeDefinitionsState(): EventTypeDefinitionsContextValue
   // anything that somehow lacks `order` — defensive only, since DEFAULT_EVENT_TYPES
   // and every type-creation path populate it.
   const merged = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_DEFINITIONS;
-  const definitions = merged
+  const allDefinitions = merged
     .map((d, i) => ({ d, i }))
     .sort((a, b) => (a.d.order ?? a.i) - (b.d.order ?? b.i))
     .map(({ d }) => d);
+  // Display list: every consumer besides EventTypesModal/ReorderEventTypesModal
+  // wants active types only.
+  const definitions = allDefinitions.filter(d => !d.removed);
 
   const byId = useMemo(
     () => Object.fromEntries(definitions.map(d => [d.id, d])) as Record<string, EventTypeDefinition>,
@@ -153,15 +164,18 @@ export function useEventTypeDefinitionsState(): EventTypeDefinitionsContextValue
   // defaults, including un-deleting one if it was removed. Custom types are left
   // untouched — mirrors useWeeklyGoals' resetBuiltInDefinitions.
   const resetBuiltInDefinitions = useCallback(async () => {
-    const customs = definitions.filter(d => !d.builtIn);
+    // allDefinitions, not definitions — a removed custom's tombstone must
+    // round-trip through this write too, or it disappears from storage here
+    // for the same reason a removed built-in would.
+    const customs = allDefinitions.filter(d => !d.builtIn);
     await updateDefinitions([...DEFAULT_EVENT_TYPES.map(d => ({ ...d })), ...customs]);
-  }, [definitions, updateDefinitions]);
+  }, [allDefinitions, updateDefinitions]);
 
   const reload = useCallback(async () => {
     await defsState.reload();
   }, [defsState]);
 
-  return { definitions, byId, customLinks, updateDefinitions, resetBuiltInDefinitions, reload, loaded: defsState.loaded };
+  return { definitions, allDefinitions, byId, customLinks, updateDefinitions, resetBuiltInDefinitions, reload, loaded: defsState.loaded };
 }
 
 export function useEventTypeDefinitions(): EventTypeDefinitionsContextValue {

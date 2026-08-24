@@ -40,7 +40,7 @@ export function HomeScreen({ navigation, route }: any) {
   const systemScheme = useColorScheme();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
 
-  const { definitions, counts, goals, updateDefinitions, reload, saveCountForWeek, loaded: weeklyLoaded } = useWeeklyGoals();
+  const { definitions, allDefinitions, counts, goals, updateDefinitions, reload, saveCountForWeek, loaded: weeklyLoaded } = useWeeklyGoals();
   const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly, saveCountForMonth, loaded: monthlyLoaded } = useMonthlyGoals();
   const { count: unreportedCount, loaded: unreportedLoaded } = useUnreported();
   const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
@@ -143,7 +143,10 @@ export function HomeScreen({ navigation, route }: any) {
   const reorderComplete = weekTaps.length === weekVisibleCount && monthTaps.length === monthVisibleCount;
 
   function commitGoalReorder() {
-    const patched = definitions.map(d => {
+    // allDefinitions, not definitions — a removed goal's tombstone must
+    // round-trip through this write too, or it disappears from storage and
+    // reappears (built-ins regenerate from DEFAULT_GOALS) on the next read.
+    const patched = allDefinitions.map(d => {
       const wIdx = weekTaps.indexOf(d.id);
       const mIdx = monthTaps.indexOf(d.id);
       return {
@@ -261,7 +264,7 @@ export function HomeScreen({ navigation, route }: any) {
       <EditGoalsModal
         visible={editVisible}
         onClose={() => setEditVisible(false)}
-        definitions={definitions}
+        definitions={allDefinitions}
         onUpdateDefinitions={updateDefinitions}
         eventTypeDefs={eventTypeDefinitions}
         onUpdateEventTypeDefs={updateEventTypeDefinitions}

@@ -22,7 +22,7 @@ import { WeekStrip } from '../components/WeekStrip';
 import { FAB, type FABAction } from '../components/FAB';
 import { AddEditEventModal } from '../modals/AddEditEventModal';
 import { EventTypeSheet } from '../modals/EventTypeSheet';
-import { CalendarEvent, renderedEventHeight, hasEndTime, eventTopOffset } from '../utils/eventUtils';
+import { CalendarEvent, EventStatus, renderedEventHeight, hasEndTime, eventTopOffset } from '../utils/eventUtils';
 import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventReport } from '../hooks/useEventReport';
@@ -250,13 +250,16 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     setShowEventModal(true);
   }
 
-  async function handleSaveEvent(eventData: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future') {
+  async function handleSaveEvent(eventData: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future', status?: EventStatus) {
     if (editingEvent) {
       if (scope === 'single') await updateOccurrence(editingEvent.id, editingEvent.date, eventData);
       else if (scope === 'future') await updateFromDate(editingEvent.id, editingEvent.date, eventData);
       else await updateEvent(editingEvent.id, eventData);
     } else {
-      await addEvent(eventData);
+      const created = await addEvent(eventData);
+      // The form set a status before the event had an id to report against —
+      // now that it does, report it through the same path a checkbox tap would.
+      if (status) await report(created, status);
     }
   }
 

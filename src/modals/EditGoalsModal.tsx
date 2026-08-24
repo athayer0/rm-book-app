@@ -223,15 +223,6 @@ export function EditGoalsModal({
     return isDark ? lightenColor(color) : color;
   }
 
-  /**
-   * Whether a goal can be deleted right now — false while an event type still
-   * links to it, in *either* slot. A type that splits by time of day holds two
-   * goals, and the evening one is no less linked for being the second.
-   */
-  function goalInUse(id: string): boolean {
-    return localEventTypeDefs.some(d => linksTo(d, id));
-  }
-
   function linksTo(d: EventTypeDefinition, goalId: string): boolean {
     return d.goalId === goalId || d.lateGoalId === goalId;
   }
@@ -272,21 +263,25 @@ export function EditGoalsModal({
     setOpenMenu(null);
   }
 
-  /** Tombstones rather than removes the array entry — see GoalDefinition.removed. */
+  /**
+   * Tombstones rather than removes the array entry — see GoalDefinition.removed.
+   * A goal still linked to an event type is deletable, not blocked — the Alert's
+   * body just says so, and confirming also clears the link (both slots, on every
+   * type that holds it — the same sweep `applyEventTypeLink`'s unlink branch
+   * does) so nothing is left pointing at a goal that no longer exists.
+   */
   function handleDeletePress() {
     if (!selected) return;
-    if (goalInUse(selected.id)) {
-      const linkedTypeDef = localEventTypeDefs.find(et => linksTo(et, selected.id));
-      const linkedTypeLabel = linkedTypeDef ? eventTypeDisplayLabel(linkedTypeDef, t) : t('editGoals.anEventType');
-      Alert.alert(
-        t('editGoals.linkedToEventTypeTitle'),
-        t('editGoals.linkedToEventTypeBody', { goal: label(selected), type: linkedTypeLabel }),
-      );
-      return;
-    }
+    const linkedTypeDef = localEventTypeDefs.find(et => linksTo(et, selected.id));
+    const body = linkedTypeDef
+      ? t('editGoals.deleteLinkedGoalBody', {
+        goal: label(selected),
+        type: eventTypeDisplayLabel(linkedTypeDef, t),
+      })
+      : t('editGoals.cannotBeUndone');
     Alert.alert(
       t('editGoals.deleteGoalTitle', { name: label(selected) }),
-      t('editGoals.cannotBeUndone'),
+      body,
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -297,6 +292,7 @@ export function EditGoalsModal({
             // the list — the selector can't sit on the row that just went away.
             const index = activeDefs.findIndex(d => d.id === selected.id);
             const next = activeDefs[index + 1] ?? activeDefs[index - 1];
+            if (linkedTypeDef) applyEventTypeLink(selected.id, undefined);
             patchGoal(selected.id, { removed: true });
             setSelectedId(next?.id ?? null);
           },

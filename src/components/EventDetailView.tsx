@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors } from '../constants/colors';
 import {
-  CalendarEvent, EventStatus, isReportableType, isCheckboxType, hasEndTime, UNITS_MAX_LENGTH,
+  CalendarEvent, EventStatus, isReportableType, isCheckboxType, hasEndTime,
 } from '../utils/eventUtils';
 import {
   CONTACT_METHODS, contactMethodLabel, methodFieldLabel, resolveContactMethod, usesContactMethod,
@@ -16,13 +16,12 @@ import {
 import { GoalIcon } from './GoalIcon';
 import { StatusCheckbox } from './StatusCheckbox';
 import { StatusIcon } from './StatusIcon';
-import { StatusPicker, statusLabel } from './StatusPicker';
+import { StatusGlyph, statusLabel } from './StatusPicker';
 import { PERSON_STATUSES, StatusConfig } from '../constants/personStatuses';
 import { usePeople, Person } from '../hooks/usePeople';
 import { AppSettings } from '../hooks/useSettings';
 import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
-import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
 import { displayTime } from '../utils/dateUtils';
 
@@ -35,12 +34,13 @@ interface Props {
   event: CalendarEvent;
   settings: AppSettings;
   status: EventStatus | undefined;
-  /** Absent when the caller doesn't track status, which makes the row read-only. */
+  /**
+   * Checkbox-style events (task) can still be checked off straight from here —
+   * it's a single tap toggling one thing, not a choice among three. The
+   * tri-state picker stays edit-only; this is never used for that case. Absent
+   * makes the checkbox display-only too.
+   */
   onStatusChange?: (status: EventStatus | undefined) => void;
-  /** Absent when the caller doesn't persist quantity, which makes the stepper read-only. */
-  onQuantityChange?: (quantity: number) => void;
-  /** Absent when the caller doesn't persist units, which makes that box read-only. */
-  onUnitsChange?: (units: string) => void;
   /** Absent hides the trash icon — the caller owns confirmation and the actual delete. */
   onDelete?: () => void;
 }
@@ -55,6 +55,10 @@ function shortDate(dateStr: string, language: 'en' | 'es'): string {
   return format(new Date(dateStr + 'T12:00:00'), datePattern('monthDayYear', language), { locale: dateFnsLocale(language) });
 }
 
+// The edit form's own checkbox size — kept here too since it's still a real
+// tap target for a checkbox-style event, not shrunk down for being read-only.
+const EDITOR_CHECKBOX_SIZE = 38;
+
 /** "Every week on Mon, Wed" — the series in one line, without its end date. */
 function recurrenceSummary(event: CalendarEvent, t: TFunction): string {
   if (event.recurringRule === 'daily') return t('eventDetail.everyDay');
@@ -68,10 +72,6 @@ function recurrenceSummary(event: CalendarEvent, t: TFunction): string {
   return t('eventDetail.everyWeekOn', { days: names.join(', ') });
 }
 
-// Smaller than StatusPicker's icons: a filled/outlined box reads heavier than a
-// glyph at the same size, so it needs to sit smaller to match their visual weight.
-const CHECKBOX_SIZE = 38;
-
 /**
  * An event as it stands, with nothing offering to be typed in.
  *
@@ -81,15 +81,17 @@ const CHECKBOX_SIZE = 38;
  * one card and is separated by rules, reading as a page about the event rather
  * than a stack of things to fill in.
  *
- * Two things stay live here rather than moving to the editor: the reported
- * status, and a quantity-type event's count — both are actions taken on the
- * event (report it, log another rep) rather than fields you go fill in.
+ * A quantity-type event's count is read-only here — setting one happens on the
+ * edit form now, which is the only place it's written. Status is read-only for
+ * the tri-state (pending/completed/failed) types for the same reason, but a
+ * checkbox-style event can still be checked off from here, same as always —
+ * see onStatusChange.
  *
  * Empty fields are dropped rather than shown blank, so what's here is what the
  * event actually has.
  */
 export function EventDetailView({
-  event, settings, status, onStatusChange, onQuantityChange, onUnitsChange, onDelete,
+  event, settings, status, onStatusChange, onDelete,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -101,41 +103,6 @@ export function EventDetailView({
     () => new Map(allPeople.map(p => [p.id, p])),
     [allPeople],
   );
-
-  // Local text for the quantity box, so a partially-typed value ("1" on the way
-  // to "12") isn't clobbered by the prop re-deriving from event.quantity on
-  // every keystroke's re-render. Only resynced while the box isn't focused —
-  // committing happens on blur, via onQuantityChange.
-  const [quantityText, setQuantityText] = useState(String(event.quantity ?? 0));
-  const [quantityFocused, setQuantityFocused] = useState(false);
-  useEffect(() => {
-    if (!quantityFocused) setQuantityText(String(event.quantity ?? 0));
-  }, [event.id, event.quantity, quantityFocused]);
-
-  function commitQuantity() {
-    setQuantityFocused(false);
-    const n = parseInt(quantityText, 10);
-    const clamped = Number.isNaN(n) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, n));
-    setQuantityText(String(clamped));
-    if (clamped !== (event.quantity ?? 0)) onQuantityChange?.(clamped);
-  }
-
-  // Units follow quantity exactly: held locally while focused so a half-typed
-  // word survives the re-render, resynced from the event when it isn't, and
-  // committed on blur rather than per keystroke — every letter would otherwise
-  // be its own write and its own queued sync op.
-  const [unitsText, setUnitsText] = useState(event.units ?? '');
-  const [unitsFocused, setUnitsFocused] = useState(false);
-  useEffect(() => {
-    if (!unitsFocused) setUnitsText(event.units ?? '');
-  }, [event.id, event.units, unitsFocused]);
-
-  function commitUnits() {
-    setUnitsFocused(false);
-    const trimmed = unitsText.trim();
-    setUnitsText(trimmed);
-    if (trimmed !== (event.units ?? '')) onUnitsChange?.(trimmed);
-  }
 
   // Same fallback as the editor's: PERSON_STATUSES is a Record, so indexing it
   // is typed as always finding something, but a status this build no longer
@@ -192,13 +159,14 @@ export function EventDetailView({
       node: (
         <>
           <Text style={styles.label}>{t('eventDetail.status')}</Text>
-          <View style={styles.statusRow}>
-            <Text style={styles.value}>
-              {isStatusCheckbox
-                ? (status === 'completed' ? t('eventStatus.completed') : t('eventDetail.notCompleted'))
-                : (status ? statusLabel(status, t) : t('goals.none'))}
-            </Text>
-            {isStatusCheckbox ? (
+          {/* Whichever one is currently set, not the other two — the tri-state
+              picker's tappable list belongs to the editor. Both cases draw at
+              the editor's own size and on the same side (right) it does. */}
+          {isStatusCheckbox ? (
+            <View style={styles.statusRow}>
+              <Text style={styles.value}>
+                {status === 'completed' ? t('eventStatus.completed') : t('eventDetail.notCompleted')}
+              </Text>
               <TouchableOpacity
                 onPress={() => onStatusChange?.(status === 'completed' ? undefined : 'completed')}
                 disabled={!onStatusChange}
@@ -206,56 +174,39 @@ export function EventDetailView({
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: status === 'completed' }}
               >
-                <StatusCheckbox checked={status === 'completed'} size={CHECKBOX_SIZE} color={color} />
+                <StatusCheckbox checked={status === 'completed'} size={EDITOR_CHECKBOX_SIZE} color={color} />
               </TouchableOpacity>
-            ) : (
-              <StatusPicker value={status} onChange={s => onStatusChange?.(s)} />
-            )}
-          </View>
+            </View>
+          ) : (
+            <View style={styles.statusRow}>
+              <Text style={styles.value}>{status ? statusLabel(status, t) : t('goals.none')}</Text>
+              {/* StatusGlyph defaults to BASE_SIZE (54) — the same "big" size
+                  StatusPicker draws each option at in the editor. */}
+              {status && <StatusGlyph status={status} />}
+            </View>
+          )}
         </>
       ),
     });
   }
 
   if (!isBackup && eventTypeById[event.type]?.goalMode === 'quantity') {
+    const quantity = event.quantity ?? 0;
     groups.push({
       key: 'quantity',
       node: (
+        // Same two-box layout as the editor's Quantity/Units row, just Text
+        // instead of TextInput — nothing here is tappable or typed into.
         <View style={styles.quantityRow}>
           <View>
             <Text style={styles.label}>{t('eventDetail.quantity')}</Text>
-            <TextInput
-              style={styles.quantityBox}
-              value={quantityText}
-              onChangeText={setQuantityText}
-              onFocus={() => setQuantityFocused(true)}
-              onBlur={commitQuantity}
-              editable={!!onQuantityChange}
-              keyboardType="number-pad"
-              selectTextOnFocus
-              maxLength={3}
-              accessibilityLabel={t('eventDetail.quantity')}
-            />
+            <Text style={styles.quantityBox}>{quantity}</Text>
           </View>
-          {/* Takes the rest of the row: a unit is a word, and it reads as one
-              field with the number rather than a second thing below it. */}
           <View style={styles.unitsField}>
             <Text style={styles.label}>{t('eventDetail.units')}</Text>
-            <TextInput
-              style={[styles.quantityBox, styles.unitsBox]}
-              value={unitsText}
-              onChangeText={setUnitsText}
-              onFocus={() => setUnitsFocused(true)}
-              onBlur={commitUnits}
-              editable={!!onUnitsChange}
-              // Neutral on purpose: a real unit ("miles") reads as a value
-              // already filled in, and suggests this box wants that one.
-              placeholder={t('eventDetail.optional')}
-              placeholderTextColor={Colors.textLight}
-              autoCapitalize="none"
-              maxLength={UNITS_MAX_LENGTH}
-              accessibilityLabel={t('eventDetail.units')}
-            />
+            <Text style={[styles.quantityBox, styles.unitsBox, !event.units && styles.unitsPlaceholder]}>
+              {event.units || t('eventDetail.optional')}
+            </Text>
           </View>
         </View>
       ),
@@ -475,28 +426,14 @@ function makeStyles(C: ColorPalette) {
     // hierarchy on one theme.
     repeatUntil: { fontWeight: '400', marginTop: 2 },
     inlineValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    colorDot: { width: 14, height: 14, borderRadius: 7 },
-    personRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7 },
-    // Only between rows: a rule under the last one would read as an input's underline.
-    personRowDivided: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: C.border,
-    },
-    personIcon: { marginRight: 10 },
-    personName: { flex: 1, fontSize: 15, color: C.text },
-    statusRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    // `stretch`, so the units box can match the number's height rather than
-    // sitting shorter because its font is smaller.
+    // Text on the left, big glyph/checkbox on the right — matches the edit
+    // form's switchRow layout exactly, since these are the same controls at
+    // the same size.
+    statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    // Matches the editor's Quantity/Units row exactly — same two boxes, same
+    // sizes — since this is that same row with Text standing in for TextInput.
     quantityRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
     unitsField: { flex: 1 },
-    // Same box as the number, but a word rather than a figure: sized like the
-    // card's other values and left-aligned, since a unit read centred under its
-    // label looked like a second number that had lost its digits. `flex` takes
-    // the height the label leaves; Android needs to be told to centre in it.
     unitsBox: {
       alignSelf: 'stretch',
       flex: 1,
@@ -505,8 +442,9 @@ function makeStyles(C: ColorPalette) {
       textAlign: 'left',
       textAlignVertical: 'center',
     },
-    // Matches GoalPeriodList's numPill: a filled rounded box holding a large
-    // number, left-aligned under its label rather than centred in the row.
+    // Neutral, the way the editor's placeholder text is: reads as "nothing
+    // entered" rather than as a real unit that happens to say "optional".
+    unitsPlaceholder: { color: C.textLight, fontWeight: '400' },
     quantityBox: {
       alignSelf: 'flex-start',
       minWidth: 60,
@@ -519,5 +457,14 @@ function makeStyles(C: ColorPalette) {
       color: C.text,
       textAlign: 'center',
     },
+    colorDot: { width: 14, height: 14, borderRadius: 7 },
+    personRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7 },
+    // Only between rows: a rule under the last one would read as an input's underline.
+    personRowDivided: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+    },
+    personIcon: { marginRight: 10 },
+    personName: { flex: 1, fontSize: 15, color: C.text },
   });
 }

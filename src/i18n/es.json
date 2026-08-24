@@ -367,9 +367,7 @@
     "addAGoal": "Añadir una meta",
     "maxGoalsPerGrid": "Máximo de {{max}} metas por cuadrícula",
     "reorderGoals": "Reordenar metas",
-    "anEventType": "un tipo de evento",
-    "linkedToEventTypeTitle": "Vinculado a un tipo de evento",
-    "linkedToEventTypeBody": "\"{{goal}}\" está vinculado a {{type}}. Cambia su Tipo de evento vinculado a Ninguno y luego elimina esta meta.",
+    "deleteLinkedGoalBody": "\"{{goal}}\" está vinculado a {{type}}. Eliminarlo también desvinculará {{type}}: sus finalizaciones dejarán de contar para cualquier meta hasta que vincules una nueva. Esto no se puede deshacer.",
     "deleteGoalTitle": "¿Eliminar \"{{name}}\"?",
     "cannotBeUndone": "Esto no se puede deshacer."
   },
@@ -455,8 +453,6 @@
     "thisPerson": "esta persona"
   },
   "addEditEvent": {
-    "quantitySaveFailed": "No se pudo guardar la cantidad. Inténtalo de nuevo.",
-    "unitsSaveFailed": "No se pudieron guardar las unidades. Inténtalo de nuevo.",
     "deleteEventTitle": "Eliminar evento",
     "deleteEventBody": "¿Seguro que quieres eliminar este evento?",
     "deleteRecurringTitle": "Eliminar evento recurrente",

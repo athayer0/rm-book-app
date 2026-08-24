@@ -110,6 +110,7 @@ export function SettingsScreen() {
   } = useWeeklyGoals();
   const {
     definitions: eventTypeDefinitions,
+    allDefinitions: allEventTypeDefinitions,
     updateDefinitions: updateEventTypeDefinitions,
     resetBuiltInDefinitions: resetBuiltInEventTypeDefinitions,
   } = useEventTypeDefinitions();
@@ -1291,14 +1292,14 @@ export function SettingsScreen() {
       <EventTypesModal
         visible={eventSheet === 'types'}
         onClose={() => setEventSheet(null)}
-        definitions={eventTypeDefinitions}
+        definitions={allEventTypeDefinitions}
         onUpdateDefinitions={updateEventTypeDefinitions}
         goalDefinitions={goalDefinitions}
       />
       <ReorderEventTypesModal
         visible={eventSheet === 'reorder'}
         onClose={() => setEventSheet(null)}
-        definitions={eventTypeDefinitions}
+        definitions={allEventTypeDefinitions}
         onUpdateDefinitions={updateEventTypeDefinitions}
       />
       <EventReminderTypesModal visible={eventSheet === 'reminderTypes'} onClose={() => setEventSheet(null)} />

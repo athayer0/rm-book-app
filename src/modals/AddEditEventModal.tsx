@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Switch, Alert, Pressable,
+  StyleSheet, Switch, Alert, Pressable, Animated, Easing, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -10,19 +10,22 @@ import type { ColorPalette } from '../constants/colors';
 import { EventColors, EventTypeConfig } from '../constants/colors';
 import {
   CalendarEvent, EventStatus, RecurringRule, defaultRecurrenceEnd,
-  isCheckboxType, hasOptionalEnd, resolveEventStatus,
+  isCheckboxType, hasOptionalEnd, resolveEventStatus, isReportableType, UNITS_MAX_LENGTH,
 } from '../utils/eventUtils';
 import {
   CONTACT_METHODS, contactMethodLabel, methodFieldLabel,
   methodOptionsFor, resolveContactMethod, usesContactMethod,
 } from '../constants/contactMethods';
 import { eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
+import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 import { dateFnsLocale, datePattern } from '../utils/dateFnsLocale';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import { DropdownMenu, DropdownItem, Collapsible, MenuScrollView } from '../components/DropdownMenu';
 import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { EventDetailView } from '../components/EventDetailView';
 import { GoalIcon } from '../components/GoalIcon';
+import { StatusCheckbox } from '../components/StatusCheckbox';
+import { StatusPicker, statusLabel } from '../components/StatusPicker';
 import { SheetModal } from '../components/SheetModal';
 import { addMinutesToTimeString, parseTimeString, weekdayInitial, displayTime } from '../utils/dateUtils';
 import { AppSettings } from '../hooks/useSettings';
@@ -50,8 +53,12 @@ interface Props {
   onStatusChange?: (status: EventStatus | undefined) => void;
   /** `scope` is set only when saving an edit to a recurring event's series row —
    *  'single' carves off just this occurrence, 'future' splits the series at it.
-   *  Absent for a non-recurring event or a brand-new one, where there's nothing to scope. */
-  onSave: (event: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future') => Promise<void>;
+   *  Absent for a non-recurring event or a brand-new one, where there's nothing to scope.
+   *  `status` carries a brand-new event's status, set from the form before the event
+   *  has an id of its own to report against — the caller applies it once the save
+   *  hands back the created event's id. Absent when editing, where a status change
+   *  reports immediately through `onStatusChange` instead. */
+  onSave: (event: Omit<CalendarEvent, 'id'>, scope?: 'single' | 'future', status?: EventStatus) => Promise<void>;
   /** 'single' drops just occurrenceDate; 'future' ends the series before it. */
   onDelete?: (id: string, occurrenceDate: string, mode: 'single' | 'future') => void;
   onClose: () => void;
@@ -61,6 +68,15 @@ interface Props {
 // by being visibly cut. MenuScrollView turns it into a height off MENU_ITEM_HEIGHT
 // and scrolls the selected row to the top by the same measure.
 const TYPE_MENU_ROWS = 4.5;
+
+// Matches EventDetailView's checkbox: smaller than StatusPicker's icons, since a
+// filled/outlined box reads heavier than a glyph at the same size.
+const CHECKBOX_SIZE = 38;
+
+// How far the edit form travels sliding on/off over the display view.
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const EDIT_COVER_IN_MS = 280;
+const EDIT_COVER_OUT_MS = 240;
 
 function resolvedColor(type: string, settings: AppSettings): string {
   return settings.eventTypeColors[type] ?? EventColors[type] ?? '#00B5C8';
@@ -86,6 +102,14 @@ function minutesBetween(startTime: string, endTime: string): number {
 
 function weekdayOf(dateStr: string): number {
   return new Date(dateStr + 'T12:00:00').getDay();
+}
+
+// Order matters (recurringDays and people are both built/stored in a fixed
+// order already), so this is position equality, not set equality.
+function sameArray<T>(a: T[] | undefined, b: T[] | undefined): boolean {
+  const aa = a ?? [];
+  const bb = b ?? [];
+  return aa.length === bb.length && aa.every((v, i) => v === bb[i]);
 }
 
 type PickerId = 'type' | 'date' | 'start' | 'end' | 'rule' | 'endsOn' | 'method';
@@ -156,6 +180,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   const [contactMethod, setContactMethod] = useState(settings.defaultContactMethod);
   const [quantity, setQuantity] = useState(0);
   const [units, setUnits] = useState('');
+  // Local text for the quantity/units boxes, same reason EventDetailView buffers
+  // them: a partially-typed value ("1" on the way to "12") isn't clobbered by
+  // `quantity` re-deriving on every keystroke's re-render. Resynced from state
+  // only while not focused, committed on blur.
+  const [quantityText, setQuantityText] = useState(() => String(quantity));
+  const [quantityFocused, setQuantityFocused] = useState(false);
+  const [unitsText, setUnitsText] = useState(() => units);
+  const [unitsFocused, setUnitsFocused] = useState(false);
   // One picker open at a time — a single value makes that structural instead of
   // something six separate booleans have to agree on.
   const [openPicker, setOpenPicker] = useState<PickerId | null>(null);
@@ -178,6 +210,38 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
    */
   const [mode, setMode] = useState<'view' | 'edit'>(event ? 'view' : 'edit');
   const [error, setError] = useState('');
+
+  /**
+   * Slides the edit form in from the right to cover the display view, and back
+   * out in reverse. A brand-new event opens straight into the form (mode
+   * starts and stays 'edit') with no display view underneath — editCover
+   * starts at 1 so it renders in place rather than off-screen.
+   *
+   * Driven from the explicit actions that flip `mode` (goToEdit/goToView)
+   * rather than from an effect watching `mode`, so reopening the sheet for a
+   * different event (the reset effect below) can snap straight to its resting
+   * state instead of replaying a transition nobody asked for. Both are only
+   * ever called while an existing event is open — the new-event header has no
+   * Edit button, and its Save/Cancel close the sheet outright instead.
+   */
+  const editCover = useRef(new Animated.Value(mode === 'edit' ? 1 : 0)).current;
+  // Kept mounted through the closing slide so it has a frame to animate off in.
+  const [editMounted, setEditMounted] = useState(mode === 'edit');
+
+  function goToEdit() {
+    setMode('edit');
+    setEditMounted(true);
+    Animated.timing(editCover, {
+      toValue: 1, duration: EDIT_COVER_IN_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    }).start();
+  }
+
+  function goToView() {
+    setMode('view');
+    Animated.timing(editCover, {
+      toValue: 0, duration: EDIT_COVER_OUT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+    }).start(({ finished }) => { if (finished) setEditMounted(false); });
+  }
 
   /**
    * Seed every field from the event, or from the defaults for a new one.
@@ -237,7 +301,13 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
   useEffect(() => {
     resetForm();
-    setMode(event ? 'view' : 'edit');
+    const initialMode = event ? 'view' : 'edit';
+    setMode(initialMode);
+    // Snapped rather than animated: this fires on opening for a (possibly
+    // different) event, not on a Save/Cancel/Edit tap, so there's no display
+    // view mid-transition to slide over — just a resting state to land on.
+    setEditMounted(initialMode === 'edit');
+    editCover.setValue(initialMode === 'edit' ? 1 : 0);
     // resetForm reads a good deal more than this lists, but every one of those is
     // either a prop covered here or state it only writes. `currentStatus` in
     // particular is deliberately absent: reporting a status from the display view
@@ -255,42 +325,37 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, currentStatus, visible]);
 
-  // Reporting happens on the display view now. Both controls there hand back the
-  // status they resolve to, including undefined when the active one is tapped
-  // again, so this just adopts it and passes it on.
+  // Shared by every control that can report a status — the display view's
+  // checkbox, and the edit form's checkbox/picker — so however it's tapped,
+  // the same write happens and every one of them re-renders off the same
+  // localStatus. All of them hand back the status they resolve to, including
+  // undefined when the active one is tapped again.
   function handleStatusTap(next: EventStatus | undefined) {
     setLocalStatus(next);
     onStatusChange?.(next);
   }
 
-  // Quantity is set from the display view too, and — unlike status — it's a
-  // field on the event itself rather than a separate tracked value, so
-  // committing a tap here means writing straight through onSave instead of
-  // waiting on the form's own Save button. buildEventData() reads `quantity`
-  // out of state, which setQuantity above hasn't applied yet by the time this
-  // runs, so the new value is spliced in after rather than trusted to state.
-  async function handleQuantityChange(newQuantity: number) {
-    setQuantity(newQuantity);
-    try {
-      await onSave({ ...buildEventData(), quantity: newQuantity });
-    } catch (e) {
-      console.error('[AddEditEventModal] quantity save failed:', e);
-      setError(t('addEditEvent.quantitySaveFailed'));
-    }
+  useEffect(() => {
+    if (!quantityFocused) setQuantityText(String(quantity));
+  }, [quantity, quantityFocused]);
+
+  function commitQuantity() {
+    setQuantityFocused(false);
+    const n = parseInt(quantityText, 10);
+    const clamped = Number.isNaN(n) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, n));
+    setQuantityText(String(clamped));
+    setQuantity(clamped);
   }
 
-  // Units commit from the display view the same way, and for the same reason
-  // have to be spliced past state that hasn't applied yet. Empty means cleared,
-  // so it goes as undefined — toRow turns that into a null column, where '' would
-  // leave the block drawing a unit made of nothing.
-  async function handleUnitsChange(newUnits: string) {
-    setUnits(newUnits);
-    try {
-      await onSave({ ...buildEventData(), units: newUnits || undefined });
-    } catch (e) {
-      console.error('[AddEditEventModal] units save failed:', e);
-      setError(t('addEditEvent.unitsSaveFailed'));
-    }
+  useEffect(() => {
+    if (!unitsFocused) setUnitsText(units);
+  }, [units, unitsFocused]);
+
+  function commitUnits() {
+    setUnitsFocused(false);
+    const trimmed = unitsText.trim();
+    setUnitsText(trimmed);
+    setUnits(trimmed);
   }
 
   function handleTypeChange(newType: string) {
@@ -443,15 +508,51 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   }
 
   /**
+   * Whether the form still reads exactly like the event it opened from.
+   * Only meaningful with an existing event — a new one has nothing to compare
+   * against, and handleSave never calls this for one.
+   */
+  function formUnchanged(): boolean {
+    if (!event) return false;
+    const data = buildEventData();
+    return (
+      data.title === event.title &&
+      data.type === event.type &&
+      data.date === event.date &&
+      data.startTime === event.startTime &&
+      data.endTime === event.endTime &&
+      data.notes === (event.notes ?? '') &&
+      data.recurring === event.recurring &&
+      data.recurringRule === event.recurringRule &&
+      data.recurringUntil === event.recurringUntil &&
+      sameArray(data.recurringDays, event.recurringDays) &&
+      data.backup === (event.backup ?? false) &&
+      sameArray(data.people, event.people) &&
+      data.contactMethod === event.contactMethod &&
+      data.quantity === event.quantity &&
+      data.units === event.units
+    );
+  }
+
+  /**
    * A recurring event's fields belong to the whole series, so saving one always
    * asks which occurrences the edit applies to before anything is written —
    * the same question, and the same two answers, handleDelete already asks.
    * A non-recurring event or a brand-new one has no series to scope, so it
    * saves straight through.
+   *
+   * That question is itself only worth asking when there's something to write:
+   * tapping Save without having changed anything is otherwise indistinguishable
+   * from Cancel, and shouldn't make the user pick a scope for a no-op.
    */
   function handleSave() {
     if (!event || !event.recurring) {
       commitSave();
+      return;
+    }
+    if (formUnchanged()) {
+      closePickers();
+      goToView();
       return;
     }
     Alert.alert(
@@ -469,13 +570,15 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   async function commitSave(scope?: 'single' | 'future') {
     setError('');
     try {
-      await onSave(buildEventData(), scope);
+      // Only for a brand-new event — an existing one already reported its
+      // status live, through onStatusChange, as the form was edited.
+      await onSave(buildEventData(), scope, event ? undefined : localStatus);
       // Otherwise a picker left open (Start Time, End Time) is still open
       // underneath when Edit reopens the form, since switching to 'view'
       // doesn't tear the form down.
       closePickers();
       // An existing event has a page to go back to; a new one does not.
-      if (event) setMode('view'); else onClose();
+      if (event) goToView(); else onClose();
     } catch (e) {
       console.error('[AddEditEventModal] onSave failed:', e);
       setError(t('addEditEvent.eventSaveFailed'));
@@ -485,10 +588,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   function handleCancel() {
     if (!event) { onClose(); return; }
     resetForm();
-    setMode('view');
+    goToView();
   }
 
   const fixed = isCheckboxType(type);
+  const isStatusCheckbox = eventTypeById[type]?.reportStyle === 'checkbox';
   // An optional-end type with end === start has no end time yet; every other type
   // always shows the picker, so a meal that happens to end when it starts is not
   // mistaken for one still awaiting an end.
@@ -560,7 +664,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>{t('addEditEvent.eventTitle')}</Text>
-              <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
+              <TouchableOpacity onPress={goToEdit} style={styles.headerRightBtn}>
                 <Text style={styles.save}>{t('common.edit')}</Text>
               </TouchableOpacity>
             </>
@@ -591,17 +695,29 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
 
-        {viewedEvent ? (
-          <EventDetailView
-            event={{ id: viewedEvent.id, ...buildEventData() }}
-            settings={settings}
-            status={localStatus}
-            onStatusChange={onStatusChange ? handleStatusTap : undefined}
-            onQuantityChange={handleQuantityChange}
-            onUnitsChange={handleUnitsChange}
-            onDelete={onDelete ? handleDelete : undefined}
-          />
-        ) : (
+        <View style={styles.stack}>
+          {event && (
+            <View style={styles.stackLayer}>
+              <EventDetailView
+                event={{ id: event.id, ...buildEventData() }}
+                settings={settings}
+                status={localStatus}
+                onStatusChange={onStatusChange ? handleStatusTap : undefined}
+                onDelete={onDelete ? handleDelete : undefined}
+              />
+            </View>
+          )}
+          {editMounted && (
+          <Animated.View
+            style={[
+              styles.stackLayer,
+              {
+                transform: [{
+                  translateX: editCover.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_WIDTH, 0] }),
+                }],
+              },
+            ]}
+          >
         <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
           {floatingPickerOpen && (
             <Pressable style={styles.pickerBackdrop} onPress={closeFloatingPicker} />
@@ -635,6 +751,71 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               )}
             </View>
           </View>
+
+          {/* Existing events always carry onStatusChange when there's a status to
+              show (see the three callers). A brand-new one has none — there's
+              nothing to report against yet — but still gets the row, since the
+              status it's given here rides along on the save. */}
+          {!isBackup && (event ? !!onStatusChange : true) && isReportableType(type, eventTypeById) && (
+            <View style={styles.group}>
+              <Text style={styles.label}>{t('eventDetail.status')}</Text>
+              <View style={styles.switchRow}>
+                <Text style={styles.pickerText}>
+                  {isStatusCheckbox
+                    ? (localStatus === 'completed' ? t('eventStatus.completed') : t('eventDetail.notCompleted'))
+                    : (localStatus ? statusLabel(localStatus, t) : t('goals.none'))}
+                </Text>
+                {isStatusCheckbox ? (
+                  <TouchableOpacity
+                    onPress={() => { closePickers(); handleStatusTap(localStatus === 'completed' ? undefined : 'completed'); }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: localStatus === 'completed' }}
+                  >
+                    <StatusCheckbox checked={localStatus === 'completed'} size={CHECKBOX_SIZE} color={resolvedColor(type, settings)} />
+                  </TouchableOpacity>
+                ) : (
+                  <StatusPicker value={localStatus} onChange={s => { closePickers(); handleStatusTap(s); }} />
+                )}
+              </View>
+            </View>
+          )}
+
+          {!isBackup && eventTypeById[type]?.goalMode === 'quantity' && (
+            <View style={styles.group}>
+              <View style={styles.quantityRow}>
+                <View>
+                  <Text style={styles.label}>{t('eventDetail.quantity')}</Text>
+                  <TextInput
+                    style={styles.quantityBox}
+                    value={quantityText}
+                    onChangeText={setQuantityText}
+                    onFocus={() => { closePickers(); setQuantityFocused(true); }}
+                    onBlur={commitQuantity}
+                    keyboardType="number-pad"
+                    selectTextOnFocus
+                    maxLength={3}
+                    accessibilityLabel={t('eventDetail.quantity')}
+                  />
+                </View>
+                <View style={styles.unitsField}>
+                  <Text style={styles.label}>{t('eventDetail.units')}</Text>
+                  <TextInput
+                    style={[styles.quantityBox, styles.unitsBox]}
+                    value={unitsText}
+                    onChangeText={setUnitsText}
+                    onFocus={() => { closePickers(); setUnitsFocused(true); }}
+                    onBlur={commitUnits}
+                    placeholder={t('eventDetail.optional')}
+                    placeholderTextColor={Colors.textLight}
+                    autoCapitalize="none"
+                    maxLength={UNITS_MAX_LENGTH}
+                    accessibilityLabel={t('eventDetail.units')}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
 
           <View style={[styles.group, styles.columns, styles.pickerRow, elevatedPicker === 'type' && styles.openPickerRow]}>
             <View style={styles.column}>
@@ -844,9 +1025,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.group]}>
+          <View style={[styles.group, { paddingBottom: 8 }]}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>{t('addEditEvent.backupEvent')}</Text>
+              <Text style={styles.pickerText}>{t('addEditEvent.backupEvent')}</Text>
               <Switch
                 value={isBackup}
                 // Sits above the dismiss backdrop now that the card does, so it
@@ -859,9 +1040,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
             </View>
           </View>
 
-          <View style={[styles.group, styles.pickerRow, (elevatedPicker === 'rule' || elevatedPicker === 'endsOn') && styles.openPickerRow]}>
+          <View style={[styles.group, styles.pickerRow, { paddingTop: 8 }, (elevatedPicker === 'rule' || elevatedPicker === 'endsOn') && styles.openPickerRow]}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>{t('addEditEvent.recurring')}</Text>
+              <Text style={styles.pickerText}>{t('addEditEvent.recurring')}</Text>
               <Switch
                 value={recurring}
                 onValueChange={handleRecurringToggle}
@@ -964,7 +1145,9 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
 
           <View style={{ height: 40 }} />
         </ScrollView>
-        )}
+          </Animated.View>
+          )}
+        </View>
 
         {/*
           Nested inside this sheet for the reason UnreportedEventsModal spells
@@ -1002,6 +1185,11 @@ function makeStyles(C: ColorPalette) {
     closeBtn: { width: 72, alignItems: 'flex-start' },
     headerRightBtn: { width: 72, alignItems: 'flex-end' },
     save: { fontSize: 16, fontWeight: '600', color: C.accent },
+    // Holds the display view and, while editing (or animating into/out of it),
+    // the edit form on top of it — both absolutely filling this box so the
+    // edit form can slide over the display view instead of replacing it.
+    stack: { flex: 1, overflow: 'hidden' },
+    stackLayer: { ...StyleSheet.absoluteFillObject },
     form: { flex: 1, backgroundColor: C.background },
     /**
      * One card for the whole form, the way the display view has one for the whole
@@ -1171,6 +1359,30 @@ function makeStyles(C: ColorPalette) {
       zIndex: 25,
     },
     switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    // Matches EventDetailView's quantity/units row exactly, since Save turns this
+    // card into that one in place.
+    quantityRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
+    unitsField: { flex: 1 },
+    unitsBox: {
+      alignSelf: 'stretch',
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'left',
+      textAlignVertical: 'center',
+    },
+    quantityBox: {
+      alignSelf: 'flex-start',
+      minWidth: 60,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: C.background,
+      fontSize: 22,
+      fontWeight: '700',
+      color: C.text,
+      textAlign: 'center',
+    },
     dayRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',

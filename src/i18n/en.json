@@ -367,9 +367,7 @@
     "addAGoal": "Add a Goal",
     "maxGoalsPerGrid": "Maximum of {{max}} goals per grid",
     "reorderGoals": "Reorder Goals",
-    "anEventType": "an event type",
-    "linkedToEventTypeTitle": "Linked to an Event Type",
-    "linkedToEventTypeBody": "\"{{goal}}\" is linked to {{type}}. Set its Linked Event Type to None, then delete this goal.",
+    "deleteLinkedGoalBody": "\"{{goal}}\" is linked to {{type}}. Deleting it will also unlink {{type}} — its completions will stop counting toward any goal until you link a new one. This cannot be undone.",
     "deleteGoalTitle": "Delete \"{{name}}\"?",
     "cannotBeUndone": "This cannot be undone."
   },
@@ -455,8 +453,6 @@
     "thisPerson": "this person"
   },
   "addEditEvent": {
-    "quantitySaveFailed": "Failed to save quantity. Please try again.",
-    "unitsSaveFailed": "Failed to save units. Please try again.",
     "deleteEventTitle": "Delete Event",
     "deleteEventBody": "Are you sure you want to delete this event?",
     "deleteRecurringTitle": "Delete Recurring Event",

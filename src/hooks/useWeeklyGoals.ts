@@ -48,6 +48,11 @@ export function resolveGoal(stored: number | undefined, isPast: boolean): number
   return stored ?? (isPast ? 0 : null);
 }
 
+// Tombstones (`removed: true`) are kept in this result, not filtered out —
+// a built-in is always regenerated fresh from DEFAULT_GOALS here, so a caller
+// that filters removed rows out before round-tripping the list back through
+// updateDefinitions would silently drop the tombstone and resurrect it on the
+// next read. Filter at the display call site instead (see `definitions` below).
 function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {
   const builtIns = DEFAULT_GOALS.map(def => {
     const stored = storedDefs.find(d => d.id === def.id);
@@ -57,11 +62,7 @@ function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {
   });
   // Keep custom (non-builtIn) goals from stored
   const customs = storedDefs.filter(d => !d.builtIn);
-  // A removed goal (built-in or custom) is a tombstone, not an absent row —
-  // dropping it here rather than never storing it is what stops a built-in
-  // from reappearing on the next read, since `builtIns` above is always
-  // regenerated from the full DEFAULT_GOALS list.
-  return [...builtIns, ...customs].filter(d => !d.removed);
+  return [...builtIns, ...customs];
 }
 
 export function useWeeklyGoals() {
@@ -83,7 +84,14 @@ export function useWeeklyGoals() {
   const { getStatus, loaded: statusesLoaded } = useEventStatuses();
   const { customLinks, loaded: typeDefsLoaded } = useEventTypeDefinitions();
 
-  const definitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_GOALS;
+  // Unfiltered — includes removed tombstones. This is the edit basis
+  // EditGoalsModal round-trips back through updateDefinitions, so a goal it
+  // isn't currently showing (deleted in an earlier session) survives the
+  // write instead of being dropped and regenerated from DEFAULT_GOALS.
+  const allDefinitions = defsState.value.length > 0 ? mergeWithDefaults(defsState.value) : DEFAULT_GOALS;
+  // Display list: every other consumer (GoalGrid, GoalsModal, GoalGraphModal, …)
+  // wants active goals only.
+  const definitions = allDefinitions.filter(d => !d.removed);
   const goals = targetsState.value;
 
   const isCompleted = useCallback(
@@ -173,9 +181,12 @@ export function useWeeklyGoals() {
   // Restore every built-in goal's fields (label, icon, colour, target, …) to the shipped
   // defaults. Custom goals are left untouched, and counts/targets live elsewhere so they persist.
   const resetBuiltInDefinitions = useCallback(async () => {
-    const customs = definitions.filter(d => !d.builtIn);
+    // allDefinitions, not definitions — a removed custom's tombstone must
+    // round-trip through this write too, or it disappears from storage here
+    // for the same reason a removed built-in would.
+    const customs = allDefinitions.filter(d => !d.builtIn);
     await updateDefinitions([...DEFAULT_GOALS.map(d => ({ ...d })), ...customs]);
-  }, [definitions, updateDefinitions]);
+  }, [allDefinitions, updateDefinitions]);
 
   const reload = useCallback(async () => {
     await Promise.all([defsState.reload(), offsetsState.reload(), targetsState.reload()]);
@@ -237,5 +248,5 @@ export function useWeeklyGoals() {
   const loaded = defsState.loaded && offsetsState.loaded && targetsState.loaded
     && eventsLoaded && statusesLoaded && typeDefsLoaded;
 
-  return { definitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek, loaded };
+  return { definitions, allDefinitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek, loaded };
 }

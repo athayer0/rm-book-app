@@ -55,7 +55,7 @@ FEATURES
 [x] make the menu x tap area bigger
 [x] expand icon pool
 [x] spectrum color selector is a lil laggy
-[ ] event reporting in a more intuitive
+[x] event reporting in a more intuitive
 [ ] hold bottom or top of event to extend the time up and down
 
 BUGS

@@ -23,6 +23,56 @@ export function statusLabel(status: EventStatus, t: TFunction): string {
 /** The size the event edit modal has always drawn these at. */
 export const BASE_SIZE = 54;
 
+interface GlyphProps {
+  status: EventStatus;
+  size?: number;
+}
+
+/**
+ * The "selected" rendering for one status, pulled out of the picker below so a
+ * read-only display of the current status (EventDetailView) draws the same
+ * glyph rather than reproducing `failed`'s disc-and-mirrored-ban treatment by
+ * hand somewhere else.
+ */
+export function StatusGlyph({ status, size = BASE_SIZE }: GlyphProps) {
+  const Colors = useColors();
+
+  const color: Record<EventStatus, string> = {
+    pending: Colors.statusPending,
+    completed: Colors.statusCompleted,
+    failed: Colors.statusFailed,
+  };
+
+  if (status === 'failed') {
+    const scale = size / BASE_SIZE;
+    const banSize = 51 * scale;
+    const disc = 45 * scale;
+    const discGlyph = 39 * scale;
+    return (
+      <View style={{ width: banSize, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{
+          width: disc,
+          height: disc,
+          borderRadius: disc / 2,
+          backgroundColor: color.failed,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <Ionicons name="ban-outline" size={discGlyph} color={Colors.white} style={{ transform: [{ scaleX: -1 }] }} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <Ionicons
+      name={status === 'completed' ? 'checkmark-circle' : 'alert-circle'}
+      size={size}
+      color={color[status]}
+    />
+  );
+}
+
 interface Props {
   value: EventStatus | undefined;
   /** Receives undefined when the active state is tapped a second time. */
@@ -54,8 +104,6 @@ export function StatusPicker({ value, onChange, size = BASE_SIZE }: Props) {
 
   const scale = size / BASE_SIZE;
   const banSize = 51 * scale;
-  const disc = 45 * scale;
-  const discGlyph = 39 * scale;
 
   return (
     <View style={{ flexDirection: 'row', gap: 12 * scale, alignItems: 'center' }}>
@@ -70,25 +118,11 @@ export function StatusPicker({ value, onChange, size = BASE_SIZE }: Props) {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={isBan ? { width: banSize, height: size, alignItems: 'center', justifyContent: 'center' } : undefined}
           >
-            {isBan && selected ? (
-              <View style={{
-                width: disc,
-                height: disc,
-                borderRadius: disc / 2,
-                backgroundColor: color.failed,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Ionicons
-                  name="ban-outline"
-                  size={discGlyph}
-                  color={Colors.white}
-                  style={{ transform: [{ scaleX: -1 }] }}
-                />
-              </View>
+            {selected ? (
+              <StatusGlyph status={opt.value} size={size} />
             ) : (
               <Ionicons
-                name={(selected ? opt.icon : `${opt.icon}-outline`) as any}
+                name={`${opt.icon}-outline` as any}
                 size={isBan ? banSize : size}
                 color={color[opt.value]}
                 style={isBan ? { transform: [{ scaleX: -1 }] } : undefined}
