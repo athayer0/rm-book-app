@@ -59,8 +59,6 @@ export interface AppSettings {
   gridStartHour: number;
   gridEndHour: number;
   eventSize: EventSize;
-  /** Prepended to local numbers when building a WhatsApp link. */
-  defaultCountryCode: string;
   /** What a new contact event's method starts as. Dates keep their own list. */
   defaultContactMethod: string;
   /** Whether leaving the app to call/text/WhatsApp/Messenger someone pops the Contact report draft on return. */
@@ -119,7 +117,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   gridStartHour: 6,
   gridEndHour: 24,
   eventSize: DEFAULT_EVENT_SIZE,
-  defaultCountryCode: '+1',
   defaultContactMethod: DEFAULT_CONTACT_METHOD,
   autoOpenContactReport: true,
   mapsApp: DEFAULT_MAPS_APP,

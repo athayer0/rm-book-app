@@ -160,7 +160,7 @@ export function PersonDetailView({
             {whatsappDialable.length > 0 && (
               <TouchableOpacity
                 style={styles.contactBtn}
-                onPress={() => onContact('whatsapp', () => openWhatsApp(whatsapp, settings.defaultCountryCode, t))}
+                onPress={() => onContact('whatsapp', () => openWhatsApp(whatsapp, t))}
                 accessibilityRole="button"
                 accessibilityLabel={trimmedName ? t('personDetail.whatsappWithName', { name: trimmedName }) : t('personDetail.openInWhatsapp')}
               >

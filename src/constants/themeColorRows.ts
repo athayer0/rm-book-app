@@ -44,15 +44,15 @@ export interface ThemeColorRow {
  * editing a colour you can't see change.
  */
 export const THEME_COLOR_ROWS: ThemeColorRow[] = [
-  { key: 'primary', label: 'Primary Color', settingKey: 'themeColor', defaultValue: DEFAULT_THEME_COLOR },
-  { key: 'secondaryLight', label: 'Secondary Color (Light)', settingKey: 'secondaryColorLight', defaultValue: DEFAULT_SECONDARY_COLOR_LIGHT, mode: 'light' },
-  { key: 'secondaryDark', label: 'Secondary Color (Dark)', settingKey: 'secondaryColorDark', defaultValue: DEFAULT_SECONDARY_COLOR_DARK, mode: 'dark' },
-  { key: 'tertiaryLight', label: 'Tertiary Color (Light)', settingKey: 'tertiaryColorLight', defaultValue: DEFAULT_TERTIARY_COLOR_LIGHT, mode: 'light' },
-  { key: 'tertiaryDark', label: 'Tertiary Color (Dark)', settingKey: 'tertiaryColorDark', defaultValue: DEFAULT_TERTIARY_COLOR_DARK, mode: 'dark' },
-  { key: 'statusCompletedLight', label: 'Completed Status Color (Light)', settingKey: 'statusCompletedColorLight', defaultValue: DEFAULT_STATUS_COMPLETED_LIGHT, mode: 'light' },
-  { key: 'statusCompletedDark', label: 'Completed Status Color (Dark)', settingKey: 'statusCompletedColorDark', defaultValue: DEFAULT_STATUS_COMPLETED_DARK, mode: 'dark' },
-  { key: 'statusFailedLight', label: 'Failed Status Color (Light)', settingKey: 'statusFailedColorLight', defaultValue: DEFAULT_STATUS_FAILED_LIGHT, mode: 'light' },
-  { key: 'statusFailedDark', label: 'Failed Status Color (Dark)', settingKey: 'statusFailedColorDark', defaultValue: DEFAULT_STATUS_FAILED_DARK, mode: 'dark' },
-  { key: 'statusPendingLight', label: 'Pending Status Color (Light)', settingKey: 'statusPendingColorLight', defaultValue: DEFAULT_STATUS_PENDING_LIGHT, mode: 'light' },
-  { key: 'statusPendingDark', label: 'Pending Status Color (Dark)', settingKey: 'statusPendingColorDark', defaultValue: DEFAULT_STATUS_PENDING_DARK, mode: 'dark' },
+  { key: 'primary', label: 'Primary', settingKey: 'themeColor', defaultValue: DEFAULT_THEME_COLOR },
+  { key: 'secondaryLight', label: 'Secondary', settingKey: 'secondaryColorLight', defaultValue: DEFAULT_SECONDARY_COLOR_LIGHT, mode: 'light' },
+  { key: 'secondaryDark', label: 'Secondary', settingKey: 'secondaryColorDark', defaultValue: DEFAULT_SECONDARY_COLOR_DARK, mode: 'dark' },
+  { key: 'tertiaryLight', label: 'Tertiary', settingKey: 'tertiaryColorLight', defaultValue: DEFAULT_TERTIARY_COLOR_LIGHT, mode: 'light' },
+  { key: 'tertiaryDark', label: 'Tertiary', settingKey: 'tertiaryColorDark', defaultValue: DEFAULT_TERTIARY_COLOR_DARK, mode: 'dark' },
+  { key: 'statusCompletedLight', label: 'Completed Status', settingKey: 'statusCompletedColorLight', defaultValue: DEFAULT_STATUS_COMPLETED_LIGHT, mode: 'light' },
+  { key: 'statusCompletedDark', label: 'Completed Status', settingKey: 'statusCompletedColorDark', defaultValue: DEFAULT_STATUS_COMPLETED_DARK, mode: 'dark' },
+  { key: 'statusFailedLight', label: 'Failed Status', settingKey: 'statusFailedColorLight', defaultValue: DEFAULT_STATUS_FAILED_LIGHT, mode: 'light' },
+  { key: 'statusFailedDark', label: 'Failed Status', settingKey: 'statusFailedColorDark', defaultValue: DEFAULT_STATUS_FAILED_DARK, mode: 'dark' },
+  { key: 'statusPendingLight', label: 'Pending Status', settingKey: 'statusPendingColorLight', defaultValue: DEFAULT_STATUS_PENDING_LIGHT, mode: 'light' },
+  { key: 'statusPendingDark', label: 'Pending Status', settingKey: 'statusPendingColorDark', defaultValue: DEFAULT_STATUS_PENDING_DARK, mode: 'dark' },
 ];

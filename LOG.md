@@ -50,7 +50,7 @@ FEATURES
 [ ] swipe down the menus to close them
 [ ] extend end hour to 2am
 [x] add x to event select menu on empty space tap
-[ ] make color scheme changing more intuitive
+[x] make color scheme changing more intuitive
 [x] hard press ki to edit, quick press to increment
 [x] make the menu x tap area bigger
 [x] expand icon pool

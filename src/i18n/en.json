@@ -505,17 +505,17 @@
     "xl": "Extra Large"
   },
   "themeColorRows": {
-    "primary": "Primary Color",
-    "secondaryLight": "Secondary Color (Light)",
-    "secondaryDark": "Secondary Color (Dark)",
-    "tertiaryLight": "Tertiary Color (Light)",
-    "tertiaryDark": "Tertiary Color (Dark)",
-    "statusCompletedLight": "Completed Status Color (Light)",
-    "statusCompletedDark": "Completed Status Color (Dark)",
-    "statusFailedLight": "Failed Status Color (Light)",
-    "statusFailedDark": "Failed Status Color (Dark)",
-    "statusPendingLight": "Pending Status Color (Light)",
-    "statusPendingDark": "Pending Status Color (Dark)"
+    "primary": "Primary",
+    "secondaryLight": "Secondary",
+    "secondaryDark": "Secondary",
+    "tertiaryLight": "Tertiary",
+    "tertiaryDark": "Tertiary",
+    "statusCompletedLight": "Completed Status",
+    "statusCompletedDark": "Completed Status",
+    "statusFailedLight": "Failed Status",
+    "statusFailedDark": "Failed Status",
+    "statusPendingLight": "Pending Status",
+    "statusPendingDark": "Pending Status"
   },
   "settingsScreen": {
     "title": "Settings",
@@ -524,9 +524,13 @@
     "resetToDefault": "Reset to Default",
     "notifications": "Notifications",
     "time": "Time",
-    "defaultContactMethod": "DEFAULT CONTACT METHOD",
+    "defaultContactMethod": "Default Contact Method",
     "autoOpenContactReport": "Create Event After Contact",
-    "preferredMapsApp": "PREFERRED MAPS APP",
+    "preferredMapsApp": "Default Maps App",
+    "mapsApp": {
+      "apple": "Apple",
+      "google": "Google"
+    },
     "account": "ACCOUNT",
     "signOutTitle": "Sign Out",
     "signOutBody": "Are you sure you want to sign out?",
@@ -557,6 +561,15 @@
     "resetEventTypesBody": "Built-in event types will be restored to their original values. This cannot be undone.",
     "resetQuickAddTitle": "Reset Event Bubble +",
     "resetQuickAddBody": "This will restore the default quick-add types and icons. This cannot be undone.",
+    "appearance": {
+      "sectionTitle": "APPEARANCE",
+      "colorScheme": "All Color Schemes",
+      "customScheme": "Custom",
+      "appColorScheme": "App Color Scheme",
+      "appColors": "App Colors",
+      "eventColors": "Event Color Scheme",
+      "goalColors": "Goal Color Scheme"
+    },
     "themeColors": {
       "sectionTitle": "THEME COLORS",
       "colorScheme": "Color Scheme",
@@ -565,7 +578,7 @@
     },
     "eventSize": {
       "sectionTitle": "EVENT SIZE",
-      "size": "Size"
+      "size": "Event Size"
     },
     "eventTypes": {
       "sectionTitle": "EVENT TYPES",
@@ -584,24 +597,29 @@
       "customScheme": "Custom"
     },
     "dailyReview": {
-      "sectionTitle": "DAILY REVIEW"
+      "sectionTitle": "DAILY REVIEW",
+      "label": "Daily Review"
     },
     "eventReminders": {
       "sectionTitle": "EVENT REMINDERS",
+      "label": "Event Reminders",
       "timeBefore": "Time Before",
       "types": "Types",
       "allTypes": "All Types",
       "typesOfTotal": "{{count}} of {{total}}"
     },
     "weekStart": {
-      "sectionTitle": "WEEK START"
+      "sectionTitle": "WEEK START",
+      "label": "Week Start"
     },
     "scheduleHours": {
       "sectionTitle": "SCHEDULE HOURS"
     },
-    "countryCode": {
-      "sectionTitle": "DEFAULT COUNTRY CODE",
-      "footnote": "Used for WhatsApp numbers saved without a + code."
+    "calendarSchedule": {
+      "sectionTitle": "CALENDAR & SCHEDULE"
+    },
+    "contacts": {
+      "sectionTitle": "CONTACTS"
     }
   },
   "eventReminderTypes": {

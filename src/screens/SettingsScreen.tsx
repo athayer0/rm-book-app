@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, TextInput, Platform, useColorScheme, Switch, Pressable,
+  Alert, Platform, useColorScheme, Switch, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -81,8 +81,8 @@ function isStockBuiltInType(d: EventTypeDefinition): boolean {
 // at a time — opening one closes whichever else was open, rather than each
 // tracking its own independent boolean.
 type DropdownKey =
-  | 'hourStart' | 'hourEnd' | 'size' | 'theme' | 'language' | 'timeFormat' | 'dailyReviewTime' | 'eventReminderLead'
-  | 'colorScheme' | 'colors' | 'eventColorScheme' | 'goalColorScheme' | 'method';
+  | 'hourStart' | 'hourEnd' | 'size' | 'language' | 'dailyReviewTime' | 'eventReminderLead'
+  | 'masterColorScheme' | 'appColorScheme' | 'colors' | 'eventColorScheme' | 'goalColorScheme' | 'method';
 
 /**
  * The dropdowns that open in the flow and push the rows below them down, rather
@@ -142,8 +142,6 @@ export function SettingsScreen() {
   // Which of the event-type screens is open.
   const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | 'reorder' | 'reminderTypes' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
-  // Content-relative y of the country-code section, from its onLayout.
-  const codeSectionY = useRef(0);
 
   function toggleDropdown(key: DropdownKey) {
     setOpenDropdown(prev => (prev === key ? null : key));
@@ -194,18 +192,6 @@ export function SettingsScreen() {
     }, []),
   );
 
-  /**
-   * Put the country-code section a fixed distance below the top of the viewport
-   * instead of leaving the destination to the platform's scroll-to-focus, which
-   * overshoots on a list this long. Runs after the keyboard animation so it has
-   * the last word, and scrollTo clamps to the content, so the section cannot end
-   * up off screen however far down the list it sits.
-   */
-  function revealCodeField() {
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(0, codeSectionY.current - 60), animated: true });
-    }, 250);
-  }
   const selectedEventSize = resolveEventSize(settings.eventSize);
   // Settings persist, so a stored method may name a choice this build no longer has.
   const selectedMethod = CONTACT_METHODS[settings.defaultContactMethod]
@@ -252,6 +238,21 @@ export function SettingsScreen() {
       } : {}),
     });
     setOpenDropdown(null);
+  }
+
+  // Applies one scheme's identity to theme + status colors, event-type
+  // colors, and goal colors all at once — the Appearance card's master
+  // Color Scheme row. The three underlying schemes share the same five ids
+  // (see the top-of-file note on THEME_COLOR_SCHEMES), and updateSettings'
+  // write() resolves against a ref rather than a stale closure, so calling
+  // applyColorScheme then applyEventColorScheme in the same tick merges
+  // rather than one clobbering the other.
+  function applyAllColorSchemes(scheme: ThemeColorScheme) {
+    applyColorScheme(scheme);
+    const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    if (eventScheme) applyEventColorScheme(eventScheme);
+    const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    if (goalScheme) applyGoalColorScheme(goalScheme);
   }
 
   function handleResetWeek() {
@@ -317,6 +318,15 @@ export function SettingsScreen() {
     )));
     setOpenDropdown(null);
   }
+
+  // The Appearance card's master picker only shows a scheme selected once
+  // theme, event, and goal colors all independently resolve to that same
+  // id — a partial match (someone hand-tuned one category) reads as Custom,
+  // same as each individual picker already does.
+  const masterSchemeId =
+    selectedSchemeId && selectedSchemeId === selectedEventSchemeId && selectedSchemeId === selectedGoalSchemeId
+      ? selectedSchemeId
+      : null;
 
   // Types with no duration to offer at all have nothing to be customized —
   // effectiveMinutes is already null for them.
@@ -466,8 +476,7 @@ export function SettingsScreen() {
       </View>
 
       {/* automaticallyAdjustKeyboardInsets, as on every other scroll in the app,
-          so focused content can clear the keyboard. Where it lands is decided by
-          revealCodeField() rather than by the platform. */}
+          so focused content can clear the keyboard. */}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -480,49 +489,30 @@ export function SettingsScreen() {
           <Pressable style={styles.pickerBackdrop} onPress={() => setOpenDropdown(null)} />
         )}
 
-        {/* Theme — collapsed to one row, same shape as Event Size / Contact
-            Method, instead of all three options sitting on the screen. */}
-        <View style={[styles.section, elevatedDropdown === 'theme' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settings.theme.sectionTitle')}</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldRow, elevatedDropdown === 'theme' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
-                onPress={() => toggleDropdown('theme')}
-              >
-                <Text style={styles.rowLabel}>{t('settings.theme.label')}</Text>
-                <Text style={styles.rowValue}>
-                  {t(`settings.theme.${settings.theme}`)}
-                </Text>
-                <Ionicons
-                  name={openDropdown === 'theme' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              <DropdownMenu open={openDropdown === 'theme'}>
-                {(['light', 'dark', 'system'] as const).map((theme, i, arr) => (
-                  <DropdownItem
-                    key={theme}
-                    label={t(`settings.theme.${theme}`)}
-                    selected={settings.theme === theme}
-                    showSeparator={i < arr.length - 1}
-                    onPress={() => { updateSettings({ theme }); setOpenDropdown(null); }}
-                  />
-                ))}
-              </DropdownMenu>
-            </View>
-          </View>
-        </View>
-
-        {/* Language — same shape as Theme above: a floating two-option picker. */}
-        <View style={[styles.section, elevatedDropdown === 'language' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settings.language.sectionTitle')}</Text>
+        {/* Appearance — every visual/display setting in one card: Language,
+            Event Size, and Mode (light/dark/system) right below it, then the
+            master Color Scheme (applies one of the five named looks to
+            theme + status + event-type + goal colors together — see
+            applyAllColorSchemes). App Color Scheme is the same five presets
+            but scoped to just the app colors below it (applyColorScheme,
+            no event/goal write), for when only those should change. Then
+            App Colors' per-swatch editor (was "Customize Colors"), and quick
+            links down to Event Types' and Goals' own Color Scheme rows for
+            overriding just one category. Event Bubble has its own card
+            below. */}
+        <View
+          style={[
+            styles.section,
+            (elevatedDropdown === 'masterColorScheme' || elevatedDropdown === 'appColorScheme'
+              || elevatedDropdown === 'eventColorScheme' || elevatedDropdown === 'goalColorScheme'
+              || elevatedDropdown === 'size' || elevatedDropdown === 'language') && styles.sectionFloating,
+          ]}
+        >
+          <Text style={styles.sectionTitle}>{t('settingsScreen.appearance.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'language' && styles.fieldRowOpen]}>
               <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
+                style={styles.row}
                 onPress={() => toggleDropdown('language')}
               >
                 <Text style={styles.rowLabel}>{t('settings.language.label')}</Text>
@@ -548,145 +538,10 @@ export function SettingsScreen() {
                 ))}
               </DropdownMenu>
             </View>
-          </View>
-        </View>
 
-        {/* Time Format — same shape as Language above: a floating two-option picker. */}
-        <View style={[styles.section, elevatedDropdown === 'timeFormat' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settings.timeFormat.sectionTitle')}</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldRow, elevatedDropdown === 'timeFormat' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
-                onPress={() => toggleDropdown('timeFormat')}
-              >
-                <Text style={styles.rowLabel}>{t('settings.timeFormat.label')}</Text>
-                <Text style={styles.rowValue}>
-                  {settings.timeFormat === '24h' ? t('settings.timeFormat.military') : t('settings.timeFormat.standard')}
-                </Text>
-                <Ionicons
-                  name={openDropdown === 'timeFormat' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              <DropdownMenu open={openDropdown === 'timeFormat'}>
-                {(['12h', '24h'] as const).map((timeFormat, i, arr) => (
-                  <DropdownItem
-                    key={timeFormat}
-                    label={timeFormat === '24h' ? t('settings.timeFormat.military') : t('settings.timeFormat.standard')}
-                    selected={settings.timeFormat === timeFormat}
-                    showSeparator={i < arr.length - 1}
-                    onPress={() => { updateSettings({ timeFormat }); setOpenDropdown(null); }}
-                  />
-                ))}
-              </DropdownMenu>
-            </View>
-          </View>
-        </View>
-
-        {/* Theme Colors — two rows. Color Scheme picks one of the five named
-            looks in one shot (theme + status colours together, see
-            applyColorScheme); Customize Colors is the per-row editor,
-            unchanged from before — see THEME_COLOR_ROWS for what each row
-            drives. */}
-        {/* Only Color Scheme needs the section lift: it's the one row here
-            that floats a menu over its sibling. Customize Colors pushes the
-            rows below it down in the flow instead, so it needs no backdrop. */}
-        <View style={[styles.section, elevatedDropdown === 'colorScheme' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.themeColors.sectionTitle')}</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldRow, elevatedDropdown === 'colorScheme' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => toggleDropdown('colorScheme')}
-              >
-                <Text style={styles.rowLabel}>{t('settingsScreen.themeColors.colorScheme')}</Text>
-                <Text style={styles.rowValue}>
-                  {selectedSchemeId
-                    ? t(`colorSchemes.${selectedSchemeId}`, { defaultValue: THEME_COLOR_SCHEMES.find(s => s.id === selectedSchemeId)?.label })
-                    : t('settingsScreen.themeColors.customScheme')}
-                </Text>
-                <Ionicons
-                  name={openDropdown === 'colorScheme' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              <DropdownMenu open={openDropdown === 'colorScheme'}>
-                {THEME_COLOR_SCHEMES.map((scheme, i, arr) => (
-                  <DropdownItem
-                    key={scheme.id}
-                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
-                    selected={selectedSchemeId === scheme.id}
-                    showSeparator={i < arr.length - 1}
-                    leading={
-                      <View style={styles.schemeDotsRow}>
-                        {schemeChipDots(scheme.id, isDark).map((color, di) => (
-                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
-                        ))}
-                      </View>
-                    }
-                    onPress={() => applyColorScheme(scheme)}
-                  />
-                ))}
-              </DropdownMenu>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.row, openDropdown !== 'colors' && styles.rowLast]}
-              onPress={() => toggleDropdown('colors')}
-            >
-              <Text style={styles.rowLabel}>{t('settingsScreen.themeColors.customizeColors')}</Text>
-              <View style={styles.dotPreviewRow}>
-                {visibleColorRows.map(row => (
-                  <View
-                    key={row.key}
-                    style={[styles.dotPreview, { backgroundColor: normalizeHex(settings[row.settingKey]) ?? row.defaultValue }]}
-                  />
-                ))}
-              </View>
-              <Ionicons
-                name={openDropdown === 'colors' ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={Colors.textLight}
-                style={{ marginLeft: 6 }}
-              />
-            </TouchableOpacity>
-            <Collapsible open={openDropdown === 'colors'}>
-              <View style={[styles.dropdownList, styles.dropdownListLast]}>
-                {visibleColorRows.map((row, i, arr) => {
-                  // The dot is the value; the hex it happens to have said
-                  // nothing the colour itself doesn't.
-                  const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
-                  return (
-                    <TouchableOpacity
-                      key={row.key}
-                      style={[styles.dropdownItem, i === arr.length - 1 && styles.dropdownItemLast]}
-                      onPress={() => setColorSheet(row.key)}
-                    >
-                      <View style={[styles.colorDot, { backgroundColor: value }]} />
-                      <Text style={styles.dropdownItemText}>{t(`themeColorRows.${row.key}`, { defaultValue: row.label })}</Text>
-                      <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </Collapsible>
-          </View>
-        </View>
-
-        {/* Event Size — collapsed to one row and expanded on tap, the same
-            shape as Start Time / End Time above, instead of every option
-            sitting on the screen at once. */}
-        <View style={[styles.section, elevatedDropdown === 'size' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.eventSize.sectionTitle')}</Text>
-          <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'size' && styles.fieldRowOpen]}>
               <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
+                style={styles.row}
                 onPress={() => toggleDropdown('size')}
               >
                 <Text style={styles.rowLabel}>{t('settingsScreen.eventSize.size')}</Text>
@@ -712,26 +567,147 @@ export function SettingsScreen() {
                 ))}
               </DropdownMenu>
             </View>
-          </View>
-        </View>
 
-        {/* Event Types — name/status/goal-link editing plus color and duration
-            both live inside the "Customize" sheet now, per type. Colors and
-            durations used to have their own screens listing every type flat;
-            those are gone, but their bulk "Reset to Default" actions stay
-            here alongside a reset for the type list itself. Color Scheme,
-            like the one on Theme Colors, applies one of the five named
-            palettes to every built-in type's color in one shot — see
-            applyEventColorScheme. */}
-        <View style={[styles.section, elevatedDropdown === 'eventColorScheme' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.eventTypes.sectionTitle')}</Text>
-          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>{t('settings.theme.label')}</Text>
+              <View style={styles.prefPills}>
+                {(['light', 'dark', 'system'] as const).map(theme => (
+                  <TouchableOpacity
+                    key={theme}
+                    style={[styles.pillSmall, settings.theme === theme && styles.pillActive]}
+                    onPress={() => updateSettings({ theme })}
+                  >
+                    <Text style={[styles.pillTextSmall, settings.theme === theme && styles.pillTextActive]}>
+                      {t(`settings.theme.${theme}`)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.fieldRow, elevatedDropdown === 'masterColorScheme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => toggleDropdown('masterColorScheme')}
+              >
+                <Text style={styles.rowLabel}>{t('settingsScreen.appearance.colorScheme')}</Text>
+                <Text style={styles.rowValue}>
+                  {masterSchemeId
+                    ? t(`colorSchemes.${masterSchemeId}`, { defaultValue: THEME_COLOR_SCHEMES.find(s => s.id === masterSchemeId)?.label })
+                    : t('settingsScreen.appearance.customScheme')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'masterColorScheme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'masterColorScheme'}>
+                {THEME_COLOR_SCHEMES.map((scheme, i, arr) => (
+                  <DropdownItem
+                    key={scheme.id}
+                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
+                    selected={masterSchemeId === scheme.id}
+                    showSeparator={i < arr.length - 1}
+                    leading={
+                      <View style={styles.schemeDotsRow}>
+                        {schemeChipDots(scheme.id, isDark).map((color, di) => (
+                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
+                        ))}
+                      </View>
+                    }
+                    onPress={() => applyAllColorSchemes(scheme)}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+
+            <View style={[styles.fieldRow, elevatedDropdown === 'appColorScheme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => toggleDropdown('appColorScheme')}
+              >
+                <Text style={styles.rowLabel}>{t('settingsScreen.appearance.appColorScheme')}</Text>
+                <Text style={styles.rowValue}>
+                  {selectedSchemeId
+                    ? t(`colorSchemes.${selectedSchemeId}`, { defaultValue: THEME_COLOR_SCHEMES.find(s => s.id === selectedSchemeId)?.label })
+                    : t('settingsScreen.appearance.customScheme')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'appColorScheme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'appColorScheme'}>
+                {THEME_COLOR_SCHEMES.map((scheme, i, arr) => (
+                  <DropdownItem
+                    key={scheme.id}
+                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
+                    selected={selectedSchemeId === scheme.id}
+                    showSeparator={i < arr.length - 1}
+                    leading={
+                      <View style={styles.schemeDotsRow}>
+                        {schemeChipDots(scheme.id, isDark).map((color, di) => (
+                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
+                        ))}
+                      </View>
+                    }
+                    onPress={() => applyColorScheme(scheme)}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => toggleDropdown('colors')}
+            >
+              <Text style={styles.rowLabel}>{t('settingsScreen.appearance.appColors')}</Text>
+              <View style={styles.dotPreviewRow}>
+                {visibleColorRows.map(row => (
+                  <View
+                    key={row.key}
+                    style={[styles.dotPreview, { backgroundColor: normalizeHex(settings[row.settingKey]) ?? row.defaultValue }]}
+                  />
+                ))}
+              </View>
+              <Ionicons
+                name={openDropdown === 'colors' ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.textLight}
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+            <Collapsible open={openDropdown === 'colors'}>
+              <View style={styles.dropdownList}>
+                {visibleColorRows.map((row, i, arr) => {
+                  // The dot is the value; the hex it happens to have said
+                  // nothing the colour itself doesn't.
+                  const value = normalizeHex(settings[row.settingKey]) ?? row.defaultValue;
+                  return (
+                    <TouchableOpacity
+                      key={row.key}
+                      style={styles.dropdownItem}
+                      onPress={() => setColorSheet(row.key)}
+                    >
+                      <View style={[styles.colorDot, { backgroundColor: value }]} />
+                      <Text style={styles.dropdownItemText}>{t(`themeColorRows.${row.key}`, { defaultValue: row.label })}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </Collapsible>
+
             <View style={[styles.fieldRow, elevatedDropdown === 'eventColorScheme' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={styles.row}
                 onPress={() => toggleDropdown('eventColorScheme')}
               >
-                <Text style={styles.rowLabel}>{t('settingsScreen.eventTypes.colorScheme')}</Text>
+                <Text style={styles.rowLabel}>{t('settingsScreen.appearance.eventColors')}</Text>
                 <Text style={styles.rowValue}>
                   {selectedEventSchemeId
                     ? t(`colorSchemes.${selectedEventSchemeId}`, { defaultValue: EVENT_COLOR_SCHEMES.find(s => s.id === selectedEventSchemeId)?.label })
@@ -764,6 +740,57 @@ export function SettingsScreen() {
               </DropdownMenu>
             </View>
 
+            <View style={[styles.fieldRow, elevatedDropdown === 'goalColorScheme' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={[styles.row, styles.rowLast]}
+                onPress={() => toggleDropdown('goalColorScheme')}
+              >
+                <Text style={styles.rowLabel}>{t('settingsScreen.appearance.goalColors')}</Text>
+                <Text style={styles.rowValue}>
+                  {selectedGoalSchemeId
+                    ? t(`colorSchemes.${selectedGoalSchemeId}`, { defaultValue: GOAL_COLOR_SCHEMES.find(s => s.id === selectedGoalSchemeId)?.label })
+                    : t('settingsScreen.goals.customScheme')}
+                </Text>
+                <Ionicons
+                  name={openDropdown === 'goalColorScheme' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'goalColorScheme'}>
+                {GOAL_COLOR_SCHEMES.map((scheme, i, arr) => (
+                  <DropdownItem
+                    key={scheme.id}
+                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
+                    selected={selectedGoalSchemeId === scheme.id}
+                    showSeparator={i < arr.length - 1}
+                    leading={
+                      <View style={styles.schemeDotsRow}>
+                        {(SCHEME_PREVIEW_DOTS[scheme.id] ?? []).map((color, di) => (
+                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
+                        ))}
+                      </View>
+                    }
+                    onPress={() => applyGoalColorScheme(scheme)}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+          </View>
+        </View>
+
+        {/* Event Types — name/status/goal-link editing plus color and duration
+            both live inside the "Customize" sheet now, per type. Colors and
+            durations used to have their own screens listing every type flat;
+            those are gone, but their bulk "Reset to Default" actions stay
+            here alongside a reset for the type list itself. Color Scheme
+            (applies one of the five named palettes to every built-in type's
+            color in one shot — see applyEventColorScheme) lives on the
+            Appearance card now, as the Event Colors row, rather than here. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.eventTypes.sectionTitle')}</Text>
+          <View style={styles.card}>
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
               <Text style={styles.rowLabel}>{t('settingsScreen.customize')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
@@ -823,8 +850,10 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Which types earn a bubble off the calendar's +, and their icon —
-            the only place an event type's icon is ever shown. */}
+        {/* Event Bubble + — the calendar's quick-add button. Customize (which
+            event types show as bubbles) and a reset back to the shipped set,
+            mirroring Event Types' own Customize row. Its own card now rather
+            than a tail end of Appearance. */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settingsScreen.eventBubble.sectionTitle')}</Text>
           <View style={styles.card}>
@@ -850,63 +879,112 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Goals — no other screen or tab of their own (see GRAIN /
-            EditGoalsModal etc.), so Color Scheme is the one goal-wide
-            setting that lives here: applies one of the five named palettes
-            to every built-in goal's color in one shot, same shape as the
-            Theme Colors and Event Types rows above. */}
-        <View style={[styles.section, elevatedDropdown === 'goalColorScheme' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.goals.sectionTitle')}</Text>
+        {/* Calendar & Schedule — Week Start, Time Format, Schedule Hours,
+            Daily Review, and Event Reminders all in one card, in the order
+            you'd hit them setting up a week. Time Format sits right below
+            Week Start since Schedule Hours and Daily Review both display in
+            whichever format it picks. Daily Review's time wheel still opens
+            in the flow (Collapsible, key dailyReviewTime) rather than
+            floating, so it needs no lift of its own. */}
+        <View
+          style={[
+            styles.section,
+            (elevatedDropdown === 'hourStart' || elevatedDropdown === 'hourEnd'
+              || elevatedDropdown === 'eventReminderLead') && styles.sectionFloating,
+          ]}
+        >
+          <Text style={styles.sectionTitle}>{t('settingsScreen.calendarSchedule.sectionTitle')}</Text>
           <View style={styles.card}>
-            <View style={[styles.fieldRow, elevatedDropdown === 'goalColorScheme' && styles.fieldRowOpen]}>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>{t('settingsScreen.weekStart.label')}</Text>
+              <View style={styles.prefPills}>
+                {(['sunday', 'monday'] as const).map(day => (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.pillSmall, settings.weekStart === day && styles.pillActive]}
+                    onPress={() => updateSettings({ weekStart: day })}
+                  >
+                    <Text style={[styles.pillTextSmall, settings.weekStart === day && styles.pillTextActive]}>
+                      {t(`calendar.weekdayFull.${day}`)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>{t('settings.timeFormat.label')}</Text>
+              <View style={styles.prefPills}>
+                {(['12h', '24h'] as const).map(timeFormat => (
+                  <TouchableOpacity
+                    key={timeFormat}
+                    style={[styles.pillSmall, settings.timeFormat === timeFormat && styles.pillActive]}
+                    onPress={() => updateSettings({ timeFormat })}
+                  >
+                    <Text style={[styles.pillTextSmall, settings.timeFormat === timeFormat && styles.pillTextActive]}>
+                      {timeFormat === '24h' ? t('settings.timeFormat.military') : t('settings.timeFormat.standard')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.fieldRow, elevatedDropdown === 'hourStart' && styles.fieldRowOpen]}>
               <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
-                onPress={() => toggleDropdown('goalColorScheme')}
+                style={styles.row}
+                onPress={() => toggleDropdown('hourStart')}
               >
-                <Text style={styles.rowLabel}>{t('settingsScreen.goals.colorScheme')}</Text>
-                <Text style={styles.rowValue}>
-                  {selectedGoalSchemeId
-                    ? t(`colorSchemes.${selectedGoalSchemeId}`, { defaultValue: GOAL_COLOR_SCHEMES.find(s => s.id === selectedGoalSchemeId)?.label })
-                    : t('settingsScreen.goals.customScheme')}
-                </Text>
+                <Text style={styles.rowLabel}>{t('addEditEvent.startTime')}</Text>
+                <Text style={styles.rowValue}>{hourOnlyLabel(settings.gridStartHour, settings.language, settings.timeFormat)}</Text>
                 <Ionicons
-                  name={openDropdown === 'goalColorScheme' ? 'chevron-up' : 'chevron-down'}
+                  name={openDropdown === 'hourStart' ? 'chevron-up' : 'chevron-down'}
                   size={16}
                   color={Colors.textLight}
                   style={{ marginLeft: 6 }}
                 />
               </TouchableOpacity>
-              <DropdownMenu open={openDropdown === 'goalColorScheme'}>
-                {GOAL_COLOR_SCHEMES.map((scheme, i, arr) => (
+              <DropdownMenu open={openDropdown === 'hourStart'}>
+                {START_HOUR_OPTIONS.map((h, i) => (
                   <DropdownItem
-                    key={scheme.id}
-                    label={t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}
-                    selected={selectedGoalSchemeId === scheme.id}
-                    showSeparator={i < arr.length - 1}
-                    leading={
-                      <View style={styles.schemeDotsRow}>
-                        {(SCHEME_PREVIEW_DOTS[scheme.id] ?? []).map((color, di) => (
-                          <View key={di} style={[styles.schemeDot, { backgroundColor: color }]} />
-                        ))}
-                      </View>
-                    }
-                    onPress={() => applyGoalColorScheme(scheme)}
+                    key={h}
+                    label={hourOnlyLabel(h, settings.language, settings.timeFormat)}
+                    selected={settings.gridStartHour === h}
+                    showSeparator={i < START_HOUR_OPTIONS.length - 1}
+                    onPress={() => { updateSettings({ gridStartHour: h }); setOpenDropdown(null); }}
                   />
                 ))}
               </DropdownMenu>
             </View>
-          </View>
-        </View>
 
-        {/* Daily Review Reminder — a local notification, off by default, that
-            opens straight to the unreported-events backlog when tapped. */}
-        {/* No lift: the time wheel opens in the flow, so no backdrop goes up
-            for it and there is nothing for the section to rise over. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.dailyReview.sectionTitle')}</Text>
-          <View style={styles.card}>
-            <View style={[styles.row, !settings.dailyReviewEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>{t('settingsScreen.notifications')}</Text>
+            <View style={[styles.fieldRow, elevatedDropdown === 'hourEnd' && styles.fieldRowOpen]}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => toggleDropdown('hourEnd')}
+              >
+                <Text style={styles.rowLabel}>{t('addEditEvent.endTime')}</Text>
+                <Text style={styles.rowValue}>{hourOnlyLabel(settings.gridEndHour, settings.language, settings.timeFormat)}</Text>
+                <Ionicons
+                  name={openDropdown === 'hourEnd' ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+              <DropdownMenu open={openDropdown === 'hourEnd'}>
+                {END_HOUR_OPTIONS.map((h, i) => (
+                  <DropdownItem
+                    key={h}
+                    label={hourOnlyLabel(h, settings.language, settings.timeFormat)}
+                    selected={settings.gridEndHour === h}
+                    showSeparator={i < END_HOUR_OPTIONS.length - 1}
+                    onPress={() => { updateSettings({ gridEndHour: h }); setOpenDropdown(null); }}
+                  />
+                ))}
+              </DropdownMenu>
+            </View>
+
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>{t('settingsScreen.dailyReview.label')}</Text>
               <Switch
                 value={settings.dailyReviewEnabled}
                 onValueChange={toggleDailyReview}
@@ -917,7 +995,7 @@ export function SettingsScreen() {
             {settings.dailyReviewEnabled && (
               <>
                 <TouchableOpacity
-                  style={[styles.row, openDropdown !== 'dailyReviewTime' && styles.rowLast]}
+                  style={styles.row}
                   onPress={() => toggleDropdown('dailyReviewTime')}
                 >
                   <Text style={styles.rowLabel}>{t('settingsScreen.time')}</Text>
@@ -941,16 +1019,9 @@ export function SettingsScreen() {
                 </Collapsible>
               </>
             )}
-          </View>
-        </View>
 
-        {/* Event Reminders — a second, independent local notification: one
-            per upcoming event occurrence rather than a single daily one. */}
-        <View style={[styles.section, elevatedDropdown === 'eventReminderLead' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.eventReminders.sectionTitle')}</Text>
-          <View style={styles.card}>
             <View style={[styles.row, !settings.eventReminderEnabled && styles.rowLast]}>
-              <Text style={styles.rowLabel}>{t('settingsScreen.notifications')}</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.eventReminders.label')}</Text>
               <Switch
                 value={settings.eventReminderEnabled}
                 onValueChange={toggleEventReminders}
@@ -1010,95 +1081,16 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Week Start */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.weekStart.sectionTitle')}</Text>
-          <View style={styles.card}>
-            {(['sunday', 'monday'] as const).map(day => (
-              <TouchableOpacity
-                key={day}
-                style={styles.row}
-                onPress={() => updateSettings({ weekStart: day })}
-              >
-                <Text style={styles.rowLabel}>{t(`calendar.weekdayFull.${day}`)}</Text>
-                {settings.weekStart === day && (
-                  <Ionicons name="checkmark" size={18} color={Colors.control} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Schedule Hours */}
-        <View style={[styles.section, (elevatedDropdown === 'hourStart' || elevatedDropdown === 'hourEnd') && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.scheduleHours.sectionTitle')}</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldRow, elevatedDropdown === 'hourStart' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => toggleDropdown('hourStart')}
-              >
-                <Text style={styles.rowLabel}>{t('addEditEvent.startTime')}</Text>
-                <Text style={styles.rowValue}>{hourOnlyLabel(settings.gridStartHour, settings.language, settings.timeFormat)}</Text>
-                <Ionicons
-                  name={openDropdown === 'hourStart' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              <DropdownMenu open={openDropdown === 'hourStart'}>
-                {START_HOUR_OPTIONS.map((h, i) => (
-                  <DropdownItem
-                    key={h}
-                    label={hourOnlyLabel(h, settings.language, settings.timeFormat)}
-                    selected={settings.gridStartHour === h}
-                    showSeparator={i < START_HOUR_OPTIONS.length - 1}
-                    onPress={() => { updateSettings({ gridStartHour: h }); setOpenDropdown(null); }}
-                  />
-                ))}
-              </DropdownMenu>
-            </View>
-
-            <View style={[styles.fieldRow, elevatedDropdown === 'hourEnd' && styles.fieldRowOpen]}>
-              <TouchableOpacity
-                style={[styles.row, styles.rowLast]}
-                onPress={() => toggleDropdown('hourEnd')}
-              >
-                <Text style={styles.rowLabel}>{t('addEditEvent.endTime')}</Text>
-                <Text style={styles.rowValue}>{hourOnlyLabel(settings.gridEndHour, settings.language, settings.timeFormat)}</Text>
-                <Ionicons
-                  name={openDropdown === 'hourEnd' ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={Colors.textLight}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-              <DropdownMenu open={openDropdown === 'hourEnd'}>
-                {END_HOUR_OPTIONS.map((h, i) => (
-                  <DropdownItem
-                    key={h}
-                    label={hourOnlyLabel(h, settings.language, settings.timeFormat)}
-                    selected={settings.gridEndHour === h}
-                    showSeparator={i < END_HOUR_OPTIONS.length - 1}
-                    onPress={() => { updateSettings({ gridEndHour: h }); setOpenDropdown(null); }}
-                  />
-                ))}
-              </DropdownMenu>
-            </View>
-          </View>
-        </View>
-
-        {/* Default Contact Method. The section title names the setting, so the
-            row carries the value alone rather than repeating it as a label. */}
+        {/* Contacts — Default Contact Method and Preferred Maps App in one card. */}
         <View style={[styles.section, elevatedDropdown === 'method' && styles.sectionFloating]}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.defaultContactMethod')}</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.contacts.sectionTitle')}</Text>
           <View style={styles.card}>
             <View style={[styles.fieldRow, elevatedDropdown === 'method' && styles.fieldRowOpen]}>
               <TouchableOpacity
                 style={styles.row}
                 onPress={() => toggleDropdown('method')}
               >
+                <Text style={styles.rowLabel}>{t('settingsScreen.defaultContactMethod')}</Text>
                 <View style={styles.methodIcon}>
                   <GoalIcon
                     icon={CONTACT_METHODS[selectedMethod].icon}
@@ -1107,11 +1099,12 @@ export function SettingsScreen() {
                     color={Colors.textSecondary}
                   />
                 </View>
-                <Text style={styles.rowLabel}>{t(`contactMethods.${selectedMethod}`, { defaultValue: CONTACT_METHODS[selectedMethod].label })}</Text>
+                <Text style={styles.rowValue}>{t(`contactMethods.${selectedMethod}`, { defaultValue: CONTACT_METHODS[selectedMethod].label })}</Text>
                 <Ionicons
                   name={openDropdown === 'method' ? 'chevron-up' : 'chevron-down'}
                   size={16}
                   color={Colors.textLight}
+                  style={{ marginLeft: 6 }}
                 />
               </TouchableOpacity>
               <DropdownMenu open={openDropdown === 'method'}>
@@ -1136,7 +1129,7 @@ export function SettingsScreen() {
                 ))}
               </DropdownMenu>
             </View>
-            <View style={[styles.row, styles.rowLast]}>
+            <View style={[styles.row, Platform.OS !== 'ios' && styles.rowLast]}>
               <Text style={styles.rowLabel}>{t('settingsScreen.autoOpenContactReport')}</Text>
               <Switch
                 value={settings.autoOpenContactReport}
@@ -1145,60 +1138,29 @@ export function SettingsScreen() {
                 thumbColor={Colors.white}
               />
             </View>
+
+            {/* Maps — iOS only. Android has no choice to offer: an address
+                there always opens in Google Maps. */}
+            {Platform.OS === 'ios' && (
+              <View style={[styles.row, styles.rowLast]}>
+                <Text style={styles.rowLabel}>{t('settingsScreen.preferredMapsApp')}</Text>
+                <View style={styles.prefPills}>
+                  {MAPS_APP_OPTIONS.map(option => (
+                    <TouchableOpacity
+                      key={option.key}
+                      style={[styles.pillSmall, settings.mapsApp === option.key && styles.pillActive]}
+                      onPress={() => updateSettings({ mapsApp: option.key })}
+                    >
+                      <Text style={[styles.pillTextSmall, settings.mapsApp === option.key && styles.pillTextActive]}>
+                        {t(`settingsScreen.mapsApp.${option.key}`, { defaultValue: option.label })}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         </View>
-
-        {/* Default Country Code */}
-        <View
-          style={styles.section}
-          onLayout={e => { codeSectionY.current = e.nativeEvent.layout.y; }}
-        >
-          <Text style={styles.sectionTitle}>{t('settingsScreen.countryCode.sectionTitle')}</Text>
-          <View style={styles.card}>
-            <View style={[styles.row, styles.rowLast]}>
-              <TextInput
-                style={styles.codeInput}
-                value={settings.defaultCountryCode}
-                onChangeText={text => {
-                  // Normalised on the way in so the stored value is always the
-                  // '+NN' the hint in the person editor claims it is.
-                  const digits = text.replace(/\D/g, '').slice(0, 4);
-                  updateSettings({ defaultCountryCode: digits ? `+${digits}` : '' });
-                }}
-                placeholder="+1"
-                placeholderTextColor={Colors.textLight}
-                keyboardType="phone-pad"
-                maxLength={5}
-                onFocus={revealCodeField}
-              />
-            </View>
-          </View>
-          <Text style={styles.sectionFootnote}>
-            {t('settingsScreen.countryCode.footnote')}
-          </Text>
-        </View>
-
-        {/* Maps — iOS only. Android has no choice to offer: an address there
-            always opens in Google Maps. */}
-        {Platform.OS === 'ios' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('settingsScreen.preferredMapsApp')}</Text>
-            <View style={styles.card}>
-              {MAPS_APP_OPTIONS.map((option, i, arr) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[styles.row, i === arr.length - 1 && styles.rowLast]}
-                  onPress={() => updateSettings({ mapsApp: option.key })}
-                >
-                  <Text style={styles.rowLabel}>{option.label}</Text>
-                  {settings.mapsApp === option.key && (
-                    <Ionicons name="checkmark" size={18} color={Colors.control} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
 
         {/* Dev Tools */}
         <View style={styles.section}>
@@ -1213,7 +1175,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset every setting on this screen — theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, country code, maps app, and notification reminders — along with the built-in Goals and Event Types (labels, icons, colors, links, targets), including restoring any that were deleted, to their original values. Your custom Goals, Event Types, counts, and events will not be affected.',
+                  'This will reset every setting on this screen — theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, maps app, and notification reminders — along with the built-in Goals and Event Types (labels, icons, colors, links, targets), including restoring any that were deleted, to their original values. Your custom Goals, Event Types, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
@@ -1394,18 +1356,19 @@ function makeStyles(C: ColorPalette) {
     },
     rowLabel: { flex: 1, fontSize: 15, color: C.text },
     rowValue: { fontSize: 14, color: C.textSecondary },
-    codeInput: {
-      flex: 1,
-      fontSize: 15,
-      color: C.text,
-      paddingVertical: 0,
+    // Week Start / Preferred Maps App — a label plus a small pill per option,
+    // same shape as onboarding's own Theme/Week Start rows (prefRow/
+    // prefPills there).
+    prefPills: { flexDirection: 'row', gap: 8 },
+    pillSmall: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: C.contactActionBg,
     },
-    sectionFootnote: {
-      fontSize: 12,
-      color: C.textLight,
-      marginTop: 8,
-      marginLeft: 4,
-    },
+    pillActive: { backgroundColor: C.control },
+    pillTextSmall: { fontSize: 12, fontWeight: '600', color: C.textSecondary },
+    pillTextActive: { color: C.white },
     colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 10 },
     // Fixed width so the labels line up despite the glyphs differing in width.
     methodIcon: { width: 24, alignItems: 'center', marginRight: 6 },
@@ -1446,9 +1409,6 @@ function makeStyles(C: ColorPalette) {
       borderBottomLeftRadius: 20,
       borderBottomRightRadius: 20,
     },
-    dropdownListLast: {
-      borderBottomWidth: 0,
-    },
     dropdownItem: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1458,20 +1418,13 @@ function makeStyles(C: ColorPalette) {
       borderBottomColor: C.border,
       backgroundColor: C.card,
     },
-    // Same reasoning as expandedPanelLast above.
-    dropdownItemLast: {
-      borderBottomWidth: 0,
-      borderBottomLeftRadius: 20,
-      borderBottomRightRadius: 20,
-    },
     dropdownItemText: {
       flex: 1,
       fontSize: 15,
       color: C.text,
     },
-    // Floating dropdowns — Schedule Hours, Event Size, Theme, Time Before, and
-    // Default Contact Method — are drawn by DropdownMenu now; all that is left
-    // here is the stacking they need from this screen.
+    // Floating dropdowns are drawn by DropdownMenu now; all that is left here
+    // is the stacking they need from this screen.
     //
     // fieldRow/fieldRowOpen: a trigger's wrapper needs a higher zIndex than the
     // sibling row beneath it in the same card, or the menu would paint behind

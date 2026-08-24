@@ -10,29 +10,21 @@ export function toDialable(phone: string | null | undefined): string {
 /**
  * wa.me addresses people by full international number: digits only, country
  * code included, no '+' and no punctuation. A number already stored with a
- * leading '+' carries its own code; anything else is treated as local to
- * `defaultCountryCode` (the Settings value).
+ * leading '+' carries its own code; anything else is treated as a US/Canada
+ * local number, since a number from anywhere else is expected to already be
+ * saved with its own '+' code.
  *
  * The leading zero of a local number is dropped when a code is prepended —
  * that zero is a national trunk prefix (UK 07700…, DE 030…) and is never part
- * of the international form. NANP numbers never start with one, so US and
- * Canadian numbers are unaffected.
- *
- * There is no attempt to detect a country code typed without a '+': '44 7700…'
- * and a local number beginning 44 are indistinguishable. Store the '+' if the
- * number is foreign.
+ * of the international form. NANP numbers never start with one, so this is a
+ * no-op for the US/Canada numbers this fallback actually applies to.
  */
-export function toWhatsAppNumber(
-  phone: string | null | undefined,
-  defaultCountryCode: string | null | undefined,
-): string {
+export function toWhatsAppNumber(phone: string | null | undefined): string {
   const raw = (phone ?? '').trim();
   const digits = raw.replace(/\D/g, '');
   if (!digits) return '';
   if (raw.startsWith('+')) return digits;
-  const code = (defaultCountryCode ?? '').replace(/\D/g, '');
-  if (!code) return digits;
-  return code + digits.replace(/^0+/, '');
+  return '1' + digits.replace(/^0+/, '');
 }
 
 /**
@@ -116,10 +108,9 @@ export async function messageNumber(phone: string | null | undefined, t: TFuncti
 // the web page instead of throwing.
 export async function openWhatsApp(
   phone: string | null | undefined,
-  defaultCountryCode: string | null | undefined,
   t: TFunction,
 ): Promise<void> {
-  const number = toWhatsAppNumber(phone, defaultCountryCode);
+  const number = toWhatsAppNumber(phone);
   if (!number) return;
   await open(
     `https://wa.me/${number}`,

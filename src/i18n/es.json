@@ -505,17 +505,17 @@
     "xl": "Extra grande"
   },
   "themeColorRows": {
-    "primary": "Color primario",
-    "secondaryLight": "Color secundario (claro)",
-    "secondaryDark": "Color secundario (oscuro)",
-    "tertiaryLight": "Color terciario (claro)",
-    "tertiaryDark": "Color terciario (oscuro)",
-    "statusCompletedLight": "Color de estado completado (claro)",
-    "statusCompletedDark": "Color de estado completado (oscuro)",
-    "statusFailedLight": "Color de estado fallido (claro)",
-    "statusFailedDark": "Color de estado fallido (oscuro)",
-    "statusPendingLight": "Color de estado pendiente (claro)",
-    "statusPendingDark": "Color de estado pendiente (oscuro)"
+    "primary": "Primario",
+    "secondaryLight": "Secundario",
+    "secondaryDark": "Secundario",
+    "tertiaryLight": "Terciario",
+    "tertiaryDark": "Terciario",
+    "statusCompletedLight": "Estado completado",
+    "statusCompletedDark": "Estado completado",
+    "statusFailedLight": "Estado fallido",
+    "statusFailedDark": "Estado fallido",
+    "statusPendingLight": "Estado pendiente",
+    "statusPendingDark": "Estado pendiente"
   },
   "settingsScreen": {
     "title": "Ajustes",
@@ -524,9 +524,13 @@
     "resetToDefault": "Restablecer a los valores predeterminados",
     "notifications": "Notificaciones",
     "time": "Hora",
-    "defaultContactMethod": "MÉTODO DE CONTACTO PREDETERMINADO",
+    "defaultContactMethod": "Método de contacto predeterminado",
     "autoOpenContactReport": "Crear evento tras el contacto",
-    "preferredMapsApp": "APP DE MAPAS PREFERIDA",
+    "preferredMapsApp": "App de mapas predeterminada",
+    "mapsApp": {
+      "apple": "Apple",
+      "google": "Google"
+    },
     "account": "CUENTA",
     "signOutTitle": "Cerrar sesión",
     "signOutBody": "¿Seguro que quieres cerrar sesión?",
@@ -557,6 +561,15 @@
     "resetEventTypesBody": "Los tipos de evento integrados se restaurarán a sus valores originales. Esto no se puede deshacer.",
     "resetQuickAddTitle": "Restablecer burbuja de evento +",
     "resetQuickAddBody": "Esto restaurará los tipos e íconos de añadido rápido predeterminados. Esto no se puede deshacer.",
+    "appearance": {
+      "sectionTitle": "APARIENCIA",
+      "colorScheme": "Todos los esquemas de colores",
+      "customScheme": "Personalizado",
+      "appColorScheme": "Esquema de colores de la app",
+      "appColors": "Colores de la app",
+      "eventColors": "Esquema de colores de eventos",
+      "goalColors": "Esquema de colores de metas"
+    },
     "themeColors": {
       "sectionTitle": "COLORES DEL TEMA",
       "colorScheme": "Esquema de colores",
@@ -565,7 +578,7 @@
     },
     "eventSize": {
       "sectionTitle": "TAMAÑO DE EVENTO",
-      "size": "Tamaño"
+      "size": "Tamaño de evento"
     },
     "eventTypes": {
       "sectionTitle": "TIPOS DE EVENTO",
@@ -584,24 +597,29 @@
       "customScheme": "Personalizado"
     },
     "dailyReview": {
-      "sectionTitle": "REVISIÓN DIARIA"
+      "sectionTitle": "REVISIÓN DIARIA",
+      "label": "Revisión diaria"
     },
     "eventReminders": {
       "sectionTitle": "RECORDATORIOS DE EVENTOS",
+      "label": "Recordatorios de eventos",
       "timeBefore": "Tiempo antes",
       "types": "Tipos",
       "allTypes": "Todos los tipos",
       "typesOfTotal": "{{count}} de {{total}}"
     },
     "weekStart": {
-      "sectionTitle": "INICIO DE SEMANA"
+      "sectionTitle": "INICIO DE SEMANA",
+      "label": "Inicio de semana"
     },
     "scheduleHours": {
       "sectionTitle": "HORARIO DEL CALENDARIO"
     },
-    "countryCode": {
-      "sectionTitle": "CÓDIGO DE PAÍS PREDETERMINADO",
-      "footnote": "Se usa para números de WhatsApp guardados sin un código +."
+    "calendarSchedule": {
+      "sectionTitle": "CALENDARIO Y HORARIO"
+    },
+    "contacts": {
+      "sectionTitle": "CONTACTOS"
     }
   },
   "eventReminderTypes": {
