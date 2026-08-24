@@ -61,7 +61,7 @@ FEATURES
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
 [x] swiping time spacing calendar bug? idk what causes it, if its an expo issue or a problem w the code
-[ ] calendar swiping flash is back
+[x] calendar swiping flash is back
 [ ] use the app for a day and find bugs
 
 DEPLOYMENT TASKS
