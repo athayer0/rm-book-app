@@ -51,8 +51,8 @@ FEATURES
 [ ] extend end hour to 2am
 [x] add x to event select menu on empty space tap
 [ ] make color scheme changing more intuitive
-[ ] hard press ki to edit, quick press to increment
-[ ] make the menu x tap area bigger
+[x] hard press ki to edit, quick press to increment
+[x] make the menu x tap area bigger
 [ ] expand icon pool
 [ ] spectrum color selector is a lil laggy
 [ ] event reporting in a more intuitive
