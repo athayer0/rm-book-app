@@ -18,6 +18,8 @@ interface Props {
   definitions: GoalDefinition[];
   /** Which grain the sheet opens on — the grid that was tapped. Defaults to weekly. */
   initialGrain?: GoalGrain;
+  /** A goal whose edit dialog should open immediately — set when a card with no target yet was tapped. */
+  initialEditGoalId?: string | null;
 }
 
 /**
@@ -31,7 +33,7 @@ interface Props {
  * for its two grids, so this adds a second pair of `deriveWeekGoalCounts` passes
  * rather than a first.
  */
-export function GoalsModal({ visible, onClose, definitions, initialGrain = 'week' }: Props) {
+export function GoalsModal({ visible, onClose, definitions, initialGrain = 'week', initialEditGoalId = null }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
@@ -44,16 +46,26 @@ export function GoalsModal({ visible, onClose, definitions, initialGrain = 'week
   // freezing the header and tabs keeps a stray tap from closing the sheet, or
   // switching grain, out from under an uncommitted dialog.
   const [editing, setEditing] = useState(false);
+  // Set once the sheet's own slide-up finishes — a card's "Set goal" tap opens
+  // both this sheet and, on it, an edit dialog, and the dialog waits on this so
+  // it doesn't pop up over a sheet that's still mid-animation.
+  const [sheetOpened, setSheetOpened] = useState(false);
+  // The auto-open goal id, cleared once consumed (see GoalPeriodList's
+  // onAutoOpened) so switching tabs afterward doesn't reopen the dialog on the
+  // other grain's freshly-mounted list.
+  const [pendingEditGoalId, setPendingEditGoalId] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       setGrain(initialGrain);
       setEditing(false);
+      setSheetOpened(false);
+      setPendingEditGoalId(initialEditGoalId);
     }
-  }, [visible, initialGrain]);
+  }, [visible, initialGrain, initialEditGoalId]);
 
   return (
-    <SheetModal visible={visible} onClose={onClose}>
+    <SheetModal visible={visible} onClose={onClose} onOpened={() => setSheetOpened(true)}>
       <View style={styles.flex}>
         <View style={styles.header} pointerEvents={editing ? 'none' : 'auto'}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12 }}>
@@ -84,6 +96,9 @@ export function GoalsModal({ visible, onClose, definitions, initialGrain = 'week
             saveCount={weekly.saveCountForWeek}
             saveGoal={weekly.saveGoalForWeek}
             onEditingChange={setEditing}
+            initialEditGoalId={pendingEditGoalId}
+            autoOpenReady={sheetOpened}
+            onAutoOpened={() => setPendingEditGoalId(null)}
           />
         ) : (
           <GoalPeriodList
@@ -96,6 +111,9 @@ export function GoalsModal({ visible, onClose, definitions, initialGrain = 'week
             saveCount={monthly.saveCountForMonth}
             saveGoal={monthly.saveGoalForMonth}
             onEditingChange={setEditing}
+            initialEditGoalId={pendingEditGoalId}
+            autoOpenReady={sheetOpened}
+            onAutoOpened={() => setPendingEditGoalId(null)}
           />
         )}
       </View>

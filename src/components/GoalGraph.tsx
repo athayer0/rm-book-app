@@ -88,7 +88,8 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
       points.push({
         periodKey: key,
         actual: counts[id] ?? 0,
-        // Never future, so this always resolves to a number the bar maths can use.
+        // Coerced to 0 regardless of whether resolveGoal itself treats an unset
+        // target as pending here, since the bar maths needs a number either way.
         goal: resolveGoal(goals[id], false) ?? 0,
       });
     }
@@ -96,7 +97,7 @@ export function GoalGraph({ definitions, grain, getPeriodData }: Props) {
 
     const nextKey = keyByOffset(1);
     const { counts: nc, goals: ng } = await getPeriodData(nextKey);
-    setNextPeriod({ actual: nc[id] ?? 0, goal: resolveGoal(ng[id], true) });
+    setNextPeriod({ actual: nc[id] ?? 0, goal: resolveGoal(ng[id], false) });
   }, [definitions, getPeriodData, keyByOffset]);
 
   useEffect(() => {

@@ -64,7 +64,7 @@ export const LightColors = {
   // and weighted per theme: the same alpha that reads as a wash on white
   // disappears on a dark card.
   rowSelectedBg: 'rgba(26,58,107,0.10)',
-  // Navy, for the "add a thing" text actions — "Set goals" and "Add a Goal +" in
+  // Navy, for the "add a thing" text actions — "Set goal" and "Add a Goal +" in
   // the goal sheets, "Add Event Type" in the types sheet. Named for where it
   // started. The two editors' add-rows ("Add Person", "Add contact method",
   // "Add address") ask for `control` directly instead, which comes to the same

@@ -233,7 +233,7 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
     const maxSlot = (gridEndHour - gridStartHour) * 2 - 1;
     const slot = Math.min(maxSlot, Math.max(0, Math.floor((locationY - 16) / SLOT_HEIGHT)));
     setPressedSlot(slot);
-    setTimeout(() => setPressedSlot(null), 500);
+    setTimeout(() => setPressedSlot(null), 250);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onTapEmpty(slotToTimeStr(slot));
   }

@@ -63,6 +63,10 @@ export function HomeScreen({ navigation, route }: any) {
   // Which tab each sheet opens on. Tapping a grid opens that grid's own grain;
   // the buttons below both grids have no one grain to mean, so they open weekly.
   const [goalsGrain, setGoalsGrain] = useState<GoalGrain>('week');
+  // Which goal GoalsModal opens its edit dialog on — set when an unset card is
+  // tapped, cleared for every other way of opening the sheet so a stale value
+  // never auto-opens a dialog the tap that got you there didn't ask for.
+  const [goalsEditGoalId, setGoalsEditGoalId] = useState<string | null>(null);
   const [unreportedVisible, setUnreportedVisible] = useState(false);
 
   // Tap-to-order goal reorder: EditGoalsModal's "Reorder Goals" button starts
@@ -78,6 +82,7 @@ export function HomeScreen({ navigation, route }: any) {
 
   function openGoals(grain: GoalGrain) {
     setGoalsGrain(grain);
+    setGoalsEditGoalId(null);
     setGoalsVisible(true);
   }
 
@@ -87,6 +92,16 @@ export function HomeScreen({ navigation, route }: any) {
   function openGoalEditor(id: string) {
     setEditGoalId(id);
     setEditVisible(true);
+  }
+
+  // A tap on a card with no target set yet: same sheet openGoals leads to, but
+  // straight onto that goal's edit dialog instead of the plain period list —
+  // there's nothing to step against an unset target, so the tap goes here
+  // rather than to incrementWeekGoal/incrementMonthGoal below.
+  function openGoalTarget(grain: GoalGrain, id: string) {
+    setGoalsGrain(grain);
+    setGoalsEditGoalId(id);
+    setGoalsVisible(true);
   }
 
   function incrementWeekGoal(id: string) {
@@ -189,6 +204,7 @@ export function HomeScreen({ navigation, route }: any) {
                 onDecrementGoal={decrementWeekGoal}
                 onIncrementGoal={incrementWeekGoal}
                 onLongPressGoal={openGoalEditor}
+                onSetGoal={id => openGoalTarget('week', id)}
                 reorderActive={reorderActive}
                 tappedIds={weekTaps}
                 onTapGoal={tapWeekGoal}
@@ -206,6 +222,7 @@ export function HomeScreen({ navigation, route }: any) {
                 onDecrementGoal={decrementMonthGoal}
                 onIncrementGoal={incrementMonthGoal}
                 onLongPressGoal={openGoalEditor}
+                onSetGoal={id => openGoalTarget('month', id)}
                 reorderActive={reorderActive}
                 tappedIds={monthTaps}
                 onTapGoal={tapMonthGoal}
@@ -259,6 +276,7 @@ export function HomeScreen({ navigation, route }: any) {
         onClose={() => { setGoalsVisible(false); reload(); reloadMonthly(); }}
         definitions={definitions}
         initialGrain={goalsGrain}
+        initialEditGoalId={goalsEditGoalId}
       />
 
       <GoalGraphModal

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, TextInput, Keyboard, Platform, Animated, Easing,
+  StyleSheet, TextInput, Keyboard, Platform, Animated, Easing, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,10 +22,12 @@ import { GoalIcon } from './GoalIcon';
 // the font size settling to its own metrics.
 const NUM_ROW_H = 36;
 
-// Same curves and timings as DropdownMenu and EventTypeSheet, so this dialog
-// settles in with the same weight as every other popup in the app rather than
-// reading as a different piece of software.
-const DIALOG_OPEN_MS = 190;
+// Same close curve/timing as DropdownMenu and EventTypeSheet, so this dialog
+// leaves the same way every other popup in the app does. The open is
+// deliberately slower than theirs — this dialog's backdrop is the "Set goal"
+// tap's only feedback (nothing else on screen moves first), so it gets a
+// gentler fade-to-gray instead of snapping in over the sheet underneath.
+const DIALOG_OPEN_MS = 400;
 const DIALOG_CLOSE_MS = 130;
 const DIALOG_EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 const DIALOG_EASE_IN = Easing.bezier(0.4, 0, 1, 1);
@@ -34,8 +36,9 @@ interface EditingRow {
   id: string;
   actualValue: string;
   goalValue: string;
-  // False on a future period with no goal set yet — there's nothing achieved
-  // against it to edit, so the dialog offers only the goal field.
+  // False on a future period — there's nothing achieved against it yet, so
+  // the dialog offers only the goal field. Independent of whether the goal
+  // itself is set: the current period always has real progress to show.
   showActual: boolean;
 }
 
@@ -56,6 +59,12 @@ interface Props {
   saveGoal: PeriodValueWriter;
   /** Lets the sheet freeze its header and tabs while the edit dialog is up. */
   onEditingChange?: (editing: boolean) => void;
+  /** A goal to open the edit dialog on as soon as the current period's row data is in and autoOpenReady is true. */
+  initialEditGoalId?: string | null;
+  /** Whether the enclosing sheet has finished opening — the dialog waits on this so it doesn't pop up mid-animation. */
+  autoOpenReady?: boolean;
+  /** Fires once initialEditGoalId has been auto-opened, so the owner can clear it (e.g. before a tab switch remounts this list on the other grain). */
+  onAutoOpened?: () => void;
 }
 
 /**
@@ -70,6 +79,7 @@ interface Props {
  */
 export function GoalPeriodList({
   definitions, grain, counts, goals, getPeriodData, saveCount, saveGoal, onEditingChange,
+  initialEditGoalId, autoOpenReady, onAutoOpened,
 }: Props) {
   const Colors = useColors();
   const isDark = useIsDark();
@@ -101,7 +111,7 @@ export function GoalPeriodList({
 
   const visibleDefs = sortForGrain(definitions.filter(d => d[visibilityKey]), grain);
   const periodKey = keyByOffset(offset);
-  const isFuture = offset > 0;
+  const isPast = offset < 0;
 
   // The current period's counts/goals are already resolved synchronously by the hook —
   // reading them directly (instead of round-tripping through getPeriodData's AsyncStorage
@@ -115,7 +125,7 @@ export function GoalPeriodList({
     for (const def of definitions) {
       next[def.id] = {
         actual: pCounts[def.id] ?? 0,
-        goal: resolveGoal(pGoals[def.id], nextOffset > 0),
+        goal: resolveGoal(pGoals[def.id], nextOffset < 0),
       };
     }
     setRowData(next);
@@ -137,14 +147,28 @@ export function GoalPeriodList({
     setEditingRow({
       id,
       actualValue: String(current.actual),
-      goalValue: current.goal == null ? '' : String(current.goal),
-      showActual: current.goal !== null,
+      goalValue: current.goal == null ? '0' : String(current.goal),
+      showActual: offset <= 0,
     });
     dialogAnim.setValue(0);
     Animated.timing(dialogAnim, {
       toValue: 1, duration: DIALOG_OPEN_MS, easing: DIALOG_EASE_OUT, useNativeDriver: true,
     }).start();
   }
+
+  // Opens straight on a specific goal's dialog once its row data is in and the
+  // sheet has finished opening — the Home screen's "Set goal" tap lands here
+  // instead of on the plain list, but only once the sheet itself has stopped
+  // sliding, so the dialog doesn't pop up over an animation still in flight.
+  // The ref stops this from reopening every time rowData is recomputed (e.g. a
+  // count changing) for the rest of this mount.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current || !initialEditGoalId || !autoOpenReady || !rowData[initialEditGoalId]) return;
+    autoOpenedRef.current = true;
+    openEdit(initialEditGoalId);
+    onAutoOpened?.();
+  }, [rowData, initialEditGoalId, autoOpenReady]);
 
   // editingRow clears only once this finishes, so the dialog keeps rendering
   // its last values for the whole exit instead of blanking out mid-fade.
@@ -230,7 +254,7 @@ export function GoalPeriodList({
         <View style={styles.goalCardShadow}>
           <View style={styles.goalCard}>
             {visibleDefs.map((def, index) => {
-              const row = rowData[def.id] ?? { actual: 0, goal: resolveGoal(undefined, isFuture) };
+              const row = rowData[def.id] ?? { actual: 0, goal: resolveGoal(undefined, isPast) };
 
               return (
                 <View
@@ -243,10 +267,10 @@ export function GoalPeriodList({
 
                   <Text style={styles.kiLabel} numberOfLines={2}>{goalDisplayLabel(def, t)}</Text>
 
-                  {/* A future period with no goal set yet has nothing to show a ratio
-                      against — just the "Set goals" prompt. Once a goal exists, the
-                      whole "actual/goal" reads as one tap target: it opens a single
-                      dialog that edits both numbers together, so it's shown as one
+                  {/* The current or a future period with no goal set yet has nothing to
+                      show a ratio against — just the "Set goal" prompt. Once a goal
+                      exists, the whole "actual/goal" reads as one tap target: it opens a
+                      single dialog that edits both numbers together, so it's shown as one
                       pill rather than the two separately-tappable boxes it used to be. */}
                   {row.goal !== null ? (
                     <TouchableOpacity
@@ -276,50 +300,87 @@ export function GoalPeriodList({
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* The sheet itself stays put; only this dialog re-centres above the keyboard. */}
+      {/* A Modal of its own rather than a view layered inside this one, so the
+          dimmed backdrop covers the whole screen — header and tabs included —
+          the same way EditGoalsModal's own pickers layer over its SheetModal.
+          Tapping that backdrop commits and closes just this dialog; the sheet
+          underneath (and its own backdrop, for closing the whole Goals menu)
+          only reappears once this one is gone. */}
       {editingRow && (
-        <View style={[styles.editOverlay, { paddingBottom: keyboardHeight }]}>
-          {/* Dismissing commits both fields — there is no explicit Done. */}
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={confirmEdit} activeOpacity={1}>
-            <Animated.View style={[styles.editOverlayBg, { opacity: dialogAnim }]} />
-          </TouchableOpacity>
-          <Animated.View
-            style={[
-              styles.editSheet,
-              {
-                opacity: dialogAnim,
-                transform: [
-                  { scale: dialogAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
-                  { translateY: dialogAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-                ],
-              },
-            ]}
-          >
-            <Text style={styles.editTitle}>{editingDef ? goalDisplayLabel(editingDef, t) : ''}</Text>
+        <Modal visible transparent animationType="none" onRequestClose={confirmEdit} statusBarTranslucent>
+          <View style={[styles.editOverlay, { paddingBottom: keyboardHeight }]}>
+            {/* Dismissing commits both fields — there is no explicit Done. */}
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={confirmEdit} activeOpacity={1}>
+              <Animated.View style={[styles.editOverlayBg, { opacity: dialogAnim }]} />
+            </TouchableOpacity>
+            <Animated.View
+              style={[
+                styles.editSheet,
+                {
+                  opacity: dialogAnim,
+                  transform: [
+                    { scale: dialogAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+                    { translateY: dialogAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.editTitle}>{editingDef ? goalDisplayLabel(editingDef, t) : ''}</Text>
 
-            <View style={styles.editFieldsRow}>
-              {editingRow.showActual && (
+              <View style={styles.editFieldsRow}>
+                {editingRow.showActual && (
+                  <View style={styles.editFieldRow}>
+                    <Text style={styles.editFieldLabel}>{t('goalPeriodList.actual')}</Text>
+                    <View style={styles.stepperRow}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editingRow.actualValue}
+                        onChangeText={v => setEditingRow(prev => prev ? { ...prev, actualValue: v } : null)}
+                        keyboardType="number-pad"
+                        selectTextOnFocus
+                        maxLength={3}
+                      />
+                      <View style={styles.stepperCol}>
+                        <TouchableOpacity
+                          onPress={() => stepValue('actual', 1)}
+                          style={styles.stepBtn}
+                          hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="add" size={20} color={Colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => stepValue('actual', -1)}
+                          style={styles.stepBtn}
+                          hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="remove" size={20} color={Colors.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
                 <View style={styles.editFieldRow}>
-                  <Text style={styles.editFieldLabel}>{t('goalPeriodList.actual')}</Text>
+                  <Text style={styles.editFieldLabel}>{t('goalPeriodList.goal')}</Text>
                   <View style={styles.stepperRow}>
                     <TextInput
                       style={styles.editInput}
-                      value={editingRow.actualValue}
-                      onChangeText={v => setEditingRow(prev => prev ? { ...prev, actualValue: v } : null)}
+                      value={editingRow.goalValue}
+                      onChangeText={v => setEditingRow(prev => prev ? { ...prev, goalValue: v } : null)}
                       keyboardType="number-pad"
                       selectTextOnFocus
                       maxLength={3}
                     />
                     <View style={styles.stepperCol}>
                       <TouchableOpacity
-                        onPress={() => stepValue('actual', 1)}
+                        onPress={() => stepValue('goal', 1)}
                         style={styles.stepBtn}
                         hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
                       >
                         <Ionicons name="add" size={20} color={Colors.text} />
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => stepValue('actual', -1)}
+                        onPress={() => stepValue('goal', -1)}
                         style={styles.stepBtn}
                         hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
                       >
@@ -328,40 +389,10 @@ export function GoalPeriodList({
                     </View>
                   </View>
                 </View>
-              )}
-
-              <View style={styles.editFieldRow}>
-                <Text style={styles.editFieldLabel}>{t('goalPeriodList.goal')}</Text>
-                <View style={styles.stepperRow}>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editingRow.goalValue}
-                    onChangeText={v => setEditingRow(prev => prev ? { ...prev, goalValue: v } : null)}
-                    keyboardType="number-pad"
-                    selectTextOnFocus
-                    maxLength={3}
-                  />
-                  <View style={styles.stepperCol}>
-                    <TouchableOpacity
-                      onPress={() => stepValue('goal', 1)}
-                      style={styles.stepBtn}
-                      hitSlop={{ top: 4, bottom: 2, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="add" size={20} color={Colors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => stepValue('goal', -1)}
-                      style={styles.stepBtn}
-                      hitSlop={{ top: 2, bottom: 4, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="remove" size={20} color={Colors.text} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
               </View>
-            </View>
-          </Animated.View>
-        </View>
+            </Animated.View>
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -455,9 +486,11 @@ function makeStyles(C: ColorPalette) {
       alignItems: 'flex-end',
       justifyContent: 'center',
     },
-    setGoalText: { fontSize: 15, fontWeight: '700', color: C.goalTextAction },
+    setGoalText: { fontSize: 15, fontWeight: '600', color: C.goalTextAction },
+    // The Modal's own root content, not a view layered over a sibling — so flex
+    // rather than absoluteFillObject, which had nothing to fill against here.
     editOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      flex: 1,
       justifyContent: 'center',
       paddingHorizontal: 32,
     },
@@ -481,7 +514,7 @@ function makeStyles(C: ColorPalette) {
     },
     editTitle: { fontSize: 16, fontWeight: '700', color: C.text, textAlign: 'center' },
     // Side by side rather than stacked, so editing both numbers reads as one
-    // dialog rather than two. A lone field (a future period's "Set goals") still
+    // dialog rather than two. A lone field (a future period's "Set goal") still
     // centres, since it's the only flex:1 child in the row.
     editFieldsRow: {
       flexDirection: 'row',

@@ -21,6 +21,8 @@ interface Props {
   onIncrementGoal?: (id: string) => void;
   /** Hard press on either side of a card (outside reorder mode): opens that goal's editor. */
   onLongPressGoal?: (id: string) => void;
+  /** Tap on a card with no target set yet (outside reorder mode): opens the Goals menu on that goal instead of stepping a count against a target that doesn't exist. */
+  onSetGoal?: (id: string) => void;
   compact?: boolean;
   /**
    * Tap-to-number reorder mode (see HomeScreen): every visible card shows a
@@ -34,7 +36,7 @@ interface Props {
 }
 
 export function GoalGrid({
-  definitions, counts, goals, grain, onDecrementGoal, onIncrementGoal, onLongPressGoal, compact, reorderActive, tappedIds, onTapGoal,
+  definitions, counts, goals, grain, onDecrementGoal, onIncrementGoal, onLongPressGoal, onSetGoal, compact, reorderActive, tappedIds, onTapGoal,
 }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -54,15 +56,26 @@ export function GoalGrid({
         <View key={ri} style={styles.row}>
           {row.map(def => {
             const tapIndex = tappedIds?.indexOf(def.id) ?? -1;
+            // The grid only ever shows the current period, which resolveGoal
+            // leaves unset (null) rather than defaulting to 0, so an unset
+            // goal shows a "Set goal" prompt instead of a false 0 target.
+            const goal = resolveGoal(goals[def.id], false);
+            // Outside reorder mode, a tap on an unset goal has nothing to step —
+            // it opens the Goals menu on that goal instead of incrementing or
+            // decrementing a count against a target that doesn't exist yet.
+            const handleTap = (fallback?: (id: string) => void) => () => {
+              if (reorderActive) return onTapGoal?.(def.id);
+              if (goal === null) return onSetGoal?.(def.id);
+              return fallback?.(def.id);
+            };
             return (
               <View key={def.id} style={styles.cell}>
                 <GoalCard
                   definition={def}
                   count={counts[def.id] ?? 0}
-                  // The grid only ever shows the current week, which never resolves to null.
-                  goal={resolveGoal(goals[def.id], false) ?? 0}
-                  onDecrement={() => (reorderActive ? onTapGoal?.(def.id) : onDecrementGoal?.(def.id))}
-                  onIncrement={() => (reorderActive ? onTapGoal?.(def.id) : onIncrementGoal?.(def.id))}
+                  goal={goal}
+                  onDecrement={handleTap(onDecrementGoal)}
+                  onIncrement={handleTap(onIncrementGoal)}
                   onLongPress={reorderActive ? undefined : () => onLongPressGoal?.(def.id)}
                   compact={compact}
                 />

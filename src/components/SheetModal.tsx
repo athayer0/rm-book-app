@@ -16,13 +16,15 @@ interface Props {
   children: React.ReactNode;
   /** Override the gap from the top of the screen. Defaults to the safe-area top + header. */
   topInset?: number;
+  /** Fires once the opening slide/fade finishes — for content that shouldn't appear mid-animation. */
+  onOpened?: () => void;
 }
 
 // A near-fullscreen sheet: its top sits just beneath the maroon header and it fills the rest of
 // the screen. The dimmed backdrop fades in uniformly over ~200ms while the sheet slides up, and
 // tapping it closes the sheet. The sheet frame stays put when a field is focused — it never
 // shifts for the keyboard; the content inside scrolls instead.
-export function SheetModal({ visible, onClose, children, topInset }: Props) {
+export function SheetModal({ visible, onClose, children, topInset, onOpened }: Props) {
   const Colors = useColors();
   const styles = makeStyles(Colors);
   const { height } = useWindowDimensions();
@@ -43,7 +45,7 @@ export function SheetModal({ visible, onClose, children, topInset }: Props) {
       Animated.parallel([
         Animated.timing(translateY, { toValue: 0, duration: 250, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
+      ]).start(({ finished }) => { if (finished) onOpened?.(); });
     } else if (mounted) {
       Animated.parallel([
         Animated.timing(translateY, { toValue: slideDistance, duration: 250, useNativeDriver: true }),

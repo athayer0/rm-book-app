@@ -41,10 +41,11 @@ function mergeCounts(derived: WeeklyCounts, offsets: WeeklyCounts): WeeklyCounts
   return totals;
 }
 
-// Each goal's weekly target is stored per week. A week at or before the current one treats
-// an unset target as 0; a future week stays unset so the UI can prompt for one.
-export function resolveGoal(stored: number | undefined, isFuture: boolean): number | null {
-  return stored ?? (isFuture ? null : 0);
+// Each goal's weekly target is stored per week. A past week treats an unset target
+// as 0 — it's over, there's nothing left to prompt for. The current or a future
+// week stays unset so the UI can prompt for one.
+export function resolveGoal(stored: number | undefined, isPast: boolean): number | null {
+  return stored ?? (isPast ? 0 : null);
 }
 
 function mergeWithDefaults(storedDefs: GoalDefinition[]): GoalDefinition[] {

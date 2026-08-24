@@ -13,7 +13,8 @@ import { GoalIcon } from './GoalIcon';
 interface Props {
   definition: GoalDefinition;
   count: number;
-  goal: number;
+  /** null when this period has no target set yet — shows a "Set goal" prompt instead of a ratio. */
+  goal: number | null;
   /** Tap on the card's left (icon) side. */
   onDecrement?: () => void;
   /** Tap on the card's right (label/count) side. */
@@ -29,8 +30,7 @@ export function GoalCard({ definition, count, goal, onDecrement, onIncrement, on
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
 
-  // An unset goal resolves to 0, which every count would otherwise "reach".
-  const goalReached = goal > 0 && count >= goal;
+  const goalReached = goal !== null && goal > 0 && count >= goal;
 
   function handleDecrement() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -58,12 +58,20 @@ export function GoalCard({ definition, count, goal, onDecrement, onIncrement, on
           {goalDisplayLabel(definition, t)}
         </Text>
         <View style={styles.countRow}>
-          <Text style={[styles.count, { color: goalReached ? Colors.success : Colors.accent }, compact && styles.countCompact]}>
-            {count}
-          </Text>
-          <Text style={[styles.goal, compact && styles.goalCompact]}>/{goal}</Text>
-          {goalReached && (
-            <Ionicons name="checkmark-circle" size={14} color={Colors.success} style={styles.check} />
+          {goal === null ? (
+            <Text style={[styles.setGoalText, compact && styles.setGoalTextCompact]}>
+              {t('goalPeriodList.setGoals')}
+            </Text>
+          ) : (
+            <>
+              <Text style={[styles.count, { color: goalReached ? Colors.success : Colors.accent }, compact && styles.countCompact]}>
+                {count}
+              </Text>
+              <Text style={[styles.goal, compact && styles.goalCompact]}>/{goal}</Text>
+              {goalReached && (
+                <Ionicons name="checkmark-circle" size={14} color={Colors.success} style={styles.check} />
+              )}
+            </>
           )}
         </View>
       </View>
@@ -179,6 +187,14 @@ function makeStyles(C: ColorPalette) {
     },
     goalCompact: {
       fontSize: 15,
+    },
+    setGoalText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.goalTextAction,
+    },
+    setGoalTextCompact: {
+      fontSize: 13,
     },
     check: {
       marginLeft: 4,

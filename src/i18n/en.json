@@ -618,7 +618,7 @@
     "chooseUpTo": "Choose up to {{max}} types to show as quick-add bubbles on the calendar's + button."
   },
   "goalPeriodList": {
-    "setGoals": "Set goals",
+    "setGoals": "Set goal",
     "actual": "Actual",
     "goal": "Goal"
   },
