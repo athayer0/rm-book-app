@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Alert, View, Text, TextInput, TouchableOpacity, Pressable, ScrollView, StyleSheet,
+  Keyboard, findNodeHandle, GestureResponderEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
@@ -87,6 +88,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   /** The split cutoff's time wheel — in the flow, so not a MenuId. */
   const [cutoffOpen, setCutoffOpen] = useState(false);
   const [colorSheetOpen, setColorSheetOpen] = useState(false);
+  const nameInputRef = useRef<TextInput>(null);
 
   /**
    * Which group wins the paint order. Lags `openMenu` on the way down and only
@@ -147,6 +149,23 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   function toggleCutoff() {
     setOpenMenu(null);
     setCutoffOpen(prev => !prev);
+  }
+
+  /**
+   * Fires in the capture phase, ahead of whatever the touch actually lands
+   * on, so it sees every tap in the sheet — a `TouchableOpacity`'s onPress
+   * never bubbles to an ancestor. Returning false leaves the touch to
+   * propagate normally, so buttons still fire and the field still gets
+   * focus back if that's what was tapped; it only dismisses the keyboard
+   * when the touch isn't on the name field itself, so placing the cursor
+   * within an already-focused field doesn't flash the keyboard shut and
+   * back open.
+   */
+  function dismissKeyboardUnlessNameField(evt: GestureResponderEvent): boolean {
+    if (String(findNodeHandle(nameInputRef.current)) !== String(evt.nativeEvent.target)) {
+      Keyboard.dismiss();
+    }
+    return false;
   }
 
   function label(def: EventTypeDefinition): string {
@@ -298,6 +317,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
 
   return (
     <SheetModal visible={visible} onClose={handleClose}>
+      <View style={styles.flexFill} onStartShouldSetResponderCapture={dismissKeyboardUnlessNameField}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={8}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
@@ -382,6 +402,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                   <View style={styles.nameRow}>
                     <View style={styles.nameField}>
                       <TextInput
+                        ref={nameInputRef}
                         style={styles.nameInput}
                         value={selected.label}
                         onChangeText={text => patchType(selected.id, { label: text })}
@@ -700,12 +721,14 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
           setColorSheetOpen(false);
         }}
       />
+      </View>
     </SheetModal>
   );
 }
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
+    flexFill: { flex: 1 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

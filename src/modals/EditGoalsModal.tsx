@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Alert, View, Text, TextInput, TouchableOpacity, Pressable, ScrollView,
-  StyleSheet,
+  StyleSheet, Keyboard, findNodeHandle, GestureResponderEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
@@ -110,6 +110,7 @@ export function EditGoalsModal({
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [iconSheetOpen, setIconSheetOpen] = useState(false);
   const [colorSheetOpen, setColorSheetOpen] = useState(false);
+  const nameInputRef = useRef<TextInput>(null);
 
   /**
    * Which group wins the paint order. Lags `openMenu` on the way down and only
@@ -194,6 +195,23 @@ export function EditGoalsModal({
 
   function toggleMenu(id: MenuId) {
     setOpenMenu(prev => (prev === id ? null : id));
+  }
+
+  /**
+   * Fires in the capture phase, ahead of whatever the touch actually lands
+   * on, so it sees every tap in the sheet — a `TouchableOpacity`'s onPress
+   * never bubbles to an ancestor. Returning false leaves the touch to
+   * propagate normally, so buttons still fire and the field still gets
+   * focus back if that's what was tapped; it only dismisses the keyboard
+   * when the touch isn't on the name field itself, so placing the cursor
+   * within an already-focused field doesn't flash the keyboard shut and
+   * back open.
+   */
+  function dismissKeyboardUnlessNameField(evt: GestureResponderEvent): boolean {
+    if (String(findNodeHandle(nameInputRef.current)) !== String(evt.nativeEvent.target)) {
+      Keyboard.dismiss();
+    }
+    return false;
   }
 
   function label(def: GoalDefinition): string {
@@ -339,6 +357,7 @@ export function EditGoalsModal({
 
   return (
     <SheetModal visible={visible} onClose={handleClose}>
+      <View style={styles.flexFill} onStartShouldSetResponderCapture={dismissKeyboardUnlessNameField}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
@@ -426,6 +445,7 @@ export function EditGoalsModal({
                   <View style={styles.nameRow}>
                     <View style={styles.nameField}>
                       <TextInput
+                        ref={nameInputRef}
                         style={styles.nameInput}
                         value={selected.label}
                         onChangeText={text => patchGoal(selected.id, { label: text })}
@@ -474,49 +494,10 @@ export function EditGoalsModal({
                   <Ionicons name="chevron-forward" size={16} color={Colors.textLight} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
 
-                {/* Which grid(s) this goal is counted on — the same segmented
-                    control the event-type sheet uses, and the reason there is no
-                    separate monthly editor. The hint below belongs to this block,
-                    so the hairline moves onto it rather than cutting between a
-                    dead segment and its own reason. */}
-                <View style={[styles.section, showPeriodLimitHint && styles.sectionFlush]}>
-                  <Text style={styles.fieldLabel}>{t('editGoals.goalPeriod')}</Text>
-                  <View style={styles.segmentTrack}>
-                    {PERIODS.map(p => {
-                      const blocked = periodBlocked(p);
-                      return (
-                        <TouchableOpacity
-                          key={p}
-                          style={[styles.segment, period === p && styles.segmentActive]}
-                          onPress={() => setPeriod(p)}
-                          disabled={blocked}
-                          activeOpacity={0.75}
-                        >
-                          <Text
-                            style={[
-                              styles.segmentText,
-                              period === p && styles.segmentTextActive,
-                              blocked && styles.segmentTextDisabled,
-                            ]}
-                          >
-                            {t(`editGoals.period.${p}`)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {showPeriodLimitHint && (
-                  <Text style={styles.rowHint}>
-                    {t('editGoals.periodLimitHint', { max: MAX_VISIBLE_GOALS })}
-                  </Text>
-                )}
-
                 {/* The row's own positioned parent — DropdownMenu anchors to it. */}
                 <View style={[styles.fieldRow, elevatedMenu === 'link' && styles.fieldRowOpen]}>
                   <TouchableOpacity
-                    style={[styles.row, styles.rowLast]}
+                    style={styles.row}
                     onPress={() => toggleMenu('link')}
                     activeOpacity={0.7}
                   >
@@ -570,6 +551,46 @@ export function EditGoalsModal({
                     </MenuScrollView>
                   </DropdownMenu>
                 </View>
+
+                {/* Which grid(s) this goal is counted on — the same segmented
+                    control the event-type sheet uses, and the reason there is no
+                    separate monthly editor. The hint below belongs to this block,
+                    so the hairline moves onto it rather than cutting between a
+                    dead segment and its own reason. Last row in the card when the
+                    hint isn't shown, so it drops its own hairline then too. */}
+                <View style={[styles.section, showPeriodLimitHint ? styles.sectionFlush : styles.sectionLast]}>
+                  <Text style={styles.fieldLabel}>{t('editGoals.goalPeriod')}</Text>
+                  <View style={styles.segmentTrack}>
+                    {PERIODS.map(p => {
+                      const blocked = periodBlocked(p);
+                      return (
+                        <TouchableOpacity
+                          key={p}
+                          style={[styles.segment, period === p && styles.segmentActive]}
+                          onPress={() => setPeriod(p)}
+                          disabled={blocked}
+                          activeOpacity={0.75}
+                        >
+                          <Text
+                            style={[
+                              styles.segmentText,
+                              period === p && styles.segmentTextActive,
+                              blocked && styles.segmentTextDisabled,
+                            ]}
+                          >
+                            {t(`editGoals.period.${p}`)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {showPeriodLimitHint && (
+                  <Text style={[styles.rowHint, styles.sectionLast]}>
+                    {t('editGoals.periodLimitHint', { max: MAX_VISIBLE_GOALS })}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -636,12 +657,14 @@ export function EditGoalsModal({
           setColorSheetOpen(false);
         }}
       />
+      </View>
     </SheetModal>
   );
 }
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
+    flexFill: { flex: 1 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -723,6 +746,11 @@ function makeStyles(C: ColorPalette) {
     sectionFlush: {
       borderBottomWidth: 0,
       paddingBottom: 10,
+    },
+    // The card's true last row/section, whichever one ends up there — no
+    // trailing hairline right before the card's rounded bottom corner.
+    sectionLast: {
+      borderBottomWidth: 0,
     },
     fieldLabel: {
       fontSize: 12,
