@@ -53,8 +53,8 @@ FEATURES
 [ ] make color scheme changing more intuitive
 [x] hard press ki to edit, quick press to increment
 [x] make the menu x tap area bigger
-[ ] expand icon pool
-[ ] spectrum color selector is a lil laggy
+[x] expand icon pool
+[x] spectrum color selector is a lil laggy
 [ ] event reporting in a more intuitive
 [ ] hold bottom or top of event to extend the time up and down
 
