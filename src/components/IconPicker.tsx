@@ -14,35 +14,65 @@ export interface IconOption { name: string; family: string; }
 // and predictable as the list grows.
 export const ICON_OPTIONS: IconOption[] = [
   { name: 'airplane',            family: 'Ionicons' },
+  { name: 'alarm-outline',       family: 'Ionicons' },
+  { name: 'ban-outline',         family: 'Ionicons' },
   { name: 'barbell-outline',     family: 'Ionicons' },
+  { name: 'basketball-outline',  family: 'Ionicons' },
+  { name: 'bed-outline',         family: 'Ionicons' },
   { name: 'bicycle',             family: 'Ionicons' },
   { name: 'book-outline',        family: 'Ionicons' },
   { name: 'briefcase-outline',   family: 'Ionicons' },
+  { name: 'broom',               family: 'MaterialCommunityIcons' },
+  { name: 'brush-outline',       family: 'Ionicons' },
   { name: 'bulb-outline',        family: 'Ionicons' },
   { name: 'call-outline',        family: 'Ionicons' },
+  { name: 'chatbubbles-outline', family: 'Ionicons' },
+  { name: 'checkmark-circle-outline', family: 'Ionicons' },
   { name: 'church',              family: 'MaterialCommunityIcons' },
   { name: 'color-palette-outline', family: 'Ionicons' },
   { name: 'compass',             family: 'Ionicons' },
   { name: 'cross',               family: 'MaterialCommunityIcons' },
+  { name: 'fitness-outline',     family: 'Ionicons' },
+  { name: 'flower-outline',      family: 'Ionicons' },
+  { name: 'food-apple',          family: 'MaterialCommunityIcons' },
+  { name: 'football-outline',    family: 'Ionicons' },
   { name: 'gift-outline',        family: 'Ionicons' },
+  { name: 'globe-outline',       family: 'Ionicons' },
+  { name: 'guitar-acoustic',     family: 'MaterialCommunityIcons' },
   { name: 'hands-pray',          family: 'MaterialCommunityIcons' },
+  { name: 'happy-outline',       family: 'Ionicons' },
   { name: 'heart',               family: 'Ionicons' },
   { name: 'home',                family: 'Ionicons' },
+  { name: 'journal-outline',     family: 'Ionicons' },
+  { name: 'laptop-outline',      family: 'Ionicons' },
   { name: 'leaf',                family: 'Ionicons' },
+  { name: 'library-outline',     family: 'Ionicons' },
+  { name: 'medkit-outline',      family: 'Ionicons' },
+  { name: 'meditation',          family: 'MaterialCommunityIcons' },
   { name: 'moon',                family: 'Ionicons' },
   { name: 'musical-notes',       family: 'Ionicons' },
+  { name: 'paw-outline',         family: 'Ionicons' },
   { name: 'people',              family: 'Ionicons' },
   { name: 'person-outline',      family: 'Ionicons' },
+  { name: 'piano',               family: 'MaterialCommunityIcons' },
+  { name: 'piggy-bank',          family: 'MaterialCommunityIcons' },
+  { name: 'pulse-outline',       family: 'Ionicons' },
   { name: 'restaurant-outline',  family: 'Ionicons' },
   { name: 'ribbon',              family: 'Ionicons' },
   { name: 'run',                 family: 'MaterialCommunityIcons' },
   { name: 'school',              family: 'Ionicons' },
+  { name: 'shower',              family: 'MaterialCommunityIcons' },
   { name: 'star',                family: 'Ionicons' },
   { name: 'sunny',               family: 'Ionicons' },
+  { name: 'swim',                family: 'MaterialCommunityIcons' },
   { name: 'synagogue',           family: 'MaterialCommunityIcons' },
   { name: 'time-outline',        family: 'Ionicons' },
   { name: 'trophy',              family: 'Ionicons' },
+  { name: 'walk-outline',        family: 'Ionicons' },
+  { name: 'wallet-outline',      family: 'Ionicons' },
   { name: 'water',               family: 'Ionicons' },
+  { name: 'weight-lifter',       family: 'MaterialCommunityIcons' },
+  { name: 'yoga',                family: 'MaterialCommunityIcons' },
 ];
 
 /**
@@ -61,8 +91,9 @@ export const DEFAULT_ICON: IconOption = { name: 'people', family: 'Ionicons' };
 const CELL_SIZE = 52;
 const GRID_GAP = 10;
 
-// Enough for the whole grid on a normal phone; BottomSheet clamps it on a
-// short one and the grid scrolls inside.
+// Tall enough to show several rows at once without the sheet swallowing the
+// whole screen; BottomSheet clamps it further on a short phone. The full
+// grid is taller than this, so it scrolls inside — see `scroll` below.
 const SHEET_HEIGHT = 420;
 
 interface Props {
@@ -161,7 +192,7 @@ export function IconPickerSheet({
       onCancel={onCancel}
       onDone={() => onDone(draft)}
     >
-      <ScrollView contentContainerStyle={styles.sheetContent} bounces={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.sheetContent} bounces={false}>
         <IconPicker
           icon={draft.name}
           iconFamily={draft.family}
@@ -175,6 +206,7 @@ export function IconPickerSheet({
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
+    scroll: { flex: 1 },
     sheetContent: { padding: 16 },
     grid: {
       flexDirection: 'row',
