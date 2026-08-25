@@ -362,18 +362,19 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     });
   }
 
-  // Carries the same-id status scheme along with the theme scheme, so
+  // Carries the theme scheme's colorSchemeId-matched status scheme along, so
   // completed/failed/pending always match whichever look was just picked
   // instead of being a separate choice — see the note on themeSchemeId above.
-  // Also seeds eventColorSchemeId/goalColorSchemeId to the same id, since
-  // Colors is the first of the three pickers a person reaches — that's only
-  // a default, not a lock: selectEventScheme/selectGoalScheme below can
+  // Also seeds eventColorSchemeId/goalColorSchemeId to that same
+  // colorSchemeId (Classic Blue and Classic Red both seed plain "classic"),
+  // since Colors is the first of the three pickers a person reaches — that's
+  // only a default, not a lock: selectEventScheme/selectGoalScheme below can
   // still override either one independently once its own page is reached.
   function selectThemeScheme(scheme: ThemeColorScheme) {
     setThemeSchemeId(scheme.id);
-    setEventColorSchemeId(scheme.id);
-    setGoalColorSchemeId(scheme.id);
-    const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    setEventColorSchemeId(scheme.colorSchemeId);
+    setGoalColorSchemeId(scheme.colorSchemeId);
+    const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.colorSchemeId);
     setDraftThemeColors(prev => ({
       ...prev,
       themeColor: scheme.themeColor,
@@ -403,14 +404,14 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     setGoalColorSchemeId(scheme.id);
   }
 
-  // The Theme picker on the Colors page: a static 3-then-2 grid rather than
-  // a horizontal scroll, so this is called once per row instead of once for
-  // a single ScrollView's worth of chips. Chips are sized to a fixed
-  // chipWidth (one third of the row, same math for both rows) instead of
-  // flex:1, so the two-chip second row's boxes come out the same width as
-  // the three-chip first row's rather than stretching to fill — the second
-  // row is then centered (schemeGridRowCenter) so the pair reads as sitting
-  // in the middle four of an implied six columns.
+  // The Theme picker on the Colors page: a static 3-then-2-then-1 grid
+  // rather than a horizontal scroll, so this is called once per row instead
+  // of once for a single ScrollView's worth of chips. Chips are sized to a
+  // fixed chipWidth (one third of the row, same math for every row) instead
+  // of flex:1, so the shorter rows' boxes come out the same width as the
+  // three-chip first row's rather than stretching to fill — each shorter
+  // row is then centered (schemeGridRowCenter) so it reads as sitting in
+  // the middle of an implied three columns.
   const chipWidth = (width - PAGE_HORIZONTAL_PADDING * 2 - SCHEME_GRID_GAP * 2) / 3;
 
   function renderThemeChip(scheme: ThemeColorScheme) {
@@ -424,7 +425,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
       >
         <View style={styles.schemeDots}>
           {dots.map((c, i) => (
-            <View key={i} style={[styles.schemeDot, { backgroundColor: c }]} />
+            <View key={i} style={[styles.schemeDot, styles.schemeDotThemeChip, { backgroundColor: c }]} />
           ))}
         </View>
         <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>{t(`colorSchemes.${scheme.id}`, { defaultValue: scheme.label })}</Text>
@@ -737,7 +738,10 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 {THEME_COLOR_SCHEMES.slice(0, 3).map(renderThemeChip)}
               </View>
               <View style={[styles.schemeGridRow, styles.schemeGridRowCenter]}>
-                {THEME_COLOR_SCHEMES.slice(3).map(renderThemeChip)}
+                {THEME_COLOR_SCHEMES.slice(3, 5).map(renderThemeChip)}
+              </View>
+              <View style={[styles.schemeGridRow, styles.schemeGridRowCenter]}>
+                {THEME_COLOR_SCHEMES.slice(5).map(renderThemeChip)}
               </View>
             </View>
 
@@ -1265,14 +1269,20 @@ function makeStyles(C: ColorPalette) {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
     },
+    // Only the app-theme scheme chips (renderThemeChip) want a heavier
+    // border than the hairline the Event Types/Goals scheme chips share —
+    // those dots are already distinguished by more of them per chip, so a
+    // thicker ring here is what makes a 3-dot theme chip read as clearly
+    // outlined at the same size.
+    schemeDotThemeChip: { borderWidth: 1 },
     schemeChipText: { fontSize: 12, fontWeight: '600', color: C.textSecondary, marginTop: 6 },
     schemeChipTextActive: { color: C.white },
-    // The Theme picker's static 3-then-2 grid, in place of a horizontal
-    // scroll — there's no overflow to fade, so each row just wraps evenly.
-    // Chips are a fixed width (see chipWidth in the component) rather than
-    // flex:1, so the two-chip second row can't stretch wider than the
-    // three-chip first row; schemeGridRowCenter centers that shorter row
-    // instead of letting it hug the left edge.
+    // The Theme picker's static 3-then-2-then-1 grid, in place of a
+    // horizontal scroll — there's no overflow to fade, so each row just
+    // wraps evenly. Chips are a fixed width (see chipWidth in the
+    // component) rather than flex:1, so the shorter rows can't stretch
+    // wider than the three-chip first row; schemeGridRowCenter centers
+    // each shorter row instead of letting it hug the left edge.
     schemeGrid: { width: '100%', marginTop: 24, gap: SCHEME_GRID_GAP },
     schemeGridRow: { flexDirection: 'row', gap: SCHEME_GRID_GAP },
     schemeGridRowCenter: { justifyContent: 'center' },

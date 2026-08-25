@@ -261,7 +261,7 @@ export function SettingsScreen() {
   // scheme, mirroring onboarding's selectThemeScheme. A scheme is one
   // identity across primary/secondary/tertiary/status, not a partial pick.
   function applyColorScheme(scheme: ThemeColorScheme) {
-    const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    const statusScheme = STATUS_COLOR_SCHEMES.find(s => s.id === scheme.colorSchemeId);
     updateSettings({
       themeColor: scheme.themeColor,
       secondaryColorLight: scheme.secondaryColorLight,
@@ -282,16 +282,18 @@ export function SettingsScreen() {
 
   // Applies one scheme's identity to theme + status colors, event-type
   // colors, and goal colors all at once — the Appearance card's master
-  // Color Scheme row. The three underlying schemes share the same five ids
-  // (see the top-of-file note on THEME_COLOR_SCHEMES), and updateSettings'
+  // Color Scheme row. Event/goal (and status, inside applyColorScheme) are
+  // looked up by the theme scheme's colorSchemeId rather than its own id,
+  // since Classic Blue and Classic Red both carry the same "classic" event/
+  // goal pair (see the top-of-file note on THEME_COLOR_SCHEMES). updateSettings'
   // write() resolves against a ref rather than a stale closure, so calling
   // applyColorScheme then applyEventColorScheme in the same tick merges
   // rather than one clobbering the other.
   function applyAllColorSchemes(scheme: ThemeColorScheme) {
     applyColorScheme(scheme);
-    const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    const eventScheme = EVENT_COLOR_SCHEMES.find(s => s.id === scheme.colorSchemeId);
     if (eventScheme) applyEventColorScheme(eventScheme);
-    const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === scheme.id);
+    const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === scheme.colorSchemeId);
     if (goalScheme) applyGoalColorScheme(goalScheme);
   }
 
@@ -364,11 +366,19 @@ export function SettingsScreen() {
   }
 
   // The Appearance card's master picker only shows a scheme selected once
-  // theme, event, and goal colors all independently resolve to that same
-  // id — a partial match (someone hand-tuned one category) reads as Custom,
-  // same as each individual picker already does.
+  // theme, event, and goal colors all independently resolve to the ids that
+  // scheme's own colorSchemeId ties together — a partial match (someone
+  // hand-tuned one category) reads as Custom, same as each individual
+  // picker already does. Compared via colorSchemeId rather than id directly
+  // so Classic Blue/Classic Red (whose own id doesn't match the "classic"
+  // event/goal schemes they carry) can still show as themselves here.
+  const selectedThemeScheme = selectedSchemeId
+    ? THEME_COLOR_SCHEMES.find(s => s.id === selectedSchemeId)
+    : null;
   const masterSchemeId =
-    selectedSchemeId && selectedSchemeId === selectedEventSchemeId && selectedSchemeId === selectedGoalSchemeId
+    selectedThemeScheme
+    && selectedThemeScheme.colorSchemeId === selectedEventSchemeId
+    && selectedThemeScheme.colorSchemeId === selectedGoalSchemeId
       ? selectedSchemeId
       : null;
 

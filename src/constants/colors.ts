@@ -7,6 +7,14 @@
  */
 export const DEFAULT_THEME_COLOR = '#1A3A6B';
 
+/**
+ * The crimson/maroon `DEFAULT_THEME_COLOR` was before the primary/tertiary
+ * swap (see the file-level comment above) — kept as its own constant only
+ * because THEME_COLOR_SCHEMES' Classic Red still uses it as a primary,
+ * unlike the tertiary values below, which moved on to their own shades.
+ */
+export const CLASSIC_RED_THEME_COLOR = '#8B1A4A';
+
 // Defaults for the other two user-editable theme colors — light/dark are
 // independent settings, not a lift computed from one value, so each needs its
 // own default. These match today's hardcoded `accent`/`control` values exactly,

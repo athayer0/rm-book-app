@@ -1,5 +1,5 @@
 import {
-  DEFAULT_THEME_COLOR,
+  DEFAULT_THEME_COLOR, CLASSIC_RED_THEME_COLOR,
   DEFAULT_SECONDARY_COLOR_LIGHT, DEFAULT_SECONDARY_COLOR_DARK,
   DEFAULT_TERTIARY_COLOR_LIGHT, DEFAULT_TERTIARY_COLOR_DARK,
   DEFAULT_STATUS_COMPLETED_LIGHT, DEFAULT_STATUS_COMPLETED_DARK,
@@ -10,13 +10,18 @@ import {
 /**
  * Ready-made palettes for the onboarding colours page — the same "pick a
  * look instead of hand-tuning every swatch" idea as EVENT_COLOR_SCHEMES /
- * GOAL_COLOR_SCHEMES in colorSchemes.ts, and deliberately the same five
- * names (Classic, Marine, Sunset, Amazon, Wildflower) so a person who
- * picks "Sunset" here and "Sunset" on the Event Types page is choosing one
+ * GOAL_COLOR_SCHEMES in colorSchemes.ts. Deliberately the same names
+ * (Marine, Sunset, Amazon, Wildflower) as those two so a person who picks
+ * "Sunset" here and "Sunset" on the Event Types page is choosing one
  * consistent identity, not two unrelated things that happen to share a
- * label. Split into a theme scheme (primary/secondary/tertiary) and a
- * status scheme (completed/failed/pending) because they drive unrelated
- * things a person may want to mix independently.
+ * label. Classic is the one exception: it's split into Classic Blue and
+ * Classic Red here (same secondary/tertiary, navy vs. the pre-swap maroon
+ * primary — see CLASSIC_RED_THEME_COLOR), but both still point at the same
+ * single "classic" entry in EVENT_COLOR_SCHEMES/GOAL_COLOR_SCHEMES via
+ * `colorSchemeId`, since neither page has a reason to fork into a blue/red
+ * pair of its own. Split into a theme scheme (primary/secondary/tertiary)
+ * and a status scheme (completed/failed/pending) because they drive
+ * unrelated things a person may want to mix independently.
  */
 export interface ThemeColorScheme {
   id: string;
@@ -26,17 +31,39 @@ export interface ThemeColorScheme {
   secondaryColorDark: string;
   tertiaryColorLight: string;
   tertiaryColorDark: string;
+  /**
+   * Which STATUS_COLOR_SCHEMES/EVENT_COLOR_SCHEMES/GOAL_COLOR_SCHEMES id
+   * this theme scheme carries along when picked — usually its own id, but
+   * Classic Blue and Classic Red both point at the single "classic" entry
+   * in those three, since none of them fork by primary colour the way this
+   * list does.
+   */
+  colorSchemeId: string;
 }
 
 export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
   {
-    id: 'classic',
-    label: 'Classic',
+    id: 'classic-blue',
+    label: 'Classic Blue',
     themeColor: DEFAULT_THEME_COLOR,
     secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
     secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,
     tertiaryColorLight: DEFAULT_TERTIARY_COLOR_LIGHT,
     tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
+    colorSchemeId: 'classic',
+  },
+  {
+    // Same secondary/tertiary as Classic Blue — only the primary changes,
+    // back to the maroon the app shipped with before the primary/tertiary
+    // swap (see the note on CLASSIC_RED_THEME_COLOR in colors.ts).
+    id: 'classic-red',
+    label: 'Classic Red',
+    themeColor: CLASSIC_RED_THEME_COLOR,
+    secondaryColorLight: DEFAULT_SECONDARY_COLOR_LIGHT,
+    secondaryColorDark: DEFAULT_SECONDARY_COLOR_DARK,
+    tertiaryColorLight: DEFAULT_TERTIARY_COLOR_LIGHT,
+    tertiaryColorDark: DEFAULT_TERTIARY_COLOR_DARK,
+    colorSchemeId: 'classic',
   },
   {
     // Light blue primary (swapped in from GOAL_COLOR_SCHEMES.marine's
@@ -52,6 +79,7 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     secondaryColorDark: '#4DDBB5',
     tertiaryColorLight: '#1C3154',
     tertiaryColorDark: '#AFCBDE',
+    colorSchemeId: 'marine',
   },
   {
     // Pink/green/blue, the same muted-garden mix as the Wildflower scheme.
@@ -62,6 +90,7 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     secondaryColorDark: '#7FB88F',
     tertiaryColorLight: '#3F5C82',
     tertiaryColorDark: '#93B8E0',
+    colorSchemeId: 'wildflower',
   },
   {
     // Burnt orange primary, magenta secondary, navy tertiary — primary and
@@ -78,6 +107,7 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     secondaryColorDark: '#D04395',
     tertiaryColorLight: '#263D5E',
     tertiaryColorDark: '#3F5E8D',
+    colorSchemeId: 'sunset',
   },
   {
     // River-brown/canopy-green only, same rule as the Amazon event/goal
@@ -96,6 +126,7 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     secondaryColorDark: '#D4A62E',
     tertiaryColorLight: '#3C7A3F',
     tertiaryColorDark: '#5FAE63',
+    colorSchemeId: 'amazon',
   },
 ];
 

@@ -57,10 +57,11 @@ FEATURES
 [x] spectrum color selector is a lil laggy
 [x] event reporting in a more intuitive
 [x] hold bottom or top of event to extend the time up and down
-[ ] add classic red back as a 6th theme
+[x] add classic red back as a 6th theme
 [ ] improve the look of the sign in screen
 [ ] fix the weird text entry box outline
 [ ] birthday feature?
+[ ] splash icon
 
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
