@@ -31,8 +31,8 @@ export function AppNavigation() {
             backgroundColor: Colors.tabBar,
             borderTopColor: Colors.border,
             borderTopWidth: 1,
-            paddingBottom: 10,
-            paddingTop: 10,
+            paddingBottom: 8,
+            paddingTop: 8,
             height: TAB_BAR_HEIGHT,
           },
           tabBarLabelStyle: {

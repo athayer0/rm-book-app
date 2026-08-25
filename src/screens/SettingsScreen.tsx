@@ -32,6 +32,7 @@ import { EventReminderTypesModal } from '../modals/EventReminderTypesModal';
 import {
   DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition, eventTypeDisplayLabel,
 } from '../constants/eventTypeDefaults';
+import { HEADER_HEIGHT } from '../constants/layout';
 import { normalizeHex } from '../utils/colorUtils';
 import { useSettings, DEFAULT_SETTINGS, type AppSettings } from '../hooks/useSettings';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
@@ -1320,7 +1321,7 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 10,
-      minHeight: 60,
+      minHeight: HEADER_HEIGHT,
       backgroundColor: C.primary,
     },
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },

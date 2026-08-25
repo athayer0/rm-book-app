@@ -23,6 +23,7 @@ import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
 import { GoalGrain, GRAIN } from '../utils/goalGrain';
 import { useUnreported } from '../hooks/useUnreported';
 import { useOnboardingFinishing } from '../hooks/useOnboarding';
+import { HEADER_HEIGHT } from '../constants/layout';
 import { getWeekKey, getMonthKey } from '../utils/dateUtils';
 import { MAX_GOAL_VALUE } from '../constants/defaultGoals';
 
@@ -308,7 +309,7 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 10,
-      minHeight: 60,
+      minHeight: HEADER_HEIGHT,
       backgroundColor: C.primary,
     },
     headerTitle: {
@@ -327,10 +328,12 @@ function makeStyles(C: ColorPalette) {
       // Asymmetric on purpose: the card sits closer under the primary-colored header than
       // it does above the tab bar. Both grids share one card now, so the content
       // is tall enough to fill the screen and these are the gaps you actually
-      // see — the justifyContent above only centres a short page.
+      // see — the justifyContent above only centres a short page. `gap` is set
+      // equal to paddingTop, so the card-to-unreported-row gap matches the
+      // header-to-card gap above it.
       paddingTop: 14,
       paddingBottom: 28,
-      gap: 16,
+      gap: 14,
     },
     card: {
       backgroundColor: C.card,
@@ -341,14 +344,17 @@ function makeStyles(C: ColorPalette) {
       shadowRadius: 6,
       elevation: 2,
     },
-    // 20 above the buttons, 16 below. The gap above is not paddingTop alone —
-    // the grid already contributes its own 8 of bottom padding and a card's 4 of
-    // margin, so paddingTop supplies only the remaining 8 of it.
+    // 16 above the buttons, 16 below — matched so the gap from the bottom of
+    // the lowest monthly card to the top of the buttons reads the same as the
+    // gap from the bottom of the buttons to the bottom of the card. The gap
+    // above is not paddingTop alone — the grid already contributes its own 8
+    // of bottom padding and a card's 4 of margin, so paddingTop supplies only
+    // the remaining 4 of it.
     actionRow: {
       flexDirection: 'row',
       gap: 10,
       paddingHorizontal: 16,
-      paddingTop: 8,
+      paddingTop: 4,
       paddingBottom: 16,
     },
     actionBtn: {

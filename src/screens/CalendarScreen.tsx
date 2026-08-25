@@ -27,6 +27,7 @@ import { EventSizes, resolveEventSize } from '../constants/eventSizes';
 import { DragProvider, useDrag } from '../components/DragContext';
 import { useEventReport } from '../hooks/useEventReport';
 import { addMinutesToTimeString, formatTime, nextHalfHour, parseTimeString } from '../utils/dateUtils';
+import { HEADER_HEIGHT } from '../constants/layout';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EDGE_ZONE = 60;
@@ -76,7 +77,7 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
   }> | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
-  const [headerBottom, setHeaderBottom] = useState(60);
+  const [headerBottom, setHeaderBottom] = useState(HEADER_HEIGHT);
   // Shared vertical scroll offset so every day page stays aligned to the same time-of-day.
   const [syncScrollY, setSyncScrollY] = useState(0);
 
@@ -689,7 +690,7 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 10,
-      minHeight: 60,
+      minHeight: HEADER_HEIGHT,
       backgroundColor: C.primary,
     },
     headerLeft: {

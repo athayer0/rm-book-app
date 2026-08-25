@@ -93,7 +93,7 @@ function makeStyles(C: ColorPalette) {
       flexDirection: 'row',
       gap: 10,
       paddingHorizontal: 16,
-      paddingTop: 8,
+      paddingTop: 4,
       paddingBottom: 16,
     },
     actionBtn: { flex: 1 },

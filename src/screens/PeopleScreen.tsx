@@ -15,6 +15,7 @@ import { PersonCard } from '../components/PersonCard';
 import { AddEditPersonModal } from '../modals/AddEditPersonModal';
 import { ImportContactsModal } from '../modals/ImportContactsModal';
 import { FAB, FAB_SIZE, FAB_BOTTOM } from '../components/FAB';
+import { HEADER_HEIGHT } from '../constants/layout';
 import {
   PERSON_STATUSES, STATUS_OPTIONS, STATUS_GROUPS, statusRank, groupByStatus, statusDisplayName, statusGroupLabel,
 } from '../constants/personStatuses';
@@ -401,7 +402,7 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 10,
-      minHeight: 60,
+      minHeight: HEADER_HEIGHT,
       backgroundColor: C.primary,
       zIndex: 20,
       elevation: 20,
@@ -409,14 +410,16 @@ function makeStyles(C: ColorPalette) {
     headerTitle: { fontSize: 20, fontWeight: '700', color: C.onPrimary },
     // Set Type sits in the row the icons sit in, so it takes the same height as
     // a chip — otherwise the row's height changes on entering select mode, which
-    // is a fourth change to a header that's meant to have only three.
-    headerTextAction: { height: 36, justifyContent: 'center', paddingHorizontal: 4 },
+    // is a fourth change to a header that's meant to have only three. Sized to
+    // fit inside HEADER_HEIGHT alongside the row's paddingVertical, so this
+    // header doesn't stand taller than the other three screens'.
+    headerTextAction: { height: 34, justifyContent: 'center', paddingHorizontal: 4 },
     headerActionText: { fontSize: 16, fontWeight: '600', color: C.onPrimary },
     headerActionTextDisabled: { color: C.onPrimaryMuted },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     filterChip: {
-      width: 36,
-      height: 36,
+      width: 34,
+      height: 34,
       alignItems: 'center',
       justifyContent: 'center',
     },

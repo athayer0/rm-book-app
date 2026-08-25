@@ -6,9 +6,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
+import { HEADER_HEIGHT } from '../constants/layout';
 
-// The sheet stops just beneath the primary-colored app header, which every tab screen renders at 60px.
-const HEADER_HEIGHT = 60;
+// The sheet stops just beneath the primary-colored app header, which every tab screen renders at HEADER_HEIGHT.
 
 interface Props {
   visible: boolean;

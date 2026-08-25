@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { HomeSkeleton } from './HomeSkeleton';
-import { TAB_BAR_HEIGHT } from '../constants/layout';
+import { TAB_BAR_HEIGHT, HEADER_HEIGHT } from '../constants/layout';
 
 /** Mirrors navigation.tsx's tab icons/order — Home is drawn focused, since that's always where this hands off to. */
 const TAB_ICONS: { name: string; focused: string; unfocused: string }[] = [
@@ -47,7 +47,7 @@ export function HomeLoadingScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <HomeSkeleton />
       </ScrollView>
-      <View style={[styles.tabBar, { paddingBottom: 10 + insets.bottom }]}>
+      <View style={[styles.tabBar, { paddingBottom: 8 + insets.bottom }]}>
         {TAB_ICONS.map(({ name, focused, unfocused }) => {
           const isHome = name === 'Home';
           return (
@@ -80,7 +80,7 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 10,
-      minHeight: 60,
+      minHeight: HEADER_HEIGHT,
       backgroundColor: C.primary,
     },
     headerTitle: {
@@ -97,7 +97,7 @@ function makeStyles(C: ColorPalette) {
       paddingHorizontal: 16,
       paddingTop: 14,
       paddingBottom: 28,
-      gap: 16,
+      gap: 14,
     },
     // Matches navigation.tsx's tabBarStyle/tabBarIcon exactly, minus the
     // paddingBottom there (react-navigation adds the inset itself; here
@@ -108,7 +108,7 @@ function makeStyles(C: ColorPalette) {
       backgroundColor: C.tabBar,
       borderTopColor: C.border,
       borderTopWidth: 1,
-      paddingTop: 10,
+      paddingTop: 8,
       minHeight: TAB_BAR_HEIGHT,
     },
     tabIconWrap: {
