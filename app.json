@@ -17,7 +17,7 @@
       "bundleIdentifier": "com.aaronthayer.compi",
       "supportsTablet": true,
       "infoPlist": {
-        "NSContactsUsageDescription": "Allow RM: Calendar and Goal Tracker to access your contacts to import people into your list.",
+        "NSContactsUsageDescription": "Allow RM Calendar to access your contacts to import people into your list.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

@@ -94,7 +94,7 @@ export function AuthScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>RM: Calendar and Goal Tracker</Text>
+      <Text style={styles.title}>RM Calendar</Text>
       <Text style={styles.subtitle}>
         {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
       </Text>
