@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Compi",
+    "name": "RM Calendar",
     "slug": "compi",
     "version": "1.0.0",
     "scheme": "compi",
@@ -17,7 +17,7 @@
       "bundleIdentifier": "com.aaronthayer.compi",
       "supportsTablet": true,
       "infoPlist": {
-        "NSContactsUsageDescription": "Allow Compi to access your contacts to import people into your list.",
+        "NSContactsUsageDescription": "Allow RM: Calendar and Goal Tracker to access your contacts to import people into your list.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

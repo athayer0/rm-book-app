@@ -11,7 +11,7 @@
     "next": "Siguiente",
     "getStarted": "Comenzar",
     "welcome": {
-      "title": "Bienvenido a Compi",
+      "title": "Bienvenido a RM: Calendar and Goal Tracker",
       "body": "Tu compañero para el próximo capítulo. Demos un vistazo rápido: Inicio para tus metas, Calendario para registrar tus días, Personas para quienes más importan, y Ajustes para personalizarlo todo."
     },
     "colors": {
@@ -138,8 +138,8 @@
   },
   "notificationToggles": {
     "disabledTitle": "Notificaciones desactivadas",
-    "dailyReviewBody": "Activa las notificaciones para Compi en los ajustes de tu dispositivo para usar el recordatorio de revisión diaria.",
-    "eventRemindersBody": "Activa las notificaciones para Compi en los ajustes de tu dispositivo para usar los recordatorios de eventos."
+    "dailyReviewBody": "Activa las notificaciones para RM: Calendar and Goal Tracker en los ajustes de tu dispositivo para usar el recordatorio de revisión diaria.",
+    "eventRemindersBody": "Activa las notificaciones para RM: Calendar and Goal Tracker en los ajustes de tu dispositivo para usar los recordatorios de eventos."
   },
   "phoneUtils": {
     "cantPlaceCallTitle": "No se puede realizar la llamada",
