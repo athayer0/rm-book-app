@@ -188,7 +188,7 @@ async function runPull(userId: string): Promise<void> {
   await pullGoalEntries(lastSynced, pull);
   await pullGoalMonthlyEntries(lastSynced, pull);
   await pullEventStatuses(lastSynced, pull);
-  await pullSettings(userId);
+  await pullSettings(userId, lastSynced);
 
   if (highWater) await setItem(LAST_SYNCED_KEY, highWater);
 }
@@ -281,14 +281,17 @@ async function pullEventStatuses(since: string | null, pull: Puller): Promise<vo
   await setItem(EVENT_STATUSES_KEY, merged);
 }
 
-async function pullSettings(userId: string): Promise<void> {
+async function pullSettings(userId: string, since: string | null): Promise<void> {
+  // Incremental, same as ROW_TABLES: without this, a settings row that hasn't
+  // changed server-side yet still gets re-fetched and merged on every pull,
+  // which lets a stale copy clobber a local edit still sitting in the queue
+  // (nothing else about this table protects against that — there's no
+  // per-row updated_at check the way the ROW_TABLES loop gets for free).
+  let query = supabase.from('settings').select('*').eq('user_id', userId);
+  if (since) query = query.gt('updated_at', since);
   // No row exists until the user changes something, so maybeSingle() rather than
   // single() — the latter errors on zero rows.
-  const { data, error } = await supabase
-    .from('settings')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { data, error } = await query.maybeSingle();
   if (error) {
     console.log('[sync] settings pull failed:', error);
     return;
