@@ -413,7 +413,7 @@ function makeStyles(C: ColorPalette) {
     // is a fourth change to a header that's meant to have only three. Sized to
     // fit inside HEADER_HEIGHT alongside the row's paddingVertical, so this
     // header doesn't stand taller than the other three screens'.
-    headerTextAction: { height: 34, justifyContent: 'center', paddingHorizontal: 4 },
+    headerTextAction: { height: 34, justifyContent: 'center', paddingLeft: 0, paddingRight: 4 },
     headerActionText: { fontSize: 16, fontWeight: '600', color: C.onPrimary },
     headerActionTextDisabled: { color: C.onPrimaryMuted },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },

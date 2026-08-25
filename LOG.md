@@ -60,7 +60,7 @@ FEATURES
 [x] add classic red back as a 6th theme
 [x] improve the look of the sign in screen
 [x] fix the weird text entry box outline
-[ ] add select and set status to the unreported events menu
+[x] add select and set status to the unreported events menu
 [ ] birthday feature?
 [ ] splash icon
 

@@ -122,7 +122,11 @@
     "allCaughtUp": "All caught up",
     "waiting": "{{count}} waiting · last 30 days",
     "nothingToReport": "Nothing to report",
-    "emptyHint": "Events show up here once their start time has passed."
+    "emptyHint": "Events show up here once their start time has passed.",
+    "selectEvents": "Select Events",
+    "exitSelectMode": "Exit Select Mode",
+    "setStatus": "Set Status",
+    "selectedCount": "{{count}} selected"
   },
   "personTimeline": {
     "today": "Today",
@@ -394,7 +398,7 @@
     "deleteSelected": "Delete Selected",
     "exitSelectMode": "Exit Select Mode",
     "selectPeople": "Select People",
-    "setType": "Set Type",
+    "setType": "Set Status",
     "importFromContacts": "Import from Contacts",
     "filterAll": "All",
     "searchPlaceholder": "Search people...",

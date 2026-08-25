@@ -122,7 +122,11 @@
     "allCaughtUp": "Todo al día",
     "waiting": "{{count}} pendientes · últimos 30 días",
     "nothingToReport": "Nada que reportar",
-    "emptyHint": "Los eventos aparecen aquí una vez que su hora de inicio ha pasado."
+    "emptyHint": "Los eventos aparecen aquí una vez que su hora de inicio ha pasado.",
+    "selectEvents": "Seleccionar eventos",
+    "exitSelectMode": "Salir del modo de selección",
+    "setStatus": "Asignar estado",
+    "selectedCount": "{{count}} seleccionados"
   },
   "personTimeline": {
     "today": "Hoy",
@@ -394,7 +398,7 @@
     "deleteSelected": "Eliminar seleccionados",
     "exitSelectMode": "Salir del modo de selección",
     "selectPeople": "Seleccionar personas",
-    "setType": "Asignar tipo",
+    "setType": "Asignar estado",
     "importFromContacts": "Importar de contactos",
     "filterAll": "Todos",
     "searchPlaceholder": "Buscar personas...",

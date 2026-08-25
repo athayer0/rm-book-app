@@ -499,13 +499,13 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
             accessibilityRole="button"
             accessibilityLabel={t('calendar.selectEvents')}
           >
-            <Ionicons name={selectMode ? 'checkbox' : 'checkbox-outline'} size={22} color={Colors.onPrimary} />
+            <Ionicons name={selectMode ? 'checkbox' : 'checkbox-outline'} size={24} color={Colors.onPrimary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setSelectedDate(d => subDays(d, 1))} style={styles.navBtn}>
-            <Ionicons name="chevron-back" size={22} color={Colors.onPrimary} />
+            <Ionicons name="chevron-back" size={24} color={Colors.onPrimary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setSelectedDate(d => addDays(d, 1))} style={styles.navBtn}>
-            <Ionicons name="chevron-forward" size={22} color={Colors.onPrimary} />
+            <Ionicons name="chevron-forward" size={24} color={Colors.onPrimary} />
           </TouchableOpacity>
         </View>
       </View>
