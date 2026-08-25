@@ -394,6 +394,18 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
     commitMoves(moves);
   }
 
+  // Resizing an edge only ever touches the one occurrence's own start or end
+  // time, so it's a single-move commit — but still goes through commitMoves
+  // rather than updateEvent directly, so a recurring series gets the same
+  // this-one/this-and-future prompt a drag or an edit would ask for.
+  function handleResizeEnd(event: CalendarEvent, newEndTime: string) {
+    commitMoves([{ id: event.id, origDate: event.date, recurring: event.recurring, changes: { endTime: newEndTime } }]);
+  }
+
+  function handleResizeStart(event: CalendarEvent, newStartTime: string) {
+    commitMoves([{ id: event.id, origDate: event.date, recurring: event.recurring, changes: { startTime: newStartTime } }]);
+  }
+
   // The grid draws one drop-target shadow per selected event, not just for the
   // block being held — so grabbing the bottom of three still previews all three
   // landing spots. Offsets come off the same pre-drag snapshot as the ghosts,
@@ -527,6 +539,8 @@ function CalendarContent({ route, navigation }: { route?: any; navigation?: any 
                   onDragMove={moveDrag}
                   onDragEnd={handleDragDrop}
                   onDragCancel={handleDragCancel}
+                  onResizeEnd={handleResizeEnd}
+                  onResizeStart={handleResizeStart}
                   dragHoverY={dragActive ? ghostY : null}
                   dragGrabOffsetY={grabOffsetY}
                   dragEventHeight={dragActive && dragEvent ? renderedEventHeight(dragEvent, SLOT_HEIGHT) : undefined}

@@ -56,7 +56,7 @@ FEATURES
 [x] expand icon pool
 [x] spectrum color selector is a lil laggy
 [x] event reporting in a more intuitive
-[ ] hold bottom or top of event to extend the time up and down
+[x] hold bottom or top of event to extend the time up and down
 
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)

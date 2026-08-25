@@ -39,6 +39,10 @@ interface Props {
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (absoluteY: number, gridTopY: number, scrollOffset: number) => void;
   onDragCancel?: () => void;
+  // Edge resize — see EventBlock. Passed straight through; each block
+  // decides for itself whether it's eligible (duration, backup, select mode).
+  onResizeEnd?: (event: CalendarEvent, newEndTime: string) => void;
+  onResizeStart?: (event: CalendarEvent, newStartTime: string) => void;
   dragHoverY?: number | null;
   dragGrabOffsetY?: number;
   // Extra drop-target shadows for a multi-select drag — one per selected event
@@ -70,7 +74,7 @@ interface Props {
   bounceEnabled?: boolean;
 }
 
-export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect, bounceEnabled = true }: Props) {
+export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onDragStart, onDragMove, onDragEnd, onDragCancel, onResizeEnd, onResizeStart, dragHoverY, dragGrabOffsetY = 0, dragEventHeight, dragGroupShadows, gridStartHour = 6, gridEndHour = 22, slotHeight = DEFAULT_SLOT_HEIGHT, eventFontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize, getStatus, isToday = false, initialScrollY, onScrollSettle, syncScrollY, selectMode = false, selectedEventIds, onToggleEventSelect, bounceEnabled = true }: Props) {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { settings } = useSettings();
@@ -350,6 +354,8 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
                   onDragMove={handleDragMove}
                   onDragEnd={onDragEnd ? (x, y) => onDragEnd(y, gridTopAbsoluteRef.current, scrollOffsetRef.current) : undefined}
                   onDragCancel={onDragCancel}
+                  onResizeEnd={onResizeEnd}
+                  onResizeStart={onResizeStart}
                 />
               );
             })}

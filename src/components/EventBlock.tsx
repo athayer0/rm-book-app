@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,8 @@ import { CONTACT_METHODS, resolveContactMethod, usesContactMethod } from '../con
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 import { useSettings } from '../hooks/useSettings';
-import { displayTime } from '../utils/dateUtils';
+import { displayTime, parseTimeString, addMinutesToTimeString } from '../utils/dateUtils';
+import { contrastInk } from '../utils/colorUtils';
 import { DEFAULT_SLOT_HEIGHT, EventSizes, DEFAULT_EVENT_SIZE, TIME_COL_WIDTH } from '../constants/eventSizes';
 import { useDrag } from './DragContext';
 import { StatusCheckbox } from './StatusCheckbox';
@@ -21,6 +22,22 @@ const TIME_GAP = 4; // styles.time marginLeft
 const GUTTER_GAP = 3; // between any two of the right-hand gutter's markers
 const UNITS_GAP = 3; // between the quantity and its units, inside the one marker
 const METHOD_GAP = 5; // between the method marker and the title
+
+// Edge resize: each touch strip is carved out of the block's own top/bottom
+// via a negative hitSlop rather than a separate child view, so grabbing it
+// needs no extra layout pass. Kept comfortably under COMPACT_EVENT_HEIGHT
+// (the shortest a resizable block ever renders) so it never eats the whole block.
+const RESIZE_HANDLE_HEIGHT = 7;
+// How long an edge has to be held before it engages — same figure the
+// move-drag below uses, so every long-press gesture on a block feels the same.
+const RESIZE_LONG_PRESS_MS = 400;
+// The granularity the user asked for — every drag snaps the end time to a
+// multiple of this many minutes.
+const RESIZE_INCREMENT_MIN = 5;
+// A block can shrink to one increment, never to (or past) zero duration —
+// zero is how "no end time" is stored, and that means a different kind of
+// block (see hasEndTime).
+const MIN_EVENT_DURATION_MIN = RESIZE_INCREMENT_MIN;
 
 // The title's line height and the method glyph, both as multiples of the block's
 // font size. The title row is as tall as whichever is larger, and the block's
@@ -138,6 +155,11 @@ function wrapTitleLines(text: string, fontSize: number, lineWidth: number): stri
   return lines;
 }
 
+function timeStringToMinutes(t: string): number {
+  const { hour, minute } = parseTimeString(t);
+  return hour * 60 + minute;
+}
+
 interface Props {
   event: CalendarEvent;
   status?: EventStatus;
@@ -147,6 +169,15 @@ interface Props {
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (x: number, y: number) => void;
   onDragCancel?: () => void;
+  /**
+   * Holding the bottom edge enters resize mode until release, dragging up/down
+   * to change the event's length in RESIZE_INCREMENT_MIN steps. Fires once, on
+   * release, with the final snapped end time — everything in between is this
+   * block's own local state, so the caller only ever sees the committed value.
+   */
+  onResizeEnd?: (event: CalendarEvent, newEndTime: string) => void;
+  /** Same as onResizeEnd, mirrored onto the top edge: changes startTime instead. */
+  onResizeStart?: (event: CalendarEvent, newStartTime: string) => void;
   columnWidth?: number;
   columnOffset?: number;
   gridStartHour?: number;
@@ -168,7 +199,7 @@ interface Props {
 }
 
 export function EventBlock({
-  event, status, onPress, onToggleStatus, onDragStart, onDragMove, onDragEnd, onDragCancel,
+  event, status, onPress, onToggleStatus, onDragStart, onDragMove, onDragEnd, onDragCancel, onResizeEnd, onResizeStart,
   columnWidth = 1, columnOffset = 0, gridStartHour = 6,
   slotHeight = DEFAULT_SLOT_HEIGHT, fontSize = EventSizes[DEFAULT_EVENT_SIZE].fontSize,
   inline = false, selected,
@@ -208,10 +239,132 @@ export function EventBlock({
   const inSelectMode = selected !== undefined;
   const showBadge = inSelectMode || isCheckbox || !!effectiveStatus;
 
+  // Resizing an edge — top changes startTime, bottom changes endTime, the
+  // other edge held fixed either way. A checkbox/no-end block has no edge
+  // worth grabbing (hasEndTime), and neither list rendering, a backup block,
+  // nor multi-select owns either gesture.
+  const resizeEnabled = !inline && !isBackup && !inSelectMode && hasEndTime(event) && !!onResizeEnd;
+  const startResizeEnabled = !inline && !isBackup && !inSelectMode && hasEndTime(event) && !!onResizeStart;
+
+  // null outside a resize; once set, the number of minutes (snapped, signed)
+  // the current drag has moved that edge by, relative to the event's own
+  // stored time — never relative to the previous frame, so drift can't
+  // accumulate across onUpdate calls.
+  const [endDeltaMin, setEndDeltaMin] = useState<number | null>(null);
+  const [startDeltaMin, setStartDeltaMin] = useState<number | null>(null);
+  const isResizingEnd = endDeltaMin !== null;
+  const isResizingStart = startDeltaMin !== null;
+  const isResizingAny = isResizingEnd || isResizingStart;
+  // The tint goes solid event.color while resizing (below), so the ink riding
+  // on top has to be picked for that background rather than assumed dark —
+  // same rule useColors already applies to a chosen primary colour.
+  const resizeInk = isResizingAny ? contrastInk(event.color) : null;
+
+  const origStartMin = timeStringToMinutes(event.startTime);
+  let origEndMin = timeStringToMinutes(event.endTime);
+  if (origEndMin <= origStartMin) origEndMin += 24 * 60; // midnight wrap, same rule as eventHeight()
+  const origDurationMin = origEndMin - origStartMin;
+
+  const pxPerMin = slotHeight / 30;
+  const liveEndTime = isResizingEnd ? addMinutesToTimeString(event.endTime, endDeltaMin) : event.endTime;
+  const liveStartTime = isResizingStart ? addMinutesToTimeString(event.startTime, startDeltaMin) : event.startTime;
+  // The block's live position/height while resizing — computed the same way
+  // the real eventTopOffset/renderedEventHeight are, off a copy of the event
+  // carrying the in-progress time, so the growing/shrinking block matches
+  // exactly what will be saved on release.
+  const displayTop = isResizingStart ? eventTopOffset(liveStartTime, gridStartHour, slotHeight) + 1 : top;
+  const displayHeight = isResizingEnd
+    ? renderedEventHeight({ ...event, endTime: liveEndTime }, slotHeight)
+    : isResizingStart
+    ? renderedEventHeight({ ...event, startTime: liveStartTime }, slotHeight)
+    : height;
+
+  // Last delta a haptic already fired for, so onUpdate only buzzes again once
+  // the snapped value actually moves to its next 5-minute step, not on every
+  // frame that happens to land on the same one.
+  const endDeltaHapticRef = useRef(0);
+  const startDeltaHapticRef = useRef(0);
+
+  const endResizeGesture = Gesture.Pan()
+    .enabled(resizeEnabled)
+    // Same hold as the move-drag below, and for the same reason: without it,
+    // the first pixel of an ordinary touch on the strip would already read as
+    // "resize". (No .minDistance() here — with activateAfterLongPress set, a
+    // minDistance of anything less than the platform default would let
+    // shouldActivate() fire before the long-press timer ever does.)
+    .activateAfterLongPress(RESIZE_LONG_PRESS_MS)
+    // Shrinks the gesture's own touch area to just the bottom strip (a
+    // negative `top` removes that many px from the top edge inward) rather
+    // than a separate child view — see RESIZE_HANDLE_HEIGHT.
+    .hitSlop({ top: -Math.max(height - RESIZE_HANDLE_HEIGHT, 0) })
+    .runOnJS(true)
+    .onStart(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      endDeltaHapticRef.current = 0;
+      setEndDeltaMin(0);
+    })
+    .onUpdate((e) => {
+      const rawMin = e.translationY / pxPerMin;
+      const snapped = Math.round(rawMin / RESIZE_INCREMENT_MIN) * RESIZE_INCREMENT_MIN;
+      const minDelta = -(origDurationMin - MIN_EVENT_DURATION_MIN);
+      const maxDelta = (24 * 60 - RESIZE_INCREMENT_MIN) - origDurationMin;
+      const clamped = Math.max(minDelta, Math.min(snapped, maxDelta));
+      if (clamped !== endDeltaHapticRef.current) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        endDeltaHapticRef.current = clamped;
+      }
+      setEndDeltaMin(clamped);
+    })
+    .onEnd(() => {
+      if (endDeltaMin) onResizeEnd?.(event, addMinutesToTimeString(event.endTime, endDeltaMin));
+    })
+    .onFinalize(() => {
+      setEndDeltaMin(null);
+    });
+
+  const startResizeGesture = Gesture.Pan()
+    .enabled(startResizeEnabled)
+    .activateAfterLongPress(RESIZE_LONG_PRESS_MS)
+    // Mirrors endResizeGesture's hitSlop, restricted to the top strip instead.
+    .hitSlop({ bottom: -Math.max(height - RESIZE_HANDLE_HEIGHT, 0) })
+    .runOnJS(true)
+    .onStart(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      startDeltaHapticRef.current = 0;
+      setStartDeltaMin(0);
+    })
+    .onUpdate((e) => {
+      const rawMin = e.translationY / pxPerMin;
+      const snapped = Math.round(rawMin / RESIZE_INCREMENT_MIN) * RESIZE_INCREMENT_MIN;
+      // Dragging the top edge down shortens the event from the front, up
+      // lengthens it — the mirror image of the bottom edge's clamp, plus a
+      // floor at midnight since a start time (unlike an end time) never wraps.
+      const maxDelta = origDurationMin - MIN_EVENT_DURATION_MIN;
+      const minDelta = Math.max(origDurationMin - (24 * 60 - RESIZE_INCREMENT_MIN), -origStartMin);
+      const clamped = Math.max(minDelta, Math.min(snapped, maxDelta));
+      if (clamped !== startDeltaHapticRef.current) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        startDeltaHapticRef.current = clamped;
+      }
+      setStartDeltaMin(clamped);
+    })
+    .onEnd(() => {
+      if (startDeltaMin) onResizeStart?.(event, addMinutesToTimeString(event.startTime, startDeltaMin));
+    })
+    .onFinalize(() => {
+      setStartDeltaMin(null);
+    });
+
   const isDraggingRef = useRef(false);
 
   const dragPanGesture = Gesture.Pan()
     .activateAfterLongPress(400)
+    // Give the resize handles exclusive claim to the top/bottom strips —
+    // without this, a long, still press there would eventually win the
+    // move-drag instead of the resize it's sitting on top of.
+    .hitSlop(resizeEnabled || startResizeEnabled
+      ? { top: -RESIZE_HANDLE_HEIGHT, bottom: -RESIZE_HANDLE_HEIGHT }
+      : {})
     .runOnJS(true)
     .onStart((e) => {
       isDraggingRef.current = true;
@@ -236,7 +389,11 @@ export function EventBlock({
   // row during multi-select, or a read-only prev/next pane. Racing the pan
   // gesture anyway would still let a long-press "activate" it and swallow the
   // tap for nothing, so drop it from the race entirely rather than let it win.
-  const composed = inline || !onDragStart ? tapGesture : Gesture.Race(dragPanGesture, tapGesture);
+  // The resize gestures ride along even then: each is independently
+  // `.enabled()`, and its own hitSlop keeps it out of the way whenever it isn't.
+  const composed = inline || !onDragStart
+    ? Gesture.Race(endResizeGesture, startResizeGesture, tapGesture)
+    : Gesture.Race(endResizeGesture, startResizeGesture, dragPanGesture, tapGesture);
 
   const stripeCount = Math.ceil(height / 7) + 4;
 
@@ -373,13 +530,25 @@ export function EventBlock({
     <GestureDetector gesture={composed}>
       <View
         style={[
-          styles.block,
+          styles.wrapper,
           {
-            top,
-            height,
+            top: displayTop,
+            height: displayHeight,
             left: `${columnOffset * 100}%` as any,
             width: `${columnWidth * 100}%` as any,
             opacity: isBeingDragged ? 0 : 1,
+            // Lifted above its siblings while resizing, so a block growing
+            // over whatever sits below it draws on top rather than under.
+            zIndex: isResizingAny ? 20 : 0,
+          },
+          // Last, so it wins over the grid placement computed above.
+          inline && styles.wrapperInline,
+        ]}
+      >
+      <View
+        style={[
+          styles.block,
+          {
             // The accent used to be a borderLeftWidth/borderLeftColor pair, but a
             // border only on one side fights borderRadius on the corners it
             // doesn't touch — the right corners rendered square. Drawn as its own
@@ -389,12 +558,10 @@ export function EventBlock({
             paddingRight: gutter,
             paddingVertical: blockPadding,
           },
-          // Last, so it wins over the grid placement computed above.
-          inline && styles.blockInline,
         ]}
         onStartShouldSetResponder={() => true}
       >
-        <View style={[styles.blockTint, { backgroundColor: event.color + BLOCK.tintAlpha }]} />
+        <View style={[styles.blockTint, { backgroundColor: isResizingAny ? event.color : event.color + BLOCK.tintAlpha }]} />
         {!isBackup && (
           <View style={[styles.accentBar, { width: BLOCK.accentWidth, backgroundColor: event.color }]} />
         )}
@@ -416,7 +583,7 @@ export function EventBlock({
                 icon={method.icon}
                 iconFamily={method.iconFamily}
                 size={methodSize}
-                color={Colors.text}
+                color={resizeInk ?? Colors.text}
               />
             </View>
           )}
@@ -428,7 +595,7 @@ export function EventBlock({
             // backstop for that gap: silently clip rather than fall back to
             // RN's default 'tail' ellipsis, which this app never shows.
             <Text
-              style={[styles.title, { fontSize, lineHeight: titleLineHeight }]}
+              style={[styles.title, { fontSize, lineHeight: titleLineHeight }, resizeInk && { color: resizeInk }]}
               numberOfLines={1}
               ellipsizeMode="clip"
             >
@@ -450,7 +617,7 @@ export function EventBlock({
               {titleLines.map((line, i) => (
                 <Text
                   key={i}
-                  style={[styles.title, { fontSize, lineHeight: titleLineHeight }]}
+                  style={[styles.title, { fontSize, lineHeight: titleLineHeight }, resizeInk && { color: resizeInk }]}
                   numberOfLines={1}
                   ellipsizeMode="clip"
                 >
@@ -464,7 +631,7 @@ export function EventBlock({
             // chose timeLabel are an estimate, so 'clip' guards against that
             // estimate being a hair optimistic rather than ever showing "…".
             <Text
-              style={[styles.time, { fontSize, lineHeight: titleLineHeight }]}
+              style={[styles.time, { fontSize, lineHeight: titleLineHeight }, resizeInk && { color: resizeInk }]}
               numberOfLines={1}
               ellipsizeMode="clip"
             >
@@ -475,7 +642,7 @@ export function EventBlock({
 
         {showRepeatIcon && (
           <View style={[styles.statusWrap, { width: repeatSize, right: repeatRight }]}>
-            <Ionicons name="sync-outline" size={repeatSize} color={Colors.textSecondary} />
+            <Ionicons name="sync-outline" size={repeatSize} color={resizeInk ?? Colors.textSecondary} />
           </View>
         )}
 
@@ -490,7 +657,7 @@ export function EventBlock({
                 style={[styles.quantity, {
                   fontSize: quantityFontSize,
                   lineHeight: Math.round(quantityFontSize * TITLE_LINE_RATIO),
-                }]}
+                }, resizeInk && { color: resizeInk }]}
                 numberOfLines={1}
                 ellipsizeMode="clip"
               >
@@ -498,7 +665,7 @@ export function EventBlock({
               </Text>
               {unitsLabel && (
                 <Text
-                  style={[styles.units, { fontSize, lineHeight: titleLineHeight, marginLeft: UNITS_GAP }]}
+                  style={[styles.units, { fontSize, lineHeight: titleLineHeight, marginLeft: UNITS_GAP }, resizeInk && { color: resizeInk }]}
                   numberOfLines={1}
                   ellipsizeMode="clip"
                 >
@@ -547,14 +714,49 @@ export function EventBlock({
           </GestureDetector>
         )}
       </View>
+
+        {isResizingStart && (
+          <View pointerEvents="none" style={styles.resizeLabelWrapTop}>
+            <Text style={styles.resizeLabelText} numberOfLines={1}>
+              {displayTime(liveStartTime, settings.language, settings.timeFormat)}
+            </Text>
+          </View>
+        )}
+
+        {isResizingEnd && (
+          <View pointerEvents="none" style={styles.resizeLabelWrapBottom}>
+            <Text style={styles.resizeLabelText} numberOfLines={1}>
+              {displayTime(liveEndTime, settings.language, settings.timeFormat)}
+            </Text>
+          </View>
+        )}
+      </View>
     </GestureDetector>
   );
 }
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
+    // Positions and sizes the event in the grid (or, inline, just takes full
+    // width in flow). Deliberately not clipped: styles.block below is the
+    // thing with overflow: hidden, so the resize handle and its label — its
+    // siblings here, not its children — can sit right on top of and below the
+    // block's own bottom edge without being cut off by it.
+    wrapper: {
+      position: 'absolute',
+    },
+    wrapperInline: {
+      position: 'relative',
+      top: 0,
+      left: 0,
+      width: '100%',
+    },
     block: {
       position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       borderRadius: BLOCK.borderRadius,
       paddingLeft: 6,
       paddingRight: BLOCK.paddingRight,
@@ -567,12 +769,6 @@ function makeStyles(C: ColorPalette) {
       left: 0,
       top: 0,
       bottom: 0,
-    },
-    blockInline: {
-      position: 'relative',
-      top: 0,
-      left: 0,
-      width: '100%',
     },
     blockTint: {
       ...StyleSheet.absoluteFillObject,
@@ -631,6 +827,32 @@ function makeStyles(C: ColorPalette) {
       width: 24,
       height: 2.5,
       transform: [{ rotate: '-45deg' }],
+    },
+    // Hangs off the edge rather than sitting inside it, so it reads as
+    // labelling the edge itself rather than as one more line of block content.
+    resizeLabelWrapBottom: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: -21,
+      alignItems: 'center',
+    },
+    resizeLabelWrapTop: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: -21,
+      alignItems: 'center',
+    },
+    resizeLabelText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: C.white,
+      backgroundColor: C.control,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      overflow: 'hidden',
     },
   });
 }
