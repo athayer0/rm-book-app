@@ -45,6 +45,7 @@ export function HomeSkeleton() {
           <Skeleton width={140} height={15} borderRadius={4} />
           <Skeleton width={180} height={12} borderRadius={4} style={{ marginTop: 6 }} />
         </View>
+        <Skeleton width={20} height={20} borderRadius={4} />
       </View>
     </>
   );

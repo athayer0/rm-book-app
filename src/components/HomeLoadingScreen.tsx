@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useColors } from '../hooks/useColors';
@@ -29,12 +29,18 @@ const TAB_ICONS: { name: string; focused: string; unfocused: string }[] = [
  * doesn't exist yet — AppNavigation isn't mounted during this gate), not a
  * live component, so it has no navigation of its own; it's here purely so
  * the screen doesn't look tab-bar-less compared to every other screen.
+ *
+ * paddingBottom is a fixed 8, not `8 + insets.bottom`: navigation.tsx's own
+ * tabBarStyle sets a fixed paddingBottom too, which — since it's spread after
+ * the library's default style — overrides react-navigation's usual
+ * inset-aware padding rather than adding to it. Padding for the inset here
+ * would make this screen's tab bar taller than the real one on any device
+ * with a bottom inset.
  */
 export function HomeLoadingScreen() {
   const Colors = useColors();
   const styles = useMemo(() => makeStyles(Colors), [Colors]);
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
 
   return (
     // Top edge only: the static tab bar below accounts for the bottom inset
@@ -47,7 +53,7 @@ export function HomeLoadingScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <HomeSkeleton />
       </ScrollView>
-      <View style={[styles.tabBar, { paddingBottom: 8 + insets.bottom }]}>
+      <View style={styles.tabBar}>
         {TAB_ICONS.map(({ name, focused, unfocused }) => {
           const isHome = name === 'Home';
           return (
@@ -94,14 +100,14 @@ function makeStyles(C: ColorPalette) {
     },
     content: {
       flexGrow: 1,
+      justifyContent: 'center',
       paddingHorizontal: 16,
       paddingTop: 14,
       paddingBottom: 28,
       gap: 14,
     },
-    // Matches navigation.tsx's tabBarStyle/tabBarIcon exactly, minus the
-    // paddingBottom there (react-navigation adds the inset itself; here
-    // that's folded into the inline paddingBottom above instead).
+    // Matches navigation.tsx's tabBarStyle/tabBarIcon exactly (see the
+    // paddingBottom note above the component for why it's a fixed 8).
     tabBar: {
       flexDirection: 'row',
       justifyContent: 'space-around',
@@ -111,9 +117,13 @@ function makeStyles(C: ColorPalette) {
       paddingTop: 8,
       minHeight: TAB_BAR_HEIGHT,
     },
+    // marginTop nudges these down to match the real tab bar's icon position
+    // (react-navigation wraps each tab in its own padded item, which this
+    // static repaint doesn't replicate) — tuned by eye against the real one.
     tabIconWrap: {
       width: 56,
       height: 34,
+      marginTop: 2,
       borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
