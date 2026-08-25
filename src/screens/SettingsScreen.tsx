@@ -122,7 +122,7 @@ export function SettingsScreen() {
     [eventTypeDefinitions],
   );
   const { events, deleteAllEvents, deleteEventsOfType } = useCalendarEvents();
-  const { signOut } = useAuth();
+  const { signOut, deleteAccount } = useAuth();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
   const replayOnboarding = useOnboardingReplay();
   // Same resolution useColors() does internally — needed here too so the
@@ -208,6 +208,44 @@ export function SettingsScreen() {
       Alert.alert(
         t('settingsScreen.signedOutLocalDataKeptTitle'),
         t('settingsScreen.signedOutLocalDataKeptBody', { count: pending }),
+      );
+    }
+  }
+
+  // Two full alerts, the second reachable only from the first's own
+  // destructive button — deliberately more friction than Sign Out, since
+  // this one can't be undone by signing back in.
+  function confirmDeleteAccount() {
+    Alert.alert(
+      t('settingsScreen.deleteAccountTitle'),
+      t('settingsScreen.deleteAccountBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settingsScreen.deleteAccountContinueButton'), style: 'destructive', onPress: confirmDeleteAccountFinal },
+      ],
+      { cancelable: true }
+    );
+  }
+
+  function confirmDeleteAccountFinal() {
+    Alert.alert(
+      t('settingsScreen.deleteAccountFinalTitle'),
+      t('settingsScreen.deleteAccountFinalBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settingsScreen.deleteAccountConfirmButton'), style: 'destructive', onPress: handleDeleteAccount },
+      ],
+      { cancelable: true }
+    );
+  }
+
+  async function handleDeleteAccount() {
+    try {
+      await deleteAccount();
+    } catch {
+      Alert.alert(
+        t('settingsScreen.deleteAccountFailedTitle'),
+        t('settingsScreen.deleteAccountFailedBody'),
       );
     }
   }
@@ -1226,7 +1264,7 @@ export function SettingsScreen() {
           <Text style={styles.sectionTitle}>{t('settingsScreen.account')}</Text>
           <View style={styles.card}>
             <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
+              style={styles.row}
               onPress={() =>
                 Alert.alert(
                   t('settingsScreen.signOutTitle'),
@@ -1241,6 +1279,13 @@ export function SettingsScreen() {
             >
               <Text style={[styles.rowLabel, { color: Colors.danger }]}>{t('settingsScreen.signOutTitle')}</Text>
               <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.row, styles.rowLast]}
+              onPress={confirmDeleteAccount}
+            >
+              <Text style={[styles.rowLabel, { color: Colors.danger }]}>{t('settingsScreen.deleteAccountTitle')}</Text>
+              <Ionicons name="trash-outline" size={18} color={Colors.danger} />
             </TouchableOpacity>
           </View>
         </View>

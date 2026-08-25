@@ -9,9 +9,11 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  /** True from the moment signOut() is called until the session actually clears. */
+  /** True from the moment signOut() or deleteAccount() is called until the session actually clears. */
   signingOut: boolean;
   signOut: () => Promise<ClearResult>;
+  /** Deletes the account and every row it owns server-side, then signs out and wipes local data. */
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -20,6 +22,7 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   signingOut: false,
   signOut: async () => ({ cleared: false, pending: 0 }),
+  deleteAccount: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -78,9 +81,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteAccount = async (): Promise<void> => {
+    // Reuses signingOut's skeleton — deletion ends in the same signed-out
+    // state, so there's no need for a second overlay flag in App.tsx.
+    setSigningOut(true);
+    try {
+      // Deletes every row this account owns, then the auth.users row itself
+      // — see delete_own_account() in supabase-schema.sql. Local queue state
+      // doesn't matter here since the rows it would push are about to be
+      // deleted server-side regardless.
+      const { error } = await supabase.rpc('delete_own_account');
+      if (error) throw error;
+      await supabase.auth.signOut();
+      await clearLocalData();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, loading, signingOut, signOut }}
+      value={{ session, user: session?.user ?? null, loading, signingOut, signOut, deleteAccount }}
     >
       {children}
     </AuthContext.Provider>

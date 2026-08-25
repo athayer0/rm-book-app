@@ -667,3 +667,35 @@ create index if not exists
 create index if not exists
   convert_progress_user_updated_idx
   on convert_progress (user_id, updated_at);
+
+-- ── account deletion ───────────────────────
+-- security definer runs as the function owner
+-- (postgres), which has access to auth.users
+-- that the authenticated role otherwise doesn't.
+-- Every delete is pinned to auth.uid(), so a
+-- caller can only ever remove their own account
+-- and rows — never anyone else's. App tables are
+-- deleted first since none of the auth.users FKs
+-- above are ON DELETE CASCADE.
+create or replace function delete_own_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  delete from people where user_id = auth.uid();
+  delete from calendar_events where user_id = auth.uid();
+  delete from goal_definitions where user_id = auth.uid();
+  delete from event_type_definitions where user_id = auth.uid();
+  delete from goal_entries where user_id = auth.uid();
+  delete from goal_monthly_entries where user_id = auth.uid();
+  delete from event_statuses where user_id = auth.uid();
+  delete from convert_progress where user_id = auth.uid();
+  delete from settings where user_id = auth.uid();
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+revoke execute on function delete_own_account() from public;
+grant execute on function delete_own_account() to authenticated;
