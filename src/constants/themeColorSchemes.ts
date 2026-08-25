@@ -41,9 +41,10 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
   {
     // Light blue primary (swapped in from GOAL_COLOR_SCHEMES.marine's
     // temple_attendance), aquamarine secondary, navy blue tertiary. Tertiary
-    // lifts to a pale light blue in dark mode, the way Classic's navy lifts
-    // to a pale blue; secondary lifts the same way, a deeper aquamarine in
-    // light mode reading as pale aquamarine once the background goes dark.
+    // lifts to a pale light blue in dark mode, the way Classic's own
+    // (deeper) navy tertiary lifts to a pale blue; secondary lifts the same
+    // way, a deeper aquamarine in light mode reading as pale aquamarine once
+    // the background goes dark.
     id: 'marine',
     label: 'Marine',
     themeColor: '#2F729E',
@@ -69,7 +70,7 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     // there since that scheme's ids are ordered by hue rather than fixed to
     // a family; secondary is the event scheme's own exercise colour, its
     // magenta family. Lifts to a lighter navy in dark mode, the way
-    // Classic's navy lifts to a pale blue.
+    // Classic's own (deeper) navy tertiary lifts to a pale blue.
     id: 'sunset',
     label: 'Sunset',
     themeColor: '#B8571E',
@@ -82,10 +83,10 @@ export const THEME_COLOR_SCHEMES: ThemeColorScheme[] = [
     // River-brown/canopy-green only, same rule as the Amazon event/goal
     // scheme. Primary is a darker forest-floor green, tertiary a more
     // saturated canopy green in light mode — lifting to a brighter canopy
-    // green in dark mode the way Classic's navy lifts to a pale blue (the
-    // old tertiary-dark value sat too close to this lighter tertiary-light
-    // to still read as a lift, so it's a fresh shade rather than the
-    // pre-swap one). Secondary is Amazon's own nightly_prayer goal colour
+    // green in dark mode the way Classic's own (deeper) navy tertiary lifts
+    // to a pale blue (the old tertiary-dark value sat too close to this
+    // lighter tertiary-light to still read as a lift, so it's a fresh shade
+    // rather than the pre-swap one). Secondary is Amazon's own nightly_prayer goal colour
     // (GOAL_COLOR_SCHEMES, not defaultGoals' default violet), shared between
     // light and dark the way Classic/Sunset/Wildflower's secondary is.
     id: 'amazon',

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
 
-// The sheet stops just beneath the maroon app header, which every tab screen renders at 60px.
+// The sheet stops just beneath the primary-colored app header, which every tab screen renders at 60px.
 const HEADER_HEIGHT = 60;
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
   onOpened?: () => void;
 }
 
-// A near-fullscreen sheet: its top sits just beneath the maroon header and it fills the rest of
+// A near-fullscreen sheet: its top sits just beneath the primary-colored header and it fills the rest of
 // the screen. The dimmed backdrop fades in uniformly over ~200ms while the sheet slides up, and
 // tapping it closes the sheet. The sheet frame stays put when a field is focused — it never
 // shifts for the keyboard; the content inside scrolls instead.

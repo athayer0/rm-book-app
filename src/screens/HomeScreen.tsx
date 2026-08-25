@@ -324,7 +324,7 @@ function makeStyles(C: ColorPalette) {
       flexGrow: 1,
       justifyContent: 'center',
       paddingHorizontal: 16,
-      // Asymmetric on purpose: the card sits closer under the maroon header than
+      // Asymmetric on purpose: the card sits closer under the primary-colored header than
       // it does above the tab bar. Both grids share one card now, so the content
       // is tall enough to fill the screen and these are the gaps you actually
       // see — the justifyContent above only centres a short page.

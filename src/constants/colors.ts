@@ -1,9 +1,11 @@
 /**
- * The crimson the app shipped with. `primary` is a setting, so this is only
- * the starting point: `useColors` swaps in the user's choice, and everything
- * that reads `primary` (headers, the active tab pill, the now-line) follows.
+ * The navy the app shipped with (Classic's primary and tertiary swapped —
+ * this was the tertiary/`control` colour before). `primary` is a setting, so
+ * this is only the starting point: `useColors` swaps in the user's choice,
+ * and everything that reads `primary` (headers, the active tab pill, the
+ * now-line) follows.
  */
-export const DEFAULT_THEME_COLOR = '#8B1A4A';
+export const DEFAULT_THEME_COLOR = '#1A3A6B';
 
 // Defaults for the other two user-editable theme colors — light/dark are
 // independent settings, not a lift computed from one value, so each needs its
@@ -11,8 +13,11 @@ export const DEFAULT_THEME_COLOR = '#8B1A4A';
 // so picking neither leaves the app looking exactly as it does today.
 export const DEFAULT_SECONDARY_COLOR_LIGHT = '#00B5C8';
 export const DEFAULT_SECONDARY_COLOR_DARK = '#00B5C8';
-export const DEFAULT_TERTIARY_COLOR_LIGHT = '#1A3A6B';
-export const DEFAULT_TERTIARY_COLOR_DARK = '#8AAFC8';
+// A deeper, more saturated navy than `primary` — same family, a shade more
+// "navy blue" than the primary above.
+export const DEFAULT_TERTIARY_COLOR_LIGHT = '#132E5D';
+// Pale blue, the dark-mode lift of the navy above.
+export const DEFAULT_TERTIARY_COLOR_DARK = '#78A3C4';
 
 // Same independent-per-theme treatment as secondary/tertiary above, for the
 // three event-reporting status colours — see the `statusCompleted` etc.
@@ -29,18 +34,17 @@ export const LightColors = {
   // Ink for anything sitting on `primary`: header titles, the active tab icon.
   // `useColors` recomputes both from the chosen theme colour's luminance, so a
   // pale header gets dark lettering instead of unreadable white. The values here
-  // are what the default maroon resolves to.
+  // are what the default navy resolves to.
   onPrimary: '#FFFFFF',
   onPrimaryMuted: 'rgba(255, 255, 255, 0.8)',
   // Cyan, now reserved for committing and emphasis: Save, Done, EDIT, and the
   // goal counts. Everything that merely selects or toggles uses `control`.
   accent: '#00B5C8',
-  // Navy, for the interactive furniture — checkmarks, switches, active pills and
-  // tabs, the FAB, and the "add a thing" links. The same navy as the Service
-  // event type and the Service Hours goal (both #1A3A6B), not the
-  // slightly darker #253960 the goal sheets use. Lifts to a pale blue in dark
-  // mode for the same reason goalTextAction does: navy on near-black is unreadable.
-  control: '#1A3A6B',
+  // A deeper navy than `primary`, for the interactive furniture — checkmarks,
+  // switches, active pills and tabs, the FAB, and the "add a thing" links.
+  // Lifts to a pale blue in dark mode for the same reason goalTextAction
+  // does: navy on near-black is unreadable.
+  control: '#132E5D',
   background: '#F5F5F5',
   card: '#FFFFFF',
   text: '#1A1A1A',
@@ -56,23 +60,23 @@ export const LightColors = {
   modalBackdrop: 'rgba(0,0,0,0.35)',
   weekStripBg: '#E8E8E8',
   weekStripBgAlt: '#D8D8D8',
-  selectedDayBg: '#D4E8F5',
-  selectedDayBorder: '#1A3A6B',
+  selectedDayBg: '#E0E4EA',
+  selectedDayBorder: '#132E5D',
   rowPressedBg: 'rgba(160,160,160,0.2)',
   // A row standing selected rather than merely being touched, so it has to read
   // as a state and not as the grey flash of rowPressedBg. Tinted with `control`,
   // and weighted per theme: the same alpha that reads as a wash on white
   // disappears on a dark card.
-  rowSelectedBg: 'rgba(26,58,107,0.10)',
+  rowSelectedBg: 'rgba(19,46,93,0.10)',
   // Navy, for the "add a thing" text actions — "Set goal" and "Add a Goal +" in
   // the goal sheets, "Add Event Type" in the types sheet. Named for where it
   // started. The two editors' add-rows ("Add Person", "Add contact method",
   // "Add address") ask for `control` directly instead, which comes to the same
   // thing: useColors derives this token *from* control, so the two can never
   // differ. Worth collapsing if anything ever needs them to.
-  goalTextAction: '#1A3A6B',
+  goalTextAction: '#132E5D',
   // Navy fill behind a white label. Stays dark in both themes so the label keeps contrast.
-  goalActionBg: '#1A3A6B',
+  goalActionBg: '#132E5D',
   statusOtherColor: '#000000',
   // Tint behind the call and message buttons, so the `control` glyph sits on a
   // soft wash of its own colour rather than the bare card.
@@ -143,7 +147,7 @@ export const DarkColors: typeof LightColors = {
   onPrimary: '#FFFFFF',
   onPrimaryMuted: 'rgba(255, 255, 255, 0.8)',
   accent: '#00B5C8',
-  control: '#8AAFC8',
+  control: '#78A3C4',
   background: '#111111',
   card: '#1E1E1E',
   text: '#F0F0F0',
@@ -159,15 +163,15 @@ export const DarkColors: typeof LightColors = {
   modalBackdrop: 'rgba(0,0,0,0.6)',
   weekStripBg: '#1A1A1A',
   weekStripBgAlt: '#141414',
-  selectedDayBg: '#263040',
-  selectedDayBorder: '#8AAFC8',
+  selectedDayBg: '#243139',
+  selectedDayBorder: '#78A3C4',
   rowPressedBg: 'rgba(160,160,160,0.2)',
   // The dark-mode `control` is the pale blue, so the tint follows it there.
-  rowSelectedBg: 'rgba(138,175,200,0.20)',
+  rowSelectedBg: 'rgba(120,163,196,0.20)',
   // Navy is unreadable on the dark background; lift it the same way selectedDayBorder does.
-  goalTextAction: '#8AAFC8',
+  goalTextAction: '#78A3C4',
   // A fill, not text — navy still reads against the dark card and keeps its white label legible.
-  goalActionBg: '#2E4877',
+  goalActionBg: '#273C69',
   statusOtherColor: '#FFFFFF',
   // Same wash, darkened so the pale-blue glyph keeps its contrast on a dark card.
   contactActionBg: '#1C2740',
