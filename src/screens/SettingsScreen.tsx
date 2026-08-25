@@ -106,7 +106,7 @@ export function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
   const {
     resetAll, resetBuiltInDefinitions,
-    definitions: goalDefinitions, updateDefinitions: updateGoalDefinitions,
+    definitions: goalDefinitions, allDefinitions: allGoalDefinitions, updateDefinitions: updateGoalDefinitions,
   } = useWeeklyGoals();
   const {
     definitions: eventTypeDefinitions,
@@ -314,7 +314,11 @@ export function SettingsScreen() {
   const selectedGoalSchemeId = matchGoalColorScheme(resolvedGoalColors);
 
   function applyGoalColorScheme(scheme: GoalColorScheme) {
-    updateGoalDefinitions(goalDefinitions.map(d => (
+    // allGoalDefinitions, not goalDefinitions — the latter drops removed
+    // tombstones, and writing it back through updateDefinitions would erase
+    // them from storage, resurrecting every deleted built-in on the next
+    // mergeWithDefaults (see the comment on allDefinitions in useWeeklyGoals).
+    updateGoalDefinitions(allGoalDefinitions.map(d => (
       scheme.colors[d.id] ? { ...d, color: scheme.colors[d.id] } : d
     )));
     setOpenDropdown(null);
