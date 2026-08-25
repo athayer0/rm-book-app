@@ -18,13 +18,15 @@ export function AuthSkeleton() {
 
   return (
     <View style={styles.container}>
-      <Skeleton width={140} height={34} borderRadius={8} style={styles.title} />
-      <Skeleton width={210} height={18} borderRadius={4} style={styles.subtitle} />
+      <Skeleton width={72} height={72} borderRadius={18} style={styles.logo} />
+      <Skeleton width={160} height={30} borderRadius={8} style={styles.title} />
+      <Skeleton width={190} height={17} borderRadius={4} style={styles.subtitle} />
 
-      <Skeleton height={48} borderRadius={10} style={styles.field} />
-      <Skeleton height={48} borderRadius={10} style={styles.field} />
-
-      <Skeleton height={48} borderRadius={10} style={styles.button} />
+      <View style={styles.card}>
+        <Skeleton height={48} borderRadius={12} style={styles.field} />
+        <Skeleton height={48} borderRadius={12} style={styles.field} />
+        <Skeleton height={49} borderRadius={12} />
+      </View>
 
       <Skeleton width={220} height={15} borderRadius={4} style={styles.toggle} />
 
@@ -34,8 +36,8 @@ export function AuthSkeleton() {
         <Skeleton height={1} style={styles.dividerLine} />
       </View>
 
-      <Skeleton height={48} borderRadius={10} style={styles.oauthButton} />
-      <Skeleton height={48} borderRadius={10} style={styles.oauthButton} />
+      <Skeleton height={50} borderRadius={12} style={styles.oauthButton} />
+      <Skeleton height={50} borderRadius={12} style={styles.oauthButton} />
     </View>
   );
 }
@@ -48,16 +50,23 @@ function makeStyles(C: ColorPalette) {
       justifyContent: 'center',
       padding: 24,
     },
+    logo: { alignSelf: 'center', marginBottom: 16 },
     title: { alignSelf: 'center', marginBottom: 8 },
-    subtitle: { alignSelf: 'center', marginBottom: 32 },
+    subtitle: { alignSelf: 'center', marginBottom: 28 },
+    card: {
+      backgroundColor: C.card,
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      padding: 18,
+    },
     field: { marginBottom: 12 },
-    button: { marginTop: 8, marginBottom: 16 },
-    toggle: { alignSelf: 'center' },
+    toggle: { alignSelf: 'center', marginTop: 20, marginBottom: 4 },
     dividerRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      marginTop: 28,
+      marginTop: 24,
       marginBottom: 16,
     },
     dividerLine: { flex: 1 },

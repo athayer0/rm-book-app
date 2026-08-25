@@ -165,6 +165,8 @@
     "signUpSubtitle": "Create an account",
     "email": "Email",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signIn": "Sign In",
     "createAccount": "Create Account",
     "needAccount": "Don't have an account? Sign up",
