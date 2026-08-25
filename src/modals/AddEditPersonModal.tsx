@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Pressable, Alert,
+  StyleSheet, Pressable, Alert, Animated, Easing, Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +30,11 @@ import { isFacebookShareLink, toMessengerHandle } from '../utils/phoneUtils';
 // scrolls. Ends on half a row rather than a whole one, which is what says there
 // is more below without needing a scrollbar to be visible to say it.
 const STATUS_LIST_MAX_HEIGHT = MENU_ITEM_HEIGHT * 4.5;
+
+// Same slide-cover treatment as AddEditEventModal's view/edit switch.
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const EDIT_COVER_IN_MS = 280;
+const EDIT_COVER_OUT_MS = 240;
 
 interface Props {
   visible: boolean;
@@ -68,10 +73,18 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   // rather than a boolean each, the same as the event editor: only one can be
   // focused, and separate booleans could disagree about it.
   const [focusedField, setFocusedField] = useState<FieldKey | null>(null);
+  // Notes sits last in the form, right above the keyboard — automaticallyAdjustKeyboardInsets
+  // alone leaves it flush against the keyboard's edge, so its own focus also scrolls to the
+  // very end of the form, which is what actually clears the space above the keyboard.
+  const formScrollRef = useRef<ScrollView>(null);
   /** Everything a focused field needs: shut the menus, and claim the edge. */
   function focusProps(field: FieldKey) {
     return {
-      onFocus: () => { closePickers(); setFocusedField(field); },
+      onFocus: () => {
+        closePickers();
+        setFocusedField(field);
+        if (field === 'notes') formScrollRef.current?.scrollToEnd({ animated: true });
+      },
       onBlur: () => setFocusedField(null),
     };
   }
@@ -96,6 +109,39 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
    * start in the form and never return here — Cancel and Save both close it.
    */
   const [mode, setMode] = useState<'view' | 'edit'>(person ? 'view' : 'edit');
+
+  /**
+   * Slides the edit form in from the right to cover the display view, and back
+   * out in reverse — the same treatment as AddEditEventModal's own view/edit
+   * switch. Someone being added opens straight into the form (mode starts and
+   * stays 'edit') with no display view underneath — editCover starts at 1 so
+   * it renders in place rather than off-screen.
+   *
+   * Driven from the explicit actions that flip `mode` (goToEdit/goToView)
+   * rather than from an effect watching `mode`, so reopening the sheet for a
+   * different person (the reset effect below) can snap straight to its resting
+   * state instead of replaying a transition nobody asked for. Both are only
+   * ever called while an existing person is open — the new-person header has
+   * no Edit button, and its Save/Cancel close the sheet outright instead.
+   */
+  const editCover = useRef(new Animated.Value(mode === 'edit' ? 1 : 0)).current;
+  // Kept mounted through the closing slide so it has a frame to animate off in.
+  const [editMounted, setEditMounted] = useState(mode === 'edit');
+
+  function goToEdit() {
+    setMode('edit');
+    setEditMounted(true);
+    Animated.timing(editCover, {
+      toValue: 1, duration: EDIT_COVER_IN_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    }).start();
+  }
+
+  function goToView() {
+    setMode('view');
+    Animated.timing(editCover, {
+      toValue: 0, duration: EDIT_COVER_OUT_MS, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+    }).start(({ finished }) => { if (finished) setEditMounted(false); });
+  }
 
   /**
    * Seed every field from the person, or clear them for a new one.
@@ -128,7 +174,13 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
   useEffect(() => {
     resetForm();
     setActiveTab('details');
-    setMode(person ? 'view' : 'edit');
+    const initialMode = person ? 'view' : 'edit';
+    setMode(initialMode);
+    // Snapped rather than animated: this fires on opening for a (possibly
+    // different) person, not on a Save/Cancel/Edit tap, so there's no display
+    // view mid-transition to slide over — just a resting state to land on.
+    setEditMounted(initialMode === 'edit');
+    editCover.setValue(initialMode === 'edit' ? 1 : 0);
     // resetForm reads only `person`, which is listed. eslint can't see that
     // through the function, so the check is answered here rather than by
     // wrapping it in a useCallback nothing else needs.
@@ -216,13 +268,13 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
       notes: notes.trim(),
     });
     // Someone who already exists has a page to go back to; a new person does not.
-    if (person) setMode('view'); else onClose();
+    if (person) goToView(); else onClose();
   }
 
   function handleCancel() {
     if (!person) { onClose(); return; }
     resetForm();
-    setMode('view');
+    goToView();
   }
 
   /**
@@ -289,7 +341,7 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>{t('addEditPerson.personTitle')}</Text>
-              <TouchableOpacity onPress={() => setMode('edit')} style={styles.headerRightBtn}>
+              <TouchableOpacity onPress={goToEdit} style={styles.headerRightBtn}>
                 <Text style={styles.save}>{t('common.edit')}</Text>
               </TouchableOpacity>
             </>
@@ -342,28 +394,43 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
         {person && activeTab === 'timeline' && <PersonTimelineTab personId={person.id} />}
         {person && activeTab === 'covenant' && <PersonCovenantPathTab personId={person.id} />}
 
-        {viewing && activeTab === 'details' && (
-          <PersonDetailView
-            name={name}
-            status={status}
-            phone={phone}
-            whatsapp={whatsapp}
-            messenger={messenger}
-            address={address}
-            notes={notes}
-            settings={settings}
-            onContact={contactVia}
-            onDelete={person && onDelete ? handleDelete : undefined}
-          />
-        )}
-
-        {/* Kept mounted while the timeline shows, not swapped out: unmounting would
-            discard every unsaved edit in the form the moment the tab changed. The
-            display view has no draft to lose, so it goes the other way and is
-            simply not rendered while the form is up. */}
-        {!viewing && (
+        {/* Both layers stay mounted (the display view has nothing to lose either
+            way, and the form would otherwise drop an unsaved edit the moment
+            the tab changed) — the form just slides over the display view on
+            Edit and back off on Cancel/Save, the same as the event editor.
+            Hidden as a whole, not excluded, while another tab shows, so the
+            form's draft survives the tab switch too. */}
+        <View style={[styles.stack, activeTab !== 'details' && styles.formHidden]}>
+          {person && (
+            <View style={styles.stackLayer}>
+              <PersonDetailView
+                name={name}
+                status={status}
+                phone={phone}
+                whatsapp={whatsapp}
+                messenger={messenger}
+                address={address}
+                notes={notes}
+                settings={settings}
+                onContact={contactVia}
+                onDelete={person && onDelete ? handleDelete : undefined}
+              />
+            </View>
+          )}
+          {editMounted && (
+          <Animated.View
+            style={[
+              styles.stackLayer,
+              {
+                transform: [{
+                  translateX: editCover.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_WIDTH, 0] }),
+                }],
+              },
+            ]}
+          >
         <ScrollView
-          style={[styles.form, activeTab !== 'details' && styles.formHidden]}
+          ref={formScrollRef}
+          style={styles.form}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
           bounces={false}
@@ -668,7 +735,9 @@ export function AddEditPersonModal({ visible, person, onSave, onDelete, onClose 
 
           <View style={{ height: 40 }} />
         </ScrollView>
-        )}
+          </Animated.View>
+          )}
+        </View>
 
         {/*
           Nested inside this sheet rather than sitting beside it in the screen,
@@ -742,9 +811,11 @@ function makeStyles(C: ColorPalette) {
       borderRadius: 1,
       backgroundColor: C.control,
     },
+    stack: { flex: 1, overflow: 'hidden' },
+    stackLayer: { ...StyleSheet.absoluteFillObject },
     form: { flex: 1, backgroundColor: C.background },
     // Collapsed rather than unmounted. display:'none' also drops it out of the
-    // touch tree, so the hidden form can't intercept taps meant for the timeline.
+    // touch tree, so the hidden stack can't intercept taps meant for the timeline.
     formHidden: { display: 'none' },
     /**
      * One card for the whole form, the way the display view has one for the whole
@@ -822,13 +893,16 @@ function makeStyles(C: ColorPalette) {
       borderWidth: 1,
       borderColor: C.inputBorder,
       borderBottomWidth: 1,
+      borderBottomColor: C.inputBorder,
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 10,
     },
     // `control`, not `primary`: this is interactive furniture saying where the
-    // keyboard is pointed, the same as a checkmark or an active pill.
-    inputFocused: { borderColor: C.control },
+    // keyboard is pointed, the same as a checkmark or an active pill. Sets
+    // borderBottomColor too — inputBoxed's own bottom edge would otherwise keep
+    // input's plain-rule C.border, focusing on three sides but not the fourth.
+    inputFocused: { borderColor: C.control, borderBottomColor: C.control },
     // An input with something beside it. Only the name row's trash is left: the
     // call, message and map buttons moved to the display view, where using a
     // number is what you're there to do.

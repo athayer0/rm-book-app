@@ -58,8 +58,9 @@ FEATURES
 [x] event reporting in a more intuitive
 [x] hold bottom or top of event to extend the time up and down
 [x] add classic red back as a 6th theme
-[ ] improve the look of the sign in screen
-[ ] fix the weird text entry box outline
+[x] improve the look of the sign in screen
+[x] fix the weird text entry box outline
+[ ] add select and set status to the unreported events menu
 [ ] birthday feature?
 [ ] splash icon
 

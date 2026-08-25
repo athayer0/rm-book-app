@@ -203,6 +203,10 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
   // value rather than a boolean each, for the same reason `openPicker` is one:
   // only one of them can be focused, and two booleans could disagree about it.
   const [focusedField, setFocusedField] = useState<'title' | 'notes' | null>(null);
+  // Notes sits last in the form, right above the keyboard — automaticallyAdjustKeyboardInsets
+  // alone leaves it flush against the keyboard's edge, so its own focus also scrolls to the
+  // very end of the form, which is what actually clears the space above the keyboard.
+  const formScrollRef = useRef<ScrollView>(null);
   /**
    * An event that already exists opens as a page about itself; only editing it
    * shows the form. A new one has nothing to display, so it starts in the form
@@ -728,7 +732,7 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               },
             ]}
           >
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
+        <ScrollView ref={formScrollRef} style={styles.form} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets bounces={false} overScrollMode="never">
           {floatingPickerOpen && (
             <Pressable style={styles.pickerBackdrop} onPress={closeFloatingPicker} />
           )}
@@ -1142,7 +1146,11 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
               style={[styles.input, styles.notesInput, focusedField === 'notes' && styles.inputFocused]}
               value={notes}
               onChangeText={setNotes}
-              onFocus={() => { closePickers(); setFocusedField('notes'); }}
+              onFocus={() => {
+                closePickers();
+                setFocusedField('notes');
+                formScrollRef.current?.scrollToEnd({ animated: true });
+              }}
               onBlur={() => setFocusedField(null)}
               placeholder={t('addEditEvent.addNotesPlaceholder')}
               placeholderTextColor={Colors.textLight}

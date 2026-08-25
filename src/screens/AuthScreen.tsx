@@ -12,6 +12,8 @@ import {
   Platform,
   Alert,
   useColorScheme,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -23,6 +25,9 @@ import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 import { AuthSkeleton } from '../components/AuthSkeleton';
+
+const FOCUS_EASE = Easing.out(Easing.quad);
+const BLUR_EASE = Easing.in(Easing.quad);
 
 export function AuthScreen() {
   const Colors = useColors();
@@ -36,12 +41,23 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const passwordRef = useRef<TextInput>(null);
+  // Drives the border-color tween on each field's wrap — plain state would
+  // swap the color in a single frame, which is the snap this replaces.
+  const emailFocusAnim = useRef(new Animated.Value(0)).current;
+  const passwordFocusAnim = useRef(new Animated.Value(0)).current;
+  const animateFocus = (anim: Animated.Value, focused: boolean) => {
+    Animated.timing(anim, {
+      toValue: focused ? 1 : 0,
+      duration: focused ? 180 : 220,
+      easing: focused ? FOCUS_EASE : BLUR_EASE,
+      useNativeDriver: false,
+    }).start();
+  };
   // isAvailableAsync() is the one piece of this screen's first paint that
   // isn't ready synchronously — without gating on it, the Apple button pops
   // in a beat after everything else and shifts what's below it. Non-iOS never
@@ -114,8 +130,11 @@ export function AuthScreen() {
         </Text>
 
         <View style={styles.card}>
-          <View
-            style={[styles.inputWrap, focusedField === 'email' && styles.inputWrapFocused]}
+          <Animated.View
+            style={[
+              styles.inputWrap,
+              { borderColor: emailFocusAnim.interpolate({ inputRange: [0, 1], outputRange: [Colors.inputBorder, Colors.primary] }) },
+            ]}
           >
             <Ionicons name="mail-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
             <TextInput
@@ -129,15 +148,18 @@ export function AuthScreen() {
               autoComplete="email"
               returnKeyType="next"
               onSubmitEditing={() => passwordRef.current?.focus()}
-              onFocus={() => setFocusedField('email')}
-              onBlur={() => setFocusedField(null)}
+              onFocus={() => animateFocus(emailFocusAnim, true)}
+              onBlur={() => animateFocus(emailFocusAnim, false)}
               value={email}
               onChangeText={setEmail}
             />
-          </View>
+          </Animated.View>
 
-          <View
-            style={[styles.inputWrap, focusedField === 'password' && styles.inputWrapFocused]}
+          <Animated.View
+            style={[
+              styles.inputWrap,
+              { borderColor: passwordFocusAnim.interpolate({ inputRange: [0, 1], outputRange: [Colors.inputBorder, Colors.primary] }) },
+            ]}
           >
             <Ionicons name="lock-closed-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
             <TextInput
@@ -150,8 +172,8 @@ export function AuthScreen() {
               autoComplete="password"
               returnKeyType="done"
               onSubmitEditing={handleSubmit}
-              onFocus={() => setFocusedField('password')}
-              onBlur={() => setFocusedField(null)}
+              onFocus={() => animateFocus(passwordFocusAnim, true)}
+              onBlur={() => animateFocus(passwordFocusAnim, false)}
               value={password}
               onChangeText={setPassword}
             />
@@ -166,7 +188,7 @@ export function AuthScreen() {
                 color={Colors.textLight}
               />
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -289,9 +311,6 @@ function makeStyles(C: ColorPalette) {
       paddingHorizontal: 14,
       marginBottom: 12,
     },
-    inputWrapFocused: {
-      borderColor: C.primary,
-    },
     inputIcon: {
       marginRight: 10,
     },
@@ -322,6 +341,7 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '600',
     },
     toggleWrap: {
+      alignSelf: 'center',
       marginTop: 20,
       marginBottom: 4,
     },

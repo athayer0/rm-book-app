@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, TextInput, Keyboard, Platform, Animated, Easing, Modal,
+  StyleSheet, TextInput, Animated, Easing, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -97,15 +97,6 @@ export function GoalPeriodList({
   // animation's callback, so the dialog has its data to render for the whole
   // exit rather than blanking out mid-fade.
   const dialogAnim = useRef(new Animated.Value(0)).current;
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, e => setKeyboardHeight(e.endCoordinates.height));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
 
   useEffect(() => { onEditingChange?.(editingRow !== null); }, [editingRow]);
 
@@ -308,7 +299,7 @@ export function GoalPeriodList({
           only reappears once this one is gone. */}
       {editingRow && (
         <Modal visible transparent animationType="none" onRequestClose={confirmEdit} statusBarTranslucent>
-          <View style={[styles.editOverlay, { paddingBottom: keyboardHeight }]}>
+          <View style={styles.editOverlay}>
             {/* Dismissing commits both fields — there is no explicit Done. */}
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={confirmEdit} activeOpacity={1}>
               <Animated.View style={[styles.editOverlayBg, { opacity: dialogAnim }]} />

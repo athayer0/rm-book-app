@@ -88,6 +88,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   /** The split cutoff's time wheel — in the flow, so not a MenuId. */
   const [cutoffOpen, setCutoffOpen] = useState(false);
   const [colorSheetOpen, setColorSheetOpen] = useState(false);
+  const [nameFocused, setNameFocused] = useState(false);
   const nameInputRef = useRef<TextInput>(null);
 
   /**
@@ -400,13 +401,14 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
                 <View style={styles.section}>
                   <Text style={styles.fieldLabel}>{t('editGoals.name')}</Text>
                   <View style={styles.nameRow}>
-                    <View style={styles.nameField}>
+                    <View style={[styles.nameField, nameFocused && styles.nameFieldFocused]}>
                       <TextInput
                         ref={nameInputRef}
                         style={styles.nameInput}
                         value={selected.label}
                         onChangeText={text => patchType(selected.id, { label: text })}
-                        onFocus={() => setOpenMenu(null)}
+                        onFocus={() => { setOpenMenu(null); setNameFocused(true); }}
+                        onBlur={() => setNameFocused(false)}
                         placeholder={t('eventTypesModal.eventTypeNamePlaceholder')}
                         placeholderTextColor={Colors.textLight}
                         returnKeyType="done"
@@ -815,9 +817,14 @@ function makeStyles(C: ColorPalette) {
       flex: 1,
       backgroundColor: C.background,
       borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'transparent',
       paddingHorizontal: 12,
       paddingVertical: 10,
     },
+    // `control`, not `primary`: this is interactive furniture saying where the
+    // keyboard is pointed, the same as the event/person editors' text fields.
+    nameFieldFocused: { borderColor: C.control },
     nameInput: {
       fontSize: 16,
       color: C.text,
