@@ -82,6 +82,12 @@ const EVENT_TYPES_PAGE_INDEX = 5;
 // same literal so the two can't quietly drift apart.
 const PAGE_HORIZONTAL_PADDING = 28;
 const SCHEME_GRID_GAP = 10;
+// The Event Types/Goals scheme rows' own left inset (styles.schemeRowContent)
+// — also the auto-scroll effects' target offset below, so a chip brought
+// into view by picking a scheme on Colors lands at the same inset an
+// untouched row already starts at, rather than SCHEME_GRID_GAP's larger
+// value leaving it sitting further right than the card list beneath it.
+const SCHEME_ROW_INSET = 2;
 
 // The Home preview page's graph is a static illustration, not the real
 // GoalGraph (which needs a live PeriodDataReader and has nothing to read from
@@ -331,19 +337,24 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
   // (or matched from a replay) sitting off the end of the row otherwise, the
   // same way it would if the active chip changed while already on the page.
   // Waits on the chip's measured x rather than an index-times-width guess,
-  // since chips size to their label/dots rather than a fixed width.
+  // since chips size to their label/dots rather than a fixed width. Offsets
+  // by SCHEME_ROW_INSET, not SCHEME_GRID_GAP — the row's own left inset, so
+  // e.g. Marine or Wildflower scrolled into view here lands flush with the
+  // same left edge an untouched row (or the card list below it) already
+  // sits at, instead of SCHEME_GRID_GAP's wider gap leaving it looking
+  // indented relative to everything else on the page.
   useEffect(() => {
     if (page !== EVENT_TYPES_PAGE_INDEX || !eventColorSchemeId) return;
     const x = eventChipX[eventColorSchemeId];
     if (x === undefined) return;
-    eventSchemeRowRef.current?.scrollTo({ x: Math.max(0, x - SCHEME_GRID_GAP), animated: true });
+    eventSchemeRowRef.current?.scrollTo({ x: Math.max(0, x - SCHEME_ROW_INSET), animated: true });
   }, [page, eventColorSchemeId, eventChipX]);
 
   useEffect(() => {
     if (page !== GOALS_PAGE_INDEX || !goalColorSchemeId) return;
     const x = goalChipX[goalColorSchemeId];
     if (x === undefined) return;
-    goalSchemeRowRef.current?.scrollTo({ x: Math.max(0, x - SCHEME_GRID_GAP), animated: true });
+    goalSchemeRowRef.current?.scrollTo({ x: Math.max(0, x - SCHEME_ROW_INSET), animated: true });
   }, [page, goalColorSchemeId, goalChipX]);
 
   if (!visible) return null;
@@ -404,14 +415,14 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
     setGoalColorSchemeId(scheme.id);
   }
 
-  // The Theme picker on the Colors page: a static 3-then-2-then-1 grid
+  // The Theme picker on the Colors page: a static two-rows-of-three grid
   // rather than a horizontal scroll, so this is called once per row instead
   // of once for a single ScrollView's worth of chips. Chips are sized to a
-  // fixed chipWidth (one third of the row, same math for every row) instead
-  // of flex:1, so the shorter rows' boxes come out the same width as the
-  // three-chip first row's rather than stretching to fill — each shorter
-  // row is then centered (schemeGridRowCenter) so it reads as sitting in
-  // the middle of an implied three columns.
+  // fixed chipWidth (one third of the row, same math for both rows) instead
+  // of flex:1 — schemeGridRowCenter on the second row is a no-op today (it's
+  // as full as the first), kept only so a future scheme count that doesn't
+  // divide evenly by three still centers its short row instead of hugging
+  // the left edge.
   const chipWidth = (width - PAGE_HORIZONTAL_PADDING * 2 - SCHEME_GRID_GAP * 2) / 3;
 
   function renderThemeChip(scheme: ThemeColorScheme) {
@@ -738,10 +749,7 @@ export function OnboardingScreen({ visible, onDismiss, onFinished }: Props) {
                 {THEME_COLOR_SCHEMES.slice(0, 3).map(renderThemeChip)}
               </View>
               <View style={[styles.schemeGridRow, styles.schemeGridRowCenter]}>
-                {THEME_COLOR_SCHEMES.slice(3, 5).map(renderThemeChip)}
-              </View>
-              <View style={[styles.schemeGridRow, styles.schemeGridRowCenter]}>
-                {THEME_COLOR_SCHEMES.slice(5).map(renderThemeChip)}
+                {THEME_COLOR_SCHEMES.slice(3).map(renderThemeChip)}
               </View>
             </View>
 
@@ -1277,12 +1285,12 @@ function makeStyles(C: ColorPalette) {
     schemeDotThemeChip: { borderWidth: 1 },
     schemeChipText: { fontSize: 12, fontWeight: '600', color: C.textSecondary, marginTop: 6 },
     schemeChipTextActive: { color: C.white },
-    // The Theme picker's static 3-then-2-then-1 grid, in place of a
+    // The Theme picker's static two-rows-of-three grid, in place of a
     // horizontal scroll — there's no overflow to fade, so each row just
     // wraps evenly. Chips are a fixed width (see chipWidth in the
-    // component) rather than flex:1, so the shorter rows can't stretch
-    // wider than the three-chip first row; schemeGridRowCenter centers
-    // each shorter row instead of letting it hug the left edge.
+    // component) rather than flex:1; schemeGridRowCenter centers a
+    // shorter second row instead of letting it hug the left edge, though
+    // with the current six schemes it has nothing to do.
     schemeGrid: { width: '100%', marginTop: 24, gap: SCHEME_GRID_GAP },
     schemeGridRow: { flexDirection: 'row', gap: SCHEME_GRID_GAP },
     schemeGridRowCenter: { justifyContent: 'center' },
