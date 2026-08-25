@@ -10,6 +10,10 @@ import type { ColorPalette } from '../constants/colors';
 import { GoalDefinition, goalDisplayLabel } from '../constants/defaultGoals';
 import { GoalIcon } from './GoalIcon';
 
+// RN's TouchableOpacity default (500ms) read as sluggish for opening the goal
+// editor — shorter so the hold-to-edit gesture fires sooner.
+const LONG_PRESS_DELAY = 300;
+
 interface Props {
   definition: GoalDefinition;
   count: number;
@@ -85,6 +89,7 @@ export function GoalCard({ definition, count, goal, onDecrement, onIncrement, on
           style={styles.touchHalf}
           onPress={onDecrement && handleDecrement}
           onLongPress={onLongPress && handleLongPress}
+          delayLongPress={LONG_PRESS_DELAY}
           disabled={!onDecrement && !onLongPress}
           activeOpacity={1}
         />
@@ -92,6 +97,7 @@ export function GoalCard({ definition, count, goal, onDecrement, onIncrement, on
           style={styles.touchHalf}
           onPress={onIncrement && handleIncrement}
           onLongPress={onLongPress && handleLongPress}
+          delayLongPress={LONG_PRESS_DELAY}
           disabled={!onIncrement && !onLongPress}
           activeOpacity={1}
         />

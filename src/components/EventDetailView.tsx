@@ -195,20 +195,17 @@ export function EventDetailView({
     groups.push({
       key: 'quantity',
       node: (
-        // Same two-box layout as the editor's Quantity/Units row, just Text
-        // instead of TextInput — nothing here is tappable or typed into.
-        <View style={styles.quantityRow}>
-          <View>
-            <Text style={styles.label}>{t('eventDetail.quantity')}</Text>
-            <Text style={styles.quantityBox}>{quantity}</Text>
-          </View>
-          <View style={styles.unitsField}>
-            <Text style={styles.label}>{t('eventDetail.units')}</Text>
-            <Text style={[styles.quantityBox, styles.unitsBox, !event.units && styles.unitsPlaceholder]}>
-              {event.units || t('eventDetail.optional')}
-            </Text>
-          </View>
-        </View>
+        <>
+          <Text style={styles.label}>{t('eventDetail.quantity')}</Text>
+          {/* Units modify the number rather than getting a section of their
+              own — "5 miles", not a separate Units row next to a bare "5" —
+              at the editor's own smaller/lighter units weight so it still
+              reads as a unit, not part of the count. */}
+          <Text style={styles.quantityBox}>
+            {quantity}
+            {!!event.units && <Text style={styles.quantityUnits}> {event.units}</Text>}
+          </Text>
+        </>
       ),
     });
   }
@@ -430,33 +427,16 @@ function makeStyles(C: ColorPalette) {
     // form's switchRow layout exactly, since these are the same controls at
     // the same size.
     statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    // Matches the editor's Quantity/Units row exactly — same two boxes, same
-    // sizes — since this is that same row with Text standing in for TextInput.
-    quantityRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
-    unitsField: { flex: 1 },
-    unitsBox: {
-      alignSelf: 'stretch',
-      flex: 1,
-      fontSize: 16,
-      fontWeight: '600',
-      textAlign: 'left',
-      textAlignVertical: 'center',
-    },
-    // Neutral, the way the editor's placeholder text is: reads as "nothing
-    // entered" rather than as a real unit that happens to say "optional".
-    unitsPlaceholder: { color: C.textLight, fontWeight: '400' },
+    // No box: this is read-only display text, not the editor's tappable input.
     quantityBox: {
-      alignSelf: 'flex-start',
-      minWidth: 60,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 10,
-      backgroundColor: C.background,
       fontSize: 22,
       fontWeight: '700',
       color: C.text,
-      textAlign: 'center',
+      textAlign: 'left',
     },
+    // Size/weight match the editor's unitsBox; colour matches EventBlock's
+    // own units text — the annotation treatment, not the value's own colour.
+    quantityUnits: { fontSize: 16, fontWeight: '600', color: C.textSecondary },
     colorDot: { width: 14, height: 14, borderRadius: 7 },
     personRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7 },
     // Only between rows: a rule under the last one would read as an input's underline.

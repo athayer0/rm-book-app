@@ -339,10 +339,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
     if (!quantityFocused) setQuantityText(String(quantity));
   }, [quantity, quantityFocused]);
 
+  function clampQuantityText(text: string): number {
+    const n = parseInt(text, 10);
+    return Number.isNaN(n) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, n));
+  }
+
   function commitQuantity() {
     setQuantityFocused(false);
-    const n = parseInt(quantityText, 10);
-    const clamped = Number.isNaN(n) ? 0 : Math.min(MAX_GOAL_VALUE, Math.max(0, n));
+    const clamped = clampQuantityText(quantityText);
     setQuantityText(String(clamped));
     setQuantity(clamped);
   }
@@ -502,8 +506,14 @@ export function AddEditEventModal({ visible, event, defaultDate, defaultStartTim
       // null column, so clearing the last person off an event syncs as a clear.
       people: attendees.length ? attendees : undefined,
       contactMethod: usesContactMethod(type) ? contactMethod : undefined,
-      quantity: eventTypeById[type]?.goalMode === 'quantity' ? quantity : undefined,
-      units: eventTypeById[type]?.goalMode === 'quantity' && units ? units : undefined,
+      // Read straight from the text buffers rather than the blur-committed
+      // `quantity`/`units` state: tapping this header button doesn't reliably
+      // blur a focused TextInput first, and `setQuantity`/`setUnits` from
+      // commitQuantity/commitUnits wouldn't be visible in this closure until
+      // a re-render anyway, so going through committed state here can save
+      // whatever was typed one edit behind — or drop it entirely.
+      quantity: eventTypeById[type]?.goalMode === 'quantity' ? clampQuantityText(quantityText) : undefined,
+      units: eventTypeById[type]?.goalMode === 'quantity' && unitsText.trim() ? unitsText.trim() : undefined,
     };
   }
 
