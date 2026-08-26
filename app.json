@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.aaronthayer.compi",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "infoPlist": {
         "NSContactsUsageDescription": "Allow RM Calendar to access your contacts to import people into your list.",
         "ITSAppUsesNonExemptEncryption": false
@@ -59,7 +59,8 @@
           "iosUrlScheme": "com.googleusercontent.apps.150594044412-4nddrri65036mnq6i3bkpp108imdv042"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "owner": "athayer0",
     "extra": {
