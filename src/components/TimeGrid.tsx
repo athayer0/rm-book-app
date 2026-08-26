@@ -169,10 +169,15 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   });
   useEffect(() => {
     if (!isToday) return;
+    // A 60s interval anchored to mount time drifts from the wall clock — if
+    // mounted 45s into a minute, it wouldn't pick up the next minute's rollover
+    // until 45s after it actually happened. Poll more often instead; setState
+    // with an unchanged value is a no-op re-render, so this costs nothing extra
+    // except right when the minute actually turns over.
     const interval = setInterval(() => {
       const now = new Date();
       setCurrentMinutes(now.getHours() * 60 + now.getMinutes());
-    }, 60000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [isToday]);
 
@@ -214,16 +219,21 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
   const nowM = currentMinutes % 60;
   const timeIndicatorY = (currentMinutes - gridStartHour * 60) / 60 * SLOT_HEIGHT * 2;
   const showTimeIndicator = isToday && nowH >= gridStartHour && nowH < gridEndHour;
+  // nowRow (below) is a 9px-tall box with the 2px line centered inside it
+  // (top: 3.5), so its own center sits 4.5px below its top edge. Positioning
+  // the row's top at timeIndicatorY would put the *line* 4.5px below the true
+  // time instead of on it — pull the row up by that same half-height so the
+  // line's center, not the row's top, lands on timeIndicatorY.
+  const NOW_ROW_CENTER_OFFSET = 4.5;
   // One continuous hide zone measured from the line itself, rather than two
   // separate radii (one around the line, one around the label's top) — the
   // label has height, so two 5px radii left a gap between them where an hour
   // mark could sit right through the middle of the label text without either
-  // one catching it. nowLabel sits `top: -15` relative to the line (see
-  // makeStyles), so that plus a margin is how far above the line a mark has
-  // to clear; below the line it's just the margin.
+  // one catching it. nowLabel sits `top: -13` relative to the line (see
+  // makeStyles), so HIDE_ABOVE_PX has to clear that plus a margin; below the
+  // line it's just the margin.
   const HIDE_MARGIN_PX = 5;
-  const NOW_LABEL_TOP_OFFSET = 15;
-  const HIDE_ABOVE_PX = NOW_LABEL_TOP_OFFSET + HIDE_MARGIN_PX;
+  const HIDE_ABOVE_PX = 20;
   const HIDE_BELOW_PX = HIDE_MARGIN_PX;
   const timeLabel = settings.timeFormat === '24h'
     ? `${String(nowH).padStart(2, '0')}:${String(nowM).padStart(2, '0')}`
@@ -288,7 +298,7 @@ export function TimeGrid({ events, onEventPress, onToggleStatus, onTapEmpty, onD
             {showTimeIndicator && (
               <View
                 pointerEvents="none"
-                style={[styles.nowIndicator, { top: timeIndicatorY }]}
+                style={[styles.nowIndicator, { top: timeIndicatorY - NOW_ROW_CENTER_OFFSET }]}
               >
                 <View style={styles.nowRow}>
                   <View style={styles.nowLine} />
@@ -425,10 +435,12 @@ function makeStyles(C: ColorPalette) {
     },
     nowLabel: {
       position: 'absolute',
-      top: -15,
-      left: 6,
+      top: -13,
+      left: 0,
+      width: TIME_COL_WIDTH - HOUR_LABEL_GAP_TO_LINE,
+      textAlign: 'center',
       fontSize: 11,
-      fontWeight: '500',
+      fontWeight: '600',
       color: C.primary,
     },
     nowRow: {
