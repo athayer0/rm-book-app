@@ -60,8 +60,8 @@ FEATURES
 [x] fix the weird text entry box outline
 [x] add select and set status to the unreported events menu
 [x] splash icon
-[ ] current time line ahead by 5 mins? not synced to actual clock by a couple seconds? blur not working right
-[ ] import contacts text being less ai-y and less verbose
+[x] current time line ahead by 5 mins? not synced to actual clock by a couple seconds? blur not working right
+[x] import contacts text being less ai-y and less verbose
 
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
