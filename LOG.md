@@ -47,8 +47,6 @@ FEATURES
 [x] add spanish 
 [x] be able to turn off auto contact event
 [x] change dark mode light mode automatically in onboarding
-[ ] swipe down the menus to close them
-[ ] extend end hour to 2am
 [x] add x to event select menu on empty space tap
 [x] make color scheme changing more intuitive
 [x] hard press ki to edit, quick press to increment
@@ -61,8 +59,9 @@ FEATURES
 [x] improve the look of the sign in screen
 [x] fix the weird text entry box outline
 [x] add select and set status to the unreported events menu
-[ ] birthday feature?
-[ ] splash icon
+[x] splash icon
+[ ] current time line ahead by 5 mins? not synced to actual clock by a couple seconds? blur not working right
+[ ] import contacts text being less ai-y and less verbose
 
 BUGS
 [x] fix first time load white flash and people and timeline empty read flashes(skeleton loading?)
@@ -74,19 +73,23 @@ DEPLOYMENT TASKS
 [x] buy the $99 license
 [x] Choose an official name and make support email
 [x] add sign in/make an account with apple and google (and facebook?)
-[ ] tip $5
 [ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
-[ ] app icon and app store pics
-[ ] change color and home setup to avoid copyright?
+[x] app icon and app store pics
+[x] change color and home setup to avoid copyright?
 [ ] security audit
 [ ] privacy policy (dont get sued)
 [ ] deploy to google play store
 [ ] deploy to app store
 
 POST 1.0.0
+[ ] tip $5
 [ ] FIGURE OUT THE MONEY MAKER $$$ (canvas sync for grades, ai agent, slack style see your data past 90 days)
 [ ] add friends and districts, be able to add events to their calendars
 [ ] add snapchat map and ping friends 
 [ ] ki for doing something with one of your friends
 [ ] add some sort of streak feature
 [ ] add other languages (portuguese french tagalog mandarin etc)
+[ ] birthday feature
+[ ] swipe down the menus to close them
+[ ] extend end hour to 2am
+[ ] tips
