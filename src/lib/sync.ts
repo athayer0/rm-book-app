@@ -48,9 +48,21 @@ async function runDrain(): Promise<void> {
   const ops = await peekQueue();
   if (ops.length === 0) return;
 
+  // Every row is stamped with `user_id` at enqueue time (see the hooks in
+  // src/hooks/*), so a stale op left over from an account that was since
+  // signed out of — or deleted — carries a different id than whoever is
+  // signed in now. RLS will reject it forever (auth.uid() can never match),
+  // so rather than retry it every drain, drop it here.
+  const currentUserId = (await supabase.auth.getSession()).data.session?.user.id;
+
   const sent: SyncOperation[] = [];
 
   for (const op of ops) {
+    if (currentUserId && op.row.user_id !== currentUserId) {
+      console.log(`[sync] dropping stale ${op.type} ${op.table} op from a previous account`);
+      sent.push(op);
+      continue;
+    }
     try {
       const pk = PK_COLUMNS[op.table];
       if (!pk) throw new Error(`unknown table ${op.table}`);
