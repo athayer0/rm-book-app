@@ -164,7 +164,7 @@
   "auth": {
     "enterEmailPassword": "Por favor, introduce tu correo y contraseña.",
     "errorTitle": "Error",
-    "checkEmailConfirmation": "Revisa tu correo para ver el enlace de confirmación.",
+    "confirmSignupSubtitle": "Introduce el código que enviamos a {{email}} para confirmar tu cuenta.",
     "signInSubtitle": "Inicia sesión en tu cuenta",
     "signUpSubtitle": "Crea una cuenta",
     "email": "Correo electrónico",

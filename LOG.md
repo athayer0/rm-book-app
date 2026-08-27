@@ -80,9 +80,9 @@ DEPLOYMENT TASKS
 [x] privacy policy (dont get sued)
 [x] add reset password
 [x] create test account for apple (testmyapp2325@outlook.com)
-[ ] make sign in more intuitive and clean
+[x] make sign in more intuitive and clean
 [ ] figure out what to do w dev tools
-[ ] delete an account and make sure that works
+[x] delete an account and make sure that works
 [ ] make the sign in popups less cryptic
 [ ] make and submit build
 [ ] deploy to app store

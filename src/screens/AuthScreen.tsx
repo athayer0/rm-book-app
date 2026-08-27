@@ -20,7 +20,6 @@ import { GoogleLogo } from '../components/GoogleLogo';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
-import { AUTH_CALLBACK_URL } from '../lib/authDeepLink';
 import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
@@ -42,7 +41,7 @@ export function AuthScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState('');
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset' | 'confirmSignup'>('signin');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -83,11 +82,7 @@ export function AuthScreen() {
     const fn =
       mode === 'signin'
         ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({
-            email,
-            password,
-            options: { emailRedirectTo: AUTH_CALLBACK_URL },
-          });
+        : supabase.auth.signUp({ email, password });
 
     const { error } = await fn;
     setLoading(false);
@@ -95,8 +90,20 @@ export function AuthScreen() {
     if (error) {
       Alert.alert(t('auth.errorTitle'), error.message);
     } else if (mode === 'signup') {
-      Alert.alert(t('auth.checkEmailConfirmation'));
+      setMode('confirmSignup');
     }
+  };
+
+  const handleConfirmSignup = async () => {
+    if (!code) {
+      Alert.alert(t('auth.enterCode'));
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'signup' });
+    setLoading(false);
+
+    if (error) Alert.alert(t('auth.errorTitle'), error.message);
   };
 
   const handleForgotPassword = async () => {
@@ -172,11 +179,13 @@ export function AuthScreen() {
               ? t('auth.signUpSubtitle')
               : mode === 'forgot'
                 ? t('auth.forgotPasswordSubtitle')
-                : t('auth.resetCodeSubtitle', { email })}
+                : mode === 'confirmSignup'
+                  ? t('auth.confirmSignupSubtitle', { email })
+                  : t('auth.resetCodeSubtitle', { email })}
         </Text>
 
         <View style={styles.card}>
-          {mode !== 'reset' && (
+          {mode !== 'reset' && mode !== 'confirmSignup' && (
             <Animated.View
               style={[
                 styles.inputWrap,
@@ -240,7 +249,7 @@ export function AuthScreen() {
             </Animated.View>
           )}
 
-          {mode === 'reset' && (
+          {(mode === 'reset' || mode === 'confirmSignup') && (
             <View style={styles.inputWrap}>
               <Ionicons name="key-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
@@ -252,7 +261,7 @@ export function AuthScreen() {
                 keyboardType="number-pad"
                 textContentType="oneTimeCode"
                 returnKeyType="done"
-                onSubmitEditing={handleVerifyCode}
+                onSubmitEditing={mode === 'reset' ? handleVerifyCode : handleConfirmSignup}
                 value={code}
                 onChangeText={setCode}
               />
@@ -271,7 +280,15 @@ export function AuthScreen() {
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={mode === 'forgot' ? handleForgotPassword : mode === 'reset' ? handleVerifyCode : handleSubmit}
+            onPress={
+              mode === 'forgot'
+                ? handleForgotPassword
+                : mode === 'reset'
+                  ? handleVerifyCode
+                  : mode === 'confirmSignup'
+                    ? handleConfirmSignup
+                    : handleSubmit
+            }
             disabled={loading}
             activeOpacity={0.85}
           >

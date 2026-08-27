@@ -164,7 +164,7 @@
   "auth": {
     "enterEmailPassword": "Please enter your email and password.",
     "errorTitle": "Error",
-    "checkEmailConfirmation": "Check your email for a confirmation link.",
+    "confirmSignupSubtitle": "Enter the code we sent to {{email}} to confirm your account.",
     "signInSubtitle": "Sign in to your account",
     "signUpSubtitle": "Create an account",
     "email": "Email",
