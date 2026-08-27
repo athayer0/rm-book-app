@@ -78,11 +78,12 @@ DEPLOYMENT TASKS
 [x] change color and home setup to avoid copyright?
 [x] security audit
 [x] privacy policy (dont get sued)
-[ ] add reset password
+[x] add reset password
+[x] create test account for apple (testmyapp2325@outlook.com)
+[ ] make sign in more intuitive and clean
 [ ] figure out what to do w dev tools
 [ ] delete an account and make sure that works
 [ ] make the sign in popups less cryptic
-[ ] create test account for apple (testmyapp2325@outlook.com)
 [ ] make and submit build
 [ ] deploy to app store
 

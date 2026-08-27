@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { supabase } from './src/lib/supabase';
+import { handleAuthRedirect } from './src/lib/authDeepLink';
 import { drainQueue, pullAll, startAutoDrain } from './src/lib/sync';
 import { peekQueue } from './src/lib/syncQueue';
 import { SettingsContext, useSettings, useSettingsState } from './src/hooks/useSettings';
@@ -58,6 +59,29 @@ function AppRoot() {
   const { t } = useTranslation();
   const [synced, setSynced] = useState(false);
   const onboarding = useOnboardingState(synced);
+
+  // Catches the `compi://auth-callback` link Supabase redirects to after a
+  // signup confirmation email is tapped — cold start (app launched by the
+  // tap) via getInitialURL, already-running via the 'url' event. Completing
+  // the exchange sets a session on the client, which AuthContext's own
+  // onAuthStateChange listener picks up on its own; nothing here has to
+  // touch session state directly.
+  useEffect(() => {
+    const onUrl = ({ url }: { url: string }) => {
+      handleAuthRedirect(url).catch(err => {
+        Alert.alert(t('auth.errorTitle'), err instanceof Error ? err.message : String(err));
+      });
+    };
+
+    Linking.getInitialURL().then(url => {
+      if (url) onUrl({ url });
+    });
+    const sub = Linking.addEventListener('url', onUrl);
+    return () => sub.remove();
+  // `t` deliberately isn't a dep — see the daily-review effect's note below;
+  // this listener only needs to be set up once.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Push anything queued, then pull the server's copy down. Screens adopt the
   // pulled data through the storage subscriptions, so this gate is only here to

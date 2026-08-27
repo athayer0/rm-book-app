@@ -20,6 +20,7 @@ import { GoogleLogo } from '../components/GoogleLogo';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
+import { AUTH_CALLBACK_URL } from '../lib/authDeepLink';
 import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
@@ -82,7 +83,11 @@ export function AuthScreen() {
     const fn =
       mode === 'signin'
         ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({ email, password });
+        : supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: AUTH_CALLBACK_URL },
+          });
 
     const { error } = await fn;
     setLoading(false);
