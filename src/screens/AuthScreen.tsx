@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Alert,
   useColorScheme,
@@ -41,7 +40,8 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [code, setCode] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -94,6 +94,44 @@ export function AuthScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert(t('auth.enterEmail'));
+      return;
+    }
+    setLoading(true);
+    // Sends a 6-digit OTP, not a tappable link — a link-based flow is prone
+    // to Apple Mail's link-prefetching ("Mail Privacy Protection") silently
+    // consuming the one-time token before the user ever taps it, which
+    // reviewers hit as often as real users. The email template must render
+    // {{ .Token }} for this to show up (Supabase dashboard > Auth > Email
+    // Templates > Reset Password).
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    setLoading(false);
+
+    if (error) {
+      Alert.alert(t('auth.errorTitle'), error.message);
+    } else {
+      setMode('reset');
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!code) {
+      Alert.alert(t('auth.enterCode'));
+      return;
+    }
+    setLoading(true);
+    // On success this hands back a live session and fires the
+    // 'PASSWORD_RECOVERY' auth event — AuthContext catches that event and
+    // sets passwordRecovery, which is what makes App.tsx swap this screen out
+    // for ResetPasswordScreen (see AuthContext's onAuthStateChange comment).
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'recovery' });
+    setLoading(false);
+
+    if (error) Alert.alert(t('auth.errorTitle'), error.message);
+  };
+
   const handleOAuth = async (provider: OAuthProvider) => {
     // No loading UI on these buttons (per design) — this guard is only to
     // stop a double-tap from opening two native sign-in sheets at once, not
@@ -112,10 +150,7 @@ export function AuthScreen() {
   if (!appleChecked) return <AuthSkeleton />;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -126,73 +161,112 @@ export function AuthScreen() {
         </View>
         <Text style={styles.title}>RM Calendar</Text>
         <Text style={styles.subtitle}>
-          {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
+          {mode === 'signin'
+            ? t('auth.signInSubtitle')
+            : mode === 'signup'
+              ? t('auth.signUpSubtitle')
+              : mode === 'forgot'
+                ? t('auth.forgotPasswordSubtitle')
+                : t('auth.resetCodeSubtitle', { email })}
         </Text>
 
         <View style={styles.card}>
-          <Animated.View
-            style={[
-              styles.inputWrap,
-              { borderColor: emailFocusAnim.interpolate({ inputRange: [0, 1], outputRange: [Colors.inputBorder, Colors.primary] }) },
-            ]}
-          >
-            <Ionicons name="mail-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
-            <TextInput
-              style={styles.inputField}
-              placeholder={t('auth.email')}
-              placeholderTextColor={Colors.textLight}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              onFocus={() => animateFocus(emailFocusAnim, true)}
-              onBlur={() => animateFocus(emailFocusAnim, false)}
-              value={email}
-              onChangeText={setEmail}
-            />
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.inputWrap,
-              { borderColor: passwordFocusAnim.interpolate({ inputRange: [0, 1], outputRange: [Colors.inputBorder, Colors.primary] }) },
-            ]}
-          >
-            <Ionicons name="lock-closed-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
-            <TextInput
-              ref={passwordRef}
-              style={styles.inputField}
-              placeholder={t('auth.password')}
-              placeholderTextColor={Colors.textLight}
-              secureTextEntry={!showPassword}
-              textContentType="password"
-              autoComplete="password"
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
-              onFocus={() => animateFocus(passwordFocusAnim, true)}
-              onBlur={() => animateFocus(passwordFocusAnim, false)}
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword((s) => !s)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+          {mode !== 'reset' && (
+            <Animated.View
+              style={[
+                styles.inputWrap,
+                { borderColor: emailFocusAnim.interpolate({ inputRange: [0, 1], outputRange: [Colors.inputBorder, Colors.primary] }) },
+              ]}
             >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={19}
-                color={Colors.textLight}
+              <Ionicons name="mail-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                placeholder={t('auth.email')}
+                placeholderTextColor={Colors.textLight}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                onFocus={() => animateFocus(emailFocusAnim, true)}
+                onBlur={() => animateFocus(emailFocusAnim, false)}
+                value={email}
+                onChangeText={setEmail}
               />
+            </Animated.View>
+          )}
+
+          {(mode === 'signin' || mode === 'signup') && (
+            <Animated.View
+              style={[
+                styles.inputWrap,
+                { borderColor: passwordFocusAnim.interpolate({ inputRange: [0, 1], outputRange: [Colors.inputBorder, Colors.primary] }) },
+              ]}
+            >
+              <Ionicons name="lock-closed-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                ref={passwordRef}
+                style={styles.inputField}
+                placeholder={t('auth.password')}
+                placeholderTextColor={Colors.textLight}
+                secureTextEntry={!showPassword}
+                textContentType="password"
+                autoComplete="password"
+                returnKeyType="done"
+                onSubmitEditing={handleSubmit}
+                onFocus={() => animateFocus(passwordFocusAnim, true)}
+                onBlur={() => animateFocus(passwordFocusAnim, false)}
+                value={password}
+                onChangeText={setPassword}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword((s) => !s)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={19}
+                  color={Colors.textLight}
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {mode === 'reset' && (
+            <View style={styles.inputWrap}>
+              <Ionicons name="key-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                placeholder={t('auth.code')}
+                placeholderTextColor={Colors.textLight}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                returnKeyType="done"
+                onSubmitEditing={handleVerifyCode}
+                value={code}
+                onChangeText={setCode}
+              />
+            </View>
+          )}
+
+          {mode === 'signin' && (
+            <TouchableOpacity
+              style={styles.forgotWrap}
+              onPress={() => setMode('forgot')}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            >
+              <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
             </TouchableOpacity>
-          </Animated.View>
+          )}
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSubmit}
+            onPress={mode === 'forgot' ? handleForgotPassword : mode === 'reset' ? handleVerifyCode : handleSubmit}
             disabled={loading}
             activeOpacity={0.85}
           >
@@ -200,7 +274,13 @@ export function AuthScreen() {
               <ActivityIndicator color={Colors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>
-                {mode === 'signin' ? t('auth.signIn') : t('auth.createAccount')}
+                {mode === 'signin'
+                  ? t('auth.signIn')
+                  : mode === 'signup'
+                    ? t('auth.createAccount')
+                    : mode === 'forgot'
+                      ? t('auth.sendResetCode')
+                      : t('auth.verifyCode')}
               </Text>
             )}
           </TouchableOpacity>
@@ -208,45 +288,51 @@ export function AuthScreen() {
 
         <TouchableOpacity
           style={styles.toggleWrap}
-          onPress={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+          onPress={() => setMode(mode === 'forgot' ? 'signin' : mode === 'signin' ? 'signup' : 'signin')}
         >
           <Text style={styles.toggle}>
             {mode === 'signin'
               ? t('auth.needAccount')
-              : t('auth.haveAccount')}
+              : mode === 'signup'
+                ? t('auth.haveAccount')
+                : t('auth.backToSignIn')}
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>{t('auth.or')}</Text>
-          <View style={styles.dividerLine} />
-        </View>
+        {(mode === 'signin' || mode === 'signup') && (
+          <>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>{t('auth.or')}</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
-        <TouchableOpacity
-          style={styles.oauthButton}
-          onPress={() => handleOAuth('google')}
-          activeOpacity={0.85}
-        >
-          <GoogleLogo size={18} style={styles.oauthIcon} />
-          <Text style={styles.oauthButtonText}>{t('auth.continueWithGoogle')}</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.oauthButton}
+              onPress={() => handleOAuth('google')}
+              activeOpacity={0.85}
+            >
+              <GoogleLogo size={18} style={styles.oauthIcon} />
+              <Text style={styles.oauthButtonText}>{t('auth.continueWithGoogle')}</Text>
+            </TouchableOpacity>
 
-        {appleAvailable && (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-            buttonStyle={
-              isDark
-                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={12}
-            style={styles.appleButton}
-            onPress={() => handleOAuth('apple')}
-          />
+            {appleAvailable && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={
+                  isDark
+                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={12}
+                style={styles.appleButton}
+                onPress={() => handleOAuth('apple')}
+              />
+            )}
+          </>
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -319,6 +405,15 @@ function makeStyles(C: ColorPalette) {
       paddingVertical: 14,
       fontSize: 16,
       color: C.text,
+    },
+    forgotWrap: {
+      alignSelf: 'flex-end',
+      marginBottom: 4,
+    },
+    forgotText: {
+      color: C.control,
+      fontSize: 13,
+      fontWeight: '500',
     },
     button: {
       backgroundColor: C.primary,

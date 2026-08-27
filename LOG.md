@@ -73,13 +73,20 @@ DEPLOYMENT TASKS
 [x] buy the $99 license
 [x] Choose an official name and make support email
 [x] add sign in/make an account with apple and google (and facebook?)
-[ ] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
+[x] check to make sure the db is hooked up correctly and accounts are secure and actually work between sessions and devices
 [x] app icon and app store pics
 [x] change color and home setup to avoid copyright?
-[ ] security audit
-[ ] privacy policy (dont get sued)
-[ ] deploy to google play store
+[x] security audit
+[x] privacy policy (dont get sued)
+[ ] add reset password
+[ ] figure out what to do w dev tools
+[ ] delete an account and make sure that works
+[ ] make the sign in popups less cryptic
+[ ] create test account for apple (testmyapp2325@outlook.com)
+[ ] make and submit build
 [ ] deploy to app store
+
+[ ] deploy to google play store
 
 POST 1.0.0
 [ ] tip $5

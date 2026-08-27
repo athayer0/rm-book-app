@@ -10,6 +10,7 @@ import i18next from './src/i18n';
 import { AppNavigation, navigationRef } from './src/navigation';
 import { AuthProvider, useAuth } from './src/lib/AuthContext';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { supabase } from './src/lib/supabase';
 import { drainQueue, pullAll, startAutoDrain } from './src/lib/sync';
@@ -51,7 +52,7 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
 }
 
 function AppRoot() {
-  const { session, user, loading, signingOut } = useAuth();
+  const { session, user, loading, signingOut, passwordRecovery } = useAuth();
   const { settings, loaded: settingsLoaded } = useSettings();
   const { events } = useCalendarEvents();
   const { t } = useTranslation();
@@ -227,6 +228,11 @@ function AppRoot() {
   // tapped would otherwise sit there, unresponsive-looking, for that whole
   // round trip before jumping straight to AuthScreen.
   if (signingOut) return <AuthSkeleton />;
+  // Checked ahead of `!session`: verifying the reset-password OTP in AuthScreen
+  // already signs the user in, so a bare `!session` check would drop them
+  // straight into the app on their old password instead of onto the "set new
+  // password" screen.
+  if (passwordRecovery) return <ResetPasswordScreen />;
   if (!session) return <AuthScreen />;
   if (!synced) return <HomeLoadingScreen />;
   return (

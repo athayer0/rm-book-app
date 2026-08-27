@@ -11,6 +11,16 @@ type AuthContextValue = {
   loading: boolean;
   /** True from the moment signOut() or deleteAccount() is called until the session actually clears. */
   signingOut: boolean;
+  /**
+   * True once AuthScreen's reset-password code has been verified — that call
+   * (supabase.auth.verifyOtp with type 'recovery') hands back a live session,
+   * so App.tsx renders ResetPasswordScreen instead of the main app while this
+   * is set, rather than letting a signed-in-but-still-on-the-old-password
+   * session straight into the app.
+   */
+  passwordRecovery: boolean;
+  /** Clears passwordRecovery once the user has set a new password, letting the already-valid session through to the app. */
+  clearPasswordRecovery: () => void;
   signOut: () => Promise<ClearResult>;
   /** Deletes the account and every row it owns server-side, then signs out and wipes local data. */
   deleteAccount: () => Promise<void>;
@@ -21,6 +31,8 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   signingOut: false,
+  passwordRecovery: false,
+  clearPasswordRecovery: () => {},
   signOut: async () => ({ cleared: false, pending: 0 }),
   deleteAccount: async () => {},
 });
@@ -29,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data, error }) => {
@@ -39,8 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+    // Supabase emits 'PASSWORD_RECOVERY' (alongside the session itself) the
+    // moment AuthScreen's verifyOtp({ type: 'recovery' }) call succeeds —
+    // catching it here, in the same callback that sets the session, is what
+    // keeps the two in lockstep. Setting passwordRecovery any later (e.g.
+    // chained after awaiting verifyOtp in AuthScreen) would risk a render
+    // where session is already truthy but passwordRecovery isn't set yet,
+    // flashing the main app before ResetPasswordScreen took over.
+    const { data: listener } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -78,6 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { cleared: true, pending: 0 };
     } finally {
       setSigningOut(false);
+      // Covers "cancel" from ResetPasswordScreen: without this, the now-null
+      // session still reads as mid-recovery and App.tsx would keep showing
+      // ResetPasswordScreen instead of falling through to AuthScreen.
+      setPasswordRecovery(false);
     }
   };
 
@@ -101,7 +126,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, loading, signingOut, signOut, deleteAccount }}
+      value={{
+        session,
+        user: session?.user ?? null,
+        loading,
+        signingOut,
+        passwordRecovery,
+        clearPasswordRecovery: () => setPasswordRecovery(false),
+        signOut,
+        deleteAccount,
+      }}
     >
       {children}
     </AuthContext.Provider>
