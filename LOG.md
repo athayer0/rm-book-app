@@ -81,9 +81,14 @@ DEPLOYMENT TASKS
 [x] add reset password
 [x] create test account for apple (testmyapp2325@outlook.com)
 [x] make sign in more intuitive and clean
-[ ] figure out what to do w dev tools
 [x] delete an account and make sure that works
+[x] cleaner reset to default settings for the user
+[ ] walk through new reset settings to make sure they work
+[ ] figure out what to do w dev tools and delete all events and reset all settings buttons
+[ ] improve typing user experience for sign in and verification code entry
 [ ] make the sign in popups less cryptic
+[ ] update privacy policy and support pages with how the app auth actually works now
+[ ] run security audit one more time
 [ ] make and submit build
 [ ] deploy to app store
 

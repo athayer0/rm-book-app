@@ -575,20 +575,10 @@
     "signedOutLocalDataKeptBody_other": "{{count}} changes could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
     "resetWeekTitle": "Reset Week",
     "resetWeekBody": "This will clear all goal counts and targets for the current week, and restore the built-in Goals (labels, icons, colors, links, targets) to their original values. Custom Goals will not be affected.",
-    "resetEventColorsTitle": "Reset Event Colors",
-    "resetEventColorsBody_one": "1 event type will go back to its original color. This cannot be undone.",
-    "resetEventColorsBody_other": "{{count}} event types will go back to their original colors. This cannot be undone.",
-    "resetDurationsTitle": "Reset Default Durations",
-    "resetDurationsBody_one": "1 event type will go back to its original duration. This cannot be undone.",
-    "resetDurationsBody_other": "{{count}} event types will go back to their original durations. This cannot be undone.",
-    "resetEventTypesTitle": "Reset Event Types",
-    "customEventTypesCount": "{{count}} custom event types",
-    "resetEventTypesInUseBody_one": "There is still {{count}} event using {{using}} that would be removed. Would you like to delete it and reset event types anyway?",
-    "resetEventTypesInUseBody_other": "There are still {{count}} events using {{using}} that would be removed. Would you like to delete them and reset event types anyway?",
-    "deleteAllAndReset": "Delete All & Reset",
-    "resetEventTypesBodyWithCustoms_one": "Built-in event types will be restored to their original values, and {{count}} custom event type will be removed. This cannot be undone.",
-    "resetEventTypesBodyWithCustoms_other": "Built-in event types will be restored to their original values, and {{count}} custom event types will be removed. This cannot be undone.",
-    "resetEventTypesBody": "Built-in event types will be restored to their original values. This cannot be undone.",
+    "resetGoalsTitle": "Restore Default Goals",
+    "resetGoalsBody": "Built-in Goals (labels, icons, colors, links, period) will be restored to their original values. Custom Goals, and this week's and month's counts and targets, will not be affected. This cannot be undone.",
+    "resetEventsTitle": "Restore Default Events",
+    "resetEventsBody": "Built-in event types, colors, and durations will be restored to their original values. Custom event types will not be affected. This cannot be undone.",
     "resetQuickAddTitle": "Reset Event Bubble +",
     "resetQuickAddBody": "This will restore the default quick-add types and icons. This cannot be undone.",
     "appearance": {
@@ -596,9 +586,7 @@
       "colorScheme": "All Color Schemes",
       "customScheme": "Custom",
       "appColorScheme": "App Color Scheme",
-      "appColors": "App Colors",
-      "eventColors": "Event Color Scheme",
-      "goalColors": "Goal Color Scheme"
+      "appColors": "App Colors"
     },
     "themeColors": {
       "sectionTitle": "THEME COLORS",
@@ -614,12 +602,14 @@
       "sectionTitle": "EVENT TYPES",
       "colorScheme": "Color Scheme",
       "customScheme": "Custom",
-      "resetColors": "Reset Colors to Default",
-      "resetDurations": "Reset Default Durations to Default",
-      "resetEventTypes": "Reset Event Types to Default"
+      "resetEvents": "Restore Default Events"
     },
     "eventBubble": {
       "sectionTitle": "EVENT BUBBLE +"
+    },
+    "goalTypes": {
+      "sectionTitle": "GOAL TYPES",
+      "resetGoals": "Restore Default Goals"
     },
     "goals": {
       "sectionTitle": "GOALS",

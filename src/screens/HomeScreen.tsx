@@ -11,12 +11,10 @@ import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 import { useWeeklyGoals } from '../hooks/useWeeklyGoals';
 import { useMonthlyGoals } from '../hooks/useMonthlyGoals';
-import { useEventTypeDefinitions } from '../hooks/useEventTypeDefinitions';
 import { GoalGrid } from '../components/GoalGrid';
 import { SectionHeader } from '../components/SectionHeader';
 import { UnreportedRow } from '../components/UnreportedRow';
 import { HomeSkeleton } from '../components/HomeSkeleton';
-import { EditGoalsModal } from '../modals/EditGoalsModal';
 import { GoalsModal } from '../modals/GoalsModal';
 import { GoalGraphModal } from '../modals/GoalGraphModal';
 import { UnreportedEventsModal } from '../modals/UnreportedEventsModal';
@@ -44,7 +42,6 @@ export function HomeScreen({ navigation, route }: any) {
   const { definitions, allDefinitions, counts, goals, updateDefinitions, reload, saveCountForWeek, loaded: weeklyLoaded } = useWeeklyGoals();
   const { counts: monthlyCounts, goals: monthlyGoals, reload: reloadMonthly, saveCountForMonth, loaded: monthlyLoaded } = useMonthlyGoals();
   const { count: unreportedCount, loaded: unreportedLoaded } = useUnreported();
-  const { definitions: eventTypeDefinitions, updateDefinitions: updateEventTypeDefinitions } = useEventTypeDefinitions();
   const onboardingFinishing = useOnboardingFinishing();
   // Covers the same gap onboardingFinishing does (see HomeSkeleton) but for a
   // plain first mount: each hook's own useStoredState only starts its
@@ -55,10 +52,6 @@ export function HomeScreen({ navigation, route }: any) {
   const dataLoaded = weeklyLoaded && monthlyLoaded && unreportedLoaded;
 
   useFocusEffect(useCallback(() => { reload(); reloadMonthly(); }, [reload, reloadMonthly]));
-  const [editVisible, setEditVisible] = useState(false);
-  // Which goal EditGoalsModal opens on — set when a card is tapped, cleared
-  // (falling back to the first goal) when the header's EDIT link is used.
-  const [editGoalId, setEditGoalId] = useState<string | null>(null);
   const [goalsVisible, setGoalsVisible] = useState(false);
   const [graphVisible, setGraphVisible] = useState(false);
   // Which tab each sheet opens on. Tapping a grid opens that grid's own grain;
@@ -70,13 +63,13 @@ export function HomeScreen({ navigation, route }: any) {
   const [goalsEditGoalId, setGoalsEditGoalId] = useState<string | null>(null);
   const [unreportedVisible, setUnreportedVisible] = useState(false);
 
-  // Tap-to-order goal reorder: EditGoalsModal's "Reorder Goals" button starts
-  // this instead of reordering in place there, since weekly/monthly are grids
-  // here, not the flat list that sheet edits. Each grain gets its own tap
-  // sequence — a goal shown on both grids gets numbered independently in each
-  // — and nothing is written until both sequences are complete and Done (the
-  // same button as Cancel, once every visible card in both grids is tapped)
-  // is pressed.
+  // Tap-to-order goal reorder: Settings' Goal Types > Reorder row navigates
+  // here and starts this (see the startGoalReorder param effect below) rather
+  // than reordering in place there, since weekly/monthly are grids here, not
+  // a flat list. Each grain gets its own tap sequence — a goal shown on both
+  // grids gets numbered independently in each — and nothing is written until
+  // both sequences are complete and Done (the same button as Cancel, once
+  // every visible card in both grids is tapped) is pressed.
   const [reorderActive, setReorderActive] = useState(false);
   const [weekTaps, setWeekTaps] = useState<string[]>([]);
   const [monthTaps, setMonthTaps] = useState<string[]>([]);
@@ -87,18 +80,12 @@ export function HomeScreen({ navigation, route }: any) {
     setGoalsVisible(true);
   }
 
-  // A hard press opens that goal's editor directly rather than the
-  // counts/targets sheet openGoals leads to; a plain tap on either side of a
-  // card instead steps the count by one (below).
-  function openGoalEditor(id: string) {
-    setEditGoalId(id);
-    setEditVisible(true);
-  }
-
-  // A tap on a card with no target set yet: same sheet openGoals leads to, but
-  // straight onto that goal's edit dialog instead of the plain period list —
-  // there's nothing to step against an unset target, so the tap goes here
-  // rather than to incrementWeekGoal/incrementMonthGoal below.
+  // Opens GoalsModal scoped to one goal's set-target dialog, rather than the
+  // plain period list openGoals leads to. Reached two ways: a long-press on
+  // any card, or a plain tap on a card with no target set yet (there's
+  // nothing to step against an unset target, so the tap goes here rather
+  // than to incrementWeekGoal/incrementMonthGoal below). A plain tap on a set
+  // card instead steps the count by one.
   function openGoalTarget(grain: GoalGrain, id: string) {
     setGoalsGrain(grain);
     setGoalsEditGoalId(id);
@@ -177,6 +164,17 @@ export function HomeScreen({ navigation, route }: any) {
     }
   }, [route?.params?.openUnreported]);
 
+  // Settings' Goal Types > Reorder row navigates here with this param (Editing
+  // itself now lives entirely in Settings, so there's no in-place button on this
+  // screen to start the tap-to-order flow from). Consumed once and cleared, same
+  // as openUnreported above.
+  useEffect(() => {
+    if (route?.params?.startGoalReorder) {
+      startGoalReorder();
+      navigation.setParams({ startGoalReorder: undefined });
+    }
+  }, [route?.params?.startGoalReorder]);
+
   return (
     <View style={[styles.safe, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -191,14 +189,18 @@ export function HomeScreen({ navigation, route }: any) {
             {/* Both grains in one card: they are two views of the same set of goal
                 definitions, and the pair of sheets below serve both, so splitting
                 them across two cards implied two independent features. EDIT sits on
-                the first heading only — there is one goal editor for both grains. */}
+                the first heading only — there is one goals sheet for both grains.
+                Definitions editing itself (name/icon/color/link) has moved entirely
+                to Settings' Goal Types > Customize; EDIT here and a long-press on a
+                card both just open GoalsModal now — EDIT on the general list, a
+                long-press scoped straight to that goal's set-target dialog. */}
             <View style={styles.card}>
               <SectionHeader
                 title={reorderActive ? t('home.gridReorderTitle', { title: t(GRAIN.week.gridLabelKey), tapped: weekTaps.length, total: weekVisibleCount }) : t(GRAIN.week.gridLabelKey)}
                 actionLabel={reorderActive ? (reorderComplete ? t('common.done') : t('common.cancel')) : t('home.editAction')}
                 onAction={reorderActive
                   ? (reorderComplete ? commitGoalReorder : cancelGoalReorder)
-                  : () => { setEditGoalId(null); setEditVisible(true); }}
+                  : () => openGoals('week')}
               />
               <GoalGrid
                 definitions={definitions}
@@ -207,7 +209,7 @@ export function HomeScreen({ navigation, route }: any) {
                 grain="week"
                 onDecrementGoal={decrementWeekGoal}
                 onIncrementGoal={incrementWeekGoal}
-                onLongPressGoal={openGoalEditor}
+                onLongPressGoal={id => openGoalTarget('week', id)}
                 onSetGoal={id => openGoalTarget('week', id)}
                 reorderActive={reorderActive}
                 tappedIds={weekTaps}
@@ -225,7 +227,7 @@ export function HomeScreen({ navigation, route }: any) {
                 grain="month"
                 onDecrementGoal={decrementMonthGoal}
                 onIncrementGoal={incrementMonthGoal}
-                onLongPressGoal={openGoalEditor}
+                onLongPressGoal={id => openGoalTarget('month', id)}
                 onSetGoal={id => openGoalTarget('month', id)}
                 reorderActive={reorderActive}
                 tappedIds={monthTaps}
@@ -261,17 +263,6 @@ export function HomeScreen({ navigation, route }: any) {
           </>
         )}
       </ScrollView>
-
-      <EditGoalsModal
-        visible={editVisible}
-        onClose={() => setEditVisible(false)}
-        definitions={allDefinitions}
-        onUpdateDefinitions={updateDefinitions}
-        eventTypeDefs={eventTypeDefinitions}
-        onUpdateEventTypeDefs={updateEventTypeDefinitions}
-        onReorderGoals={startGoalReorder}
-        initialGoalId={editGoalId}
-      />
 
       {/* Reloads both grains on close: the sheet's tabs write either one, and
           which of them was touched isn't reported back. */}

@@ -575,20 +575,10 @@
     "signedOutLocalDataKeptBody_other": "{{count}} cambios no se pudieron sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
     "resetWeekTitle": "Restablecer semana",
     "resetWeekBody": "Esto borrará todos los conteos y metas de la semana actual, y restaurará las Metas integradas (nombres, íconos, colores, vínculos, objetivos) a sus valores originales. Las Metas personalizadas no se verán afectadas.",
-    "resetEventColorsTitle": "Restablecer colores de eventos",
-    "resetEventColorsBody_one": "1 tipo de evento volverá a su color original. Esto no se puede deshacer.",
-    "resetEventColorsBody_other": "{{count}} tipos de evento volverán a sus colores originales. Esto no se puede deshacer.",
-    "resetDurationsTitle": "Restablecer duraciones predeterminadas",
-    "resetDurationsBody_one": "1 tipo de evento volverá a su duración original. Esto no se puede deshacer.",
-    "resetDurationsBody_other": "{{count}} tipos de evento volverán a sus duraciones originales. Esto no se puede deshacer.",
-    "resetEventTypesTitle": "Restablecer tipos de evento",
-    "customEventTypesCount": "{{count}} tipos de evento personalizados",
-    "resetEventTypesInUseBody_one": "Todavía hay {{count}} evento usando {{using}} que se eliminaría. ¿Quieres eliminarlo y restablecer los tipos de evento de todos modos?",
-    "resetEventTypesInUseBody_other": "Todavía hay {{count}} eventos usando {{using}} que se eliminarían. ¿Quieres eliminarlos y restablecer los tipos de evento de todos modos?",
-    "deleteAllAndReset": "Eliminar todo y restablecer",
-    "resetEventTypesBodyWithCustoms_one": "Los tipos de evento integrados se restaurarán a sus valores originales, y {{count}} tipo de evento personalizado se eliminará. Esto no se puede deshacer.",
-    "resetEventTypesBodyWithCustoms_other": "Los tipos de evento integrados se restaurarán a sus valores originales, y {{count}} tipos de evento personalizados se eliminarán. Esto no se puede deshacer.",
-    "resetEventTypesBody": "Los tipos de evento integrados se restaurarán a sus valores originales. Esto no se puede deshacer.",
+    "resetGoalsTitle": "Restaurar metas predeterminadas",
+    "resetGoalsBody": "Las Metas integradas (nombres, íconos, colores, vínculos, período) se restaurarán a sus valores originales. Las Metas personalizadas, y los conteos y objetivos de esta semana y mes, no se verán afectados. Esto no se puede deshacer.",
+    "resetEventsTitle": "Restaurar eventos predeterminados",
+    "resetEventsBody": "Los tipos de evento, colores y duraciones integrados se restaurarán a sus valores originales. Los tipos de evento personalizados no se verán afectados. Esto no se puede deshacer.",
     "resetQuickAddTitle": "Restablecer burbuja de evento +",
     "resetQuickAddBody": "Esto restaurará los tipos e íconos de añadido rápido predeterminados. Esto no se puede deshacer.",
     "appearance": {
@@ -596,9 +586,7 @@
       "colorScheme": "Todos los esquemas de colores",
       "customScheme": "Personalizado",
       "appColorScheme": "Esquema de colores de la app",
-      "appColors": "Colores de la app",
-      "eventColors": "Esquema de colores de eventos",
-      "goalColors": "Esquema de colores de metas"
+      "appColors": "Colores de la app"
     },
     "themeColors": {
       "sectionTitle": "COLORES DEL TEMA",
@@ -614,12 +602,14 @@
       "sectionTitle": "TIPOS DE EVENTO",
       "colorScheme": "Esquema de colores",
       "customScheme": "Personalizado",
-      "resetColors": "Restablecer colores predeterminados",
-      "resetDurations": "Restablecer duraciones predeterminadas",
-      "resetEventTypes": "Restablecer tipos de evento predeterminados"
+      "resetEvents": "Restaurar eventos predeterminados"
     },
     "eventBubble": {
       "sectionTitle": "BURBUJA DE EVENTO +"
+    },
+    "goalTypes": {
+      "sectionTitle": "TIPOS DE META",
+      "resetGoals": "Restaurar metas predeterminadas"
     },
     "goals": {
       "sectionTitle": "METAS",
