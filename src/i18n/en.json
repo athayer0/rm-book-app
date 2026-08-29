@@ -175,6 +175,7 @@
     "createAccount": "Create Account",
     "needAccount": "Don't have an account? Sign up",
     "haveAccount": "Already have an account? Sign in",
+    "haveCode": "Already have a code?",
     "or": "or",
     "continueWithGoogle": "Continue with Google",
     "continueWithApple": "Continue with Apple",

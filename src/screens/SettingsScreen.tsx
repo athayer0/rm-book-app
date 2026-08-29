@@ -30,7 +30,7 @@ import { EventTypesModal } from '../modals/EventTypesModal';
 import { ReorderEventTypesModal } from '../modals/ReorderEventTypesModal';
 import { EventReminderTypesModal } from '../modals/EventReminderTypesModal';
 import { EditGoalsModal } from '../modals/EditGoalsModal';
-import { navigationRef } from '../navigation';
+import { navigationRef } from '../lib/navigationRef';
 import {
   DEFAULT_EVENT_TYPES, BUILTIN_GOAL_LINKS, BUILTIN_REPORT_STYLES, EventTypeDefinition,
 } from '../constants/eventTypeDefaults';

@@ -13,6 +13,8 @@ import {
   useColorScheme,
   Animated,
   Easing,
+  Keyboard,
+  KeyboardEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -73,6 +75,25 @@ export function AuthScreen() {
     }
   }, []);
 
+  // Only half the keyboard's height, not the full amount a KeyboardAvoidingView
+  // would add — the code/password fields sit well above the bottom edge already,
+  // so matching the keyboard height one-for-one shoves the card up further than
+  // it needs to go to clear it.
+  const keyboardPad = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const animateTo = (next: number, e?: KeyboardEvent) => {
+      Animated.timing(keyboardPad, {
+        toValue: next,
+        duration: e?.duration || 250,
+        useNativeDriver: false,
+      }).start();
+    };
+    const showSub = Keyboard.addListener('keyboardWillShow', (e) => animateTo(e.endCoordinates.height / 2, e));
+    const hideSub = Keyboard.addListener('keyboardWillHide', (e) => animateTo(0, e));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [keyboardPad]);
+
   const handleSubmit = async () => {
     if (!email || !password) {
       Alert.alert(t('auth.enterEmailPassword'));
@@ -104,6 +125,18 @@ export function AuthScreen() {
     setLoading(false);
 
     if (error) Alert.alert(t('auth.errorTitle'), error.message);
+  };
+
+  // For a user who closed the app after signing up but before entering the
+  // code — lets them jump straight to the code field on a later visit rather
+  // than going through signUp again. No security concern: the code is what's
+  // secret, not the ability to reach the field that asks for it.
+  const handleHaveCode = () => {
+    if (!email) {
+      Alert.alert(t('auth.enterEmail'));
+      return;
+    }
+    setMode('confirmSignup');
   };
 
   const handleForgotPassword = async () => {
@@ -162,7 +195,7 @@ export function AuthScreen() {
   if (!appleChecked) return <AuthSkeleton />;
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { paddingBottom: keyboardPad }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -251,7 +284,6 @@ export function AuthScreen() {
 
           {(mode === 'reset' || mode === 'confirmSignup') && (
             <View style={styles.inputWrap}>
-              <Ionicons name="key-outline" size={18} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.inputField}
                 placeholder={t('auth.code')}
@@ -275,6 +307,16 @@ export function AuthScreen() {
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             >
               <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
+            </TouchableOpacity>
+          )}
+
+          {mode === 'signup' && (
+            <TouchableOpacity
+              style={styles.forgotWrap}
+              onPress={handleHaveCode}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            >
+              <Text style={styles.forgotText}>{t('auth.haveCode')}</Text>
             </TouchableOpacity>
           )}
 
@@ -354,7 +396,7 @@ export function AuthScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 
