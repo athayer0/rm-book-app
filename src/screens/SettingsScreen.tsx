@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Platform, useColorScheme, Switch, Pressable,
+  Alert, Platform, useColorScheme, Switch, Pressable, TextInput, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -141,7 +141,7 @@ export function SettingsScreen() {
     [eventTypeDefinitions],
   );
   const { deleteAllEvents } = useCalendarEvents();
-  const { signOut, deleteAccount } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
   const { toggleDailyReview, toggleEventReminders } = useNotificationToggles();
   const replayOnboarding = useOnboardingReplay();
   // Same resolution useColors() does internally — needed here too so the
@@ -164,6 +164,12 @@ export function SettingsScreen() {
   const [eventSheet, setEventSheet] = useState<'types' | 'quickAdd' | 'reorder' | 'reminderTypes' | null>(null);
   // Goal definitions editing — the one sheet, opened from Goal Types > Customize.
   const [goalEditVisible, setGoalEditVisible] = useState(false);
+  // Second delete-account confirmation — requires typing common.delete's
+  // localized word before the button unlocks, rather than a plain tap.
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const deleteConfirmWord = t('common.delete').toUpperCase();
+  const deleteConfirmMatches = deleteConfirmInput.trim().toUpperCase() === deleteConfirmWord;
   const scrollRef = useRef<ScrollView>(null);
 
   function toggleDropdown(key: DropdownKey) {
@@ -212,6 +218,8 @@ export function SettingsScreen() {
         setColorSheet(null);
         setEventSheet(null);
         setGoalEditVisible(false);
+        setDeleteConfirmVisible(false);
+        setDeleteConfirmInput('');
       };
     }, []),
   );
@@ -249,19 +257,54 @@ export function SettingsScreen() {
     );
   }
 
+  // iOS gets the real system input alert (Alert.prompt is iOS-only); Android
+  // falls back to the in-house modal below, styled to match it as closely as
+  // a custom view can.
   function confirmDeleteAccountFinal() {
-    Alert.alert(
+    if (Platform.OS === 'ios') {
+      promptDeleteConfirmIOS();
+    } else {
+      setDeleteConfirmInput('');
+      setDeleteConfirmVisible(true);
+    }
+  }
+
+  // Alert.prompt's buttons can't be disabled while the user types, unlike the
+  // Android modal's button — so a mismatch re-prompts instead of blocking the
+  // tap up front.
+  function promptDeleteConfirmIOS() {
+    Alert.prompt(
       t('settingsScreen.deleteAccountFinalTitle'),
-      t('settingsScreen.deleteAccountFinalBody'),
+      `${t('settingsScreen.deleteAccountFinalBody')}\n\n${t('settingsScreen.deleteAccountTypeToConfirm', { word: deleteConfirmWord })}`,
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('settingsScreen.deleteAccountConfirmButton'), style: 'destructive', onPress: handleDeleteAccount },
+        {
+          text: t('settingsScreen.deleteAccountConfirmButton'),
+          style: 'destructive',
+          onPress: (text?: string) => {
+            if ((text ?? '').trim().toUpperCase() === deleteConfirmWord) {
+              performDeleteAccount();
+            } else {
+              Alert.alert(
+                t('settingsScreen.deleteAccountMismatchTitle'),
+                t('settingsScreen.deleteAccountMismatchBody', { word: deleteConfirmWord }),
+                [{ text: t('common.ok'), onPress: promptDeleteConfirmIOS }],
+              );
+            }
+          },
+        },
       ],
-      { cancelable: true }
+      'plain-text',
     );
   }
 
-  async function handleDeleteAccount() {
+  function closeDeleteConfirm() {
+    setDeleteConfirmVisible(false);
+    setDeleteConfirmInput('');
+  }
+
+  async function performDeleteAccount() {
+    setDeleteConfirmVisible(false);
     try {
       await deleteAccount();
     } catch {
@@ -269,6 +312,8 @@ export function SettingsScreen() {
         t('settingsScreen.deleteAccountFailedTitle'),
         t('settingsScreen.deleteAccountFailedBody'),
       );
+    } finally {
+      setDeleteConfirmInput('');
     }
   }
 
@@ -1274,6 +1319,12 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settingsScreen.account')}</Text>
           <View style={styles.card}>
+            {user?.email && (
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>{t('settingsScreen.email')}</Text>
+                <Text style={styles.rowValue} numberOfLines={1} ellipsizeMode="middle">{user.email}</Text>
+              </View>
+            )}
             <TouchableOpacity
               style={styles.row}
               onPress={() =>
@@ -1375,6 +1426,41 @@ export function SettingsScreen() {
         onReorderGoals={goToGoalReorder}
         initialGoalId={null}
       />
+
+      <Modal visible={deleteConfirmVisible} transparent animationType="fade" onRequestClose={closeDeleteConfirm}>
+        <View style={styles.deleteConfirmBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeDeleteConfirm} />
+          <View style={styles.deleteConfirmCard}>
+            <Text style={styles.deleteConfirmTitle}>{t('settingsScreen.deleteAccountFinalTitle')}</Text>
+            <Text style={styles.deleteConfirmBody}>{t('settingsScreen.deleteAccountFinalBody')}</Text>
+            <Text style={styles.deleteConfirmInstructions}>
+              {t('settingsScreen.deleteAccountTypeToConfirm', { word: deleteConfirmWord })}
+            </Text>
+            <TextInput
+              style={styles.deleteConfirmInput}
+              value={deleteConfirmInput}
+              onChangeText={setDeleteConfirmInput}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              placeholder={deleteConfirmWord}
+              placeholderTextColor={Colors.textLight}
+            />
+            <View style={styles.deleteConfirmButtonRow}>
+              <TouchableOpacity style={styles.deleteConfirmCancelButton} onPress={closeDeleteConfirm}>
+                <Text style={styles.deleteConfirmCancelText}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteConfirmDeleteButton, !deleteConfirmMatches && styles.deleteConfirmDeleteButtonDisabled]}
+                disabled={!deleteConfirmMatches}
+                onPress={performDeleteAccount}
+              >
+                <Text style={styles.deleteConfirmDeleteText}>{t('settingsScreen.deleteAccountConfirmButton')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1539,6 +1625,79 @@ function makeStyles(C: ColorPalette) {
       color: C.textLight,
       marginTop: 4,
       alignSelf: 'flex-end',
+    },
+    deleteConfirmBackdrop: {
+      flex: 1,
+      backgroundColor: C.modalBackdrop,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    deleteConfirmCard: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: C.card,
+      borderRadius: 14,
+      padding: 20,
+    },
+    deleteConfirmTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: C.text,
+      marginBottom: 8,
+    },
+    deleteConfirmBody: {
+      fontSize: 14,
+      color: C.textSecondary,
+      lineHeight: 20,
+    },
+    deleteConfirmInstructions: {
+      fontSize: 14,
+      color: C.text,
+      marginTop: 14,
+      marginBottom: 8,
+    },
+    deleteConfirmInput: {
+      backgroundColor: C.inputBg,
+      borderWidth: 1,
+      borderColor: C.inputBorder,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: C.text,
+    },
+    deleteConfirmButtonRow: {
+      flexDirection: 'row',
+      marginTop: 20,
+      gap: 12,
+    },
+    deleteConfirmCancelButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      backgroundColor: C.inputBg,
+      alignItems: 'center',
+    },
+    deleteConfirmCancelText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.text,
+    },
+    deleteConfirmDeleteButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      backgroundColor: C.danger,
+      alignItems: 'center',
+    },
+    deleteConfirmDeleteButtonDisabled: {
+      opacity: 0.4,
+    },
+    deleteConfirmDeleteText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.white,
     },
   });
 }

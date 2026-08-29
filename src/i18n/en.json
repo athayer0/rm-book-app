@@ -555,6 +555,7 @@
       "google": "Google"
     },
     "account": "ACCOUNT",
+    "email": "Email",
     "signOutTitle": "Sign Out",
     "signOutBody": "Are you sure you want to sign out?",
     "deleteAccountTitle": "Delete Account",
@@ -562,6 +563,9 @@
     "deleteAccountContinueButton": "Continue",
     "deleteAccountFinalTitle": "Are you absolutely sure?",
     "deleteAccountFinalBody": "There is no way to recover your account or data once it's deleted.",
+    "deleteAccountTypeToConfirm": "Type {{word}} to confirm.",
+    "deleteAccountMismatchTitle": "Not Quite",
+    "deleteAccountMismatchBody": "Type {{word}} exactly to confirm.",
     "deleteAccountConfirmButton": "Delete My Account",
     "deleteAccountFailedTitle": "Couldn't Delete Account",
     "deleteAccountFailedBody": "Something went wrong. Check your connection and try again.",

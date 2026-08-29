@@ -76,6 +76,12 @@ export const LightColors = {
   // and weighted per theme: the same alpha that reads as a wash on white
   // disappears on a dark card.
   rowSelectedBg: 'rgba(19,46,93,0.10)',
+  // GoalCard's press feedback: tinted with `success`/`danger` (same hex in both
+  // themes), while the grey "this is now a hold" state reuses `rowPressedBg`
+  // rather than getting its own token — it's the same "touched, no verdict yet"
+  // meaning a list row's press state already carries.
+  goalCardIncrementBg: 'rgba(39,174,96,0.18)',
+  goalCardDecrementBg: 'rgba(231,76,60,0.18)',
   // Navy, for the "add a thing" text actions — "Set goal" and "Add a Goal +" in
   // the goal sheets, "Add Event Type" in the types sheet. Named for where it
   // started. The two editors' add-rows ("Add Person", "Add contact method",
@@ -176,6 +182,11 @@ export const DarkColors: typeof LightColors = {
   rowPressedBg: 'rgba(160,160,160,0.2)',
   // The dark-mode `control` is the pale blue, so the tint follows it there.
   rowSelectedBg: 'rgba(120,163,196,0.20)',
+  // Same hue as the light values (`success`/`danger` don't shift between
+  // themes) but heavier, the same 2x-ish lift `rowSelectedBg` takes going dark
+  // — a wash that reads on white all but disappears on a near-black card.
+  goalCardIncrementBg: 'rgba(39,174,96,0.35)',
+  goalCardDecrementBg: 'rgba(231,76,60,0.35)',
   // Navy is unreadable on the dark background; lift it the same way selectedDayBorder does.
   goalTextAction: '#78A3C4',
   // A fill, not text — navy still reads against the dark card and keeps its white label legible.

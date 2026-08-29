@@ -555,6 +555,7 @@
       "google": "Google"
     },
     "account": "CUENTA",
+    "email": "Correo electrónico",
     "signOutTitle": "Cerrar sesión",
     "signOutBody": "¿Seguro que quieres cerrar sesión?",
     "deleteAccountTitle": "Eliminar cuenta",
@@ -562,6 +563,9 @@
     "deleteAccountContinueButton": "Continuar",
     "deleteAccountFinalTitle": "¿Estás completamente seguro?",
     "deleteAccountFinalBody": "No hay forma de recuperar tu cuenta ni tus datos una vez eliminados.",
+    "deleteAccountTypeToConfirm": "Escribe {{word}} para confirmar.",
+    "deleteAccountMismatchTitle": "No coincide",
+    "deleteAccountMismatchBody": "Escribe {{word}} exactamente para confirmar.",
     "deleteAccountConfirmButton": "Eliminar mi cuenta",
     "deleteAccountFailedTitle": "No se pudo eliminar la cuenta",
     "deleteAccountFailedBody": "Algo salió mal. Revisa tu conexión e inténtalo de nuevo.",

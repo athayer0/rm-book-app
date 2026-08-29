@@ -83,7 +83,7 @@ DEPLOYMENT TASKS
 [x] make sign in more intuitive and clean
 [x] delete an account and make sure that works
 [x] cleaner reset to default settings for the user
-[ ] make the ki cards seem pressed down when tapping and when holding them down
+[x] make the ki cards seem pressed down when tapping and when holding them down
 [ ] walk through new reset settings to make sure they work
 [ ] figure out what to do w dev tools and delete all events and reset all settings buttons
 [ ] improve typing user experience for sign in and verification code entry
