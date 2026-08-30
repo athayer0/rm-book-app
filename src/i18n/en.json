@@ -594,8 +594,6 @@
     "signedOutLocalDataKeptTitle": "Signed out, local data kept",
     "signedOutLocalDataKeptBody_one": "{{count}} change could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
     "signedOutLocalDataKeptBody_other": "{{count}} changes could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
-    "resetWeekTitle": "Reset Week",
-    "resetWeekBody": "This will clear all goal counts and targets for the current week, and restore the built-in Goals (labels, icons, colors, links, targets) to their original values. Custom Goals will not be affected.",
     "resetGoalsTitle": "Restore Default Goals",
     "resetGoalsBody": "Built-in Goals (labels, icons, colors, links, period) will be restored to their original values. Custom Goals, and this week's and month's counts and targets, will not be affected. This cannot be undone.",
     "resetEventsTitle": "Restore Default Events",

@@ -125,7 +125,7 @@ export function SettingsScreen() {
 
   const { settings, updateSettings } = useSettings();
   const {
-    resetAll, resetBuiltInDefinitions,
+    resetBuiltInDefinitions,
     definitions: goalDefinitions, allDefinitions: allGoalDefinitions, updateDefinitions: updateGoalDefinitions,
   } = useWeeklyGoals();
   const {
@@ -362,24 +362,6 @@ export function SettingsScreen() {
     if (eventScheme) applyEventColorScheme(eventScheme);
     const goalScheme = GOAL_COLOR_SCHEMES.find(s => s.id === scheme.colorSchemeId);
     if (goalScheme) applyGoalColorScheme(goalScheme);
-  }
-
-  function handleResetWeek() {
-    Alert.alert(
-      t('settingsScreen.resetWeekTitle'),
-      t('settingsScreen.resetWeekBody'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.reset'),
-          style: 'destructive',
-          onPress: () => {
-            resetAll();
-            resetBuiltInDefinitions();
-          },
-        },
-      ],
-    );
   }
 
   // Per-type editing lives in EventTypesModal's edit sheet, one type at a
@@ -1262,13 +1244,32 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Dev Tools */}
+        {/* Account */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DEV TOOLS</Text>
+          <Text style={styles.sectionTitle}>{t('settingsScreen.account')}</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.row} onPress={handleResetWeek}>
-              <Text style={[styles.rowLabel, { color: Colors.danger }]}>Reset Counts & Targets</Text>
-              <Ionicons name="refresh" size={18} color={Colors.danger} />
+            {user?.email && (
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>{t('settingsScreen.email')}</Text>
+                <Text style={styles.rowValue} numberOfLines={1} ellipsizeMode="middle">{user.email}</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() =>
+                Alert.alert(
+                  t('settingsScreen.signOutTitle'),
+                  t('settingsScreen.signOutBody'),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('settingsScreen.signOutTitle'), style: 'destructive', onPress: handleSignOut },
+                  ],
+                  { cancelable: true }
+                )
+              }
+            >
+              <Text style={[styles.rowLabel, { color: Colors.danger }]}>{t('settingsScreen.signOutTitle')}</Text>
+              <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.row}
@@ -1296,7 +1297,7 @@ export function SettingsScreen() {
               <Ionicons name="refresh-outline" size={18} color={Colors.danger} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.row, styles.rowLast]}
+              style={styles.row}
               onPress={() =>
                 Alert.alert(
                   'Delete All Events',
@@ -1311,36 +1312,6 @@ export function SettingsScreen() {
             >
               <Text style={[styles.rowLabel, { color: Colors.danger }]}>Delete All Events</Text>
               <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Account */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settingsScreen.account')}</Text>
-          <View style={styles.card}>
-            {user?.email && (
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>{t('settingsScreen.email')}</Text>
-                <Text style={styles.rowValue} numberOfLines={1} ellipsizeMode="middle">{user.email}</Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() =>
-                Alert.alert(
-                  t('settingsScreen.signOutTitle'),
-                  t('settingsScreen.signOutBody'),
-                  [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    { text: t('settingsScreen.signOutTitle'), style: 'destructive', onPress: handleSignOut },
-                  ],
-                  { cancelable: true }
-                )
-              }
-            >
-              <Text style={[styles.rowLabel, { color: Colors.danger }]}>{t('settingsScreen.signOutTitle')}</Text>
-              <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.row, styles.rowLast]}

@@ -142,30 +142,6 @@ export function useWeeklyGoals() {
     });
   }, [user]);
 
-  /**
-   * Force every goal to read zero for the current week, and clear the targets
-   * set for it — a full reset back to "week not planned yet" rather than just
-   * zeroing progress against whatever targets were left in place.
-   *
-   * Completed events cannot be un-completed from here, so zeroing means offsetting
-   * their contribution: the offset is the negative of what the week derives. Goals
-   * with nothing derived store no offset at all, which keeps the file free of
-   * zero entries that would otherwise be indistinguishable from a real edit.
-   */
-  const resetAll = useCallback(async () => {
-    const offsets: WeeklyCounts = {};
-    for (const def of definitions) {
-      const contributed = derived[def.id] ?? 0;
-      if (contributed > 0) offsets[def.id] = -contributed;
-    }
-    await offsetsState.write(() => offsets);
-    await targetsState.write(() => ({}));
-    for (const def of definitions) {
-      await syncCount(def.id, weekKey, offsets[def.id] ?? 0);
-      await syncTarget(def.id, weekKey, 0);
-    }
-  }, [offsetsState, targetsState, definitions, derived, syncCount, syncTarget, weekKey]);
-
   const updateDefinitions = useCallback(async (defs: GoalDefinition[]) => {
     await defsState.write(() => defs);
     if (!user) return;
@@ -248,5 +224,5 @@ export function useWeeklyGoals() {
   const loaded = defsState.loaded && offsetsState.loaded && targetsState.loaded
     && eventsLoaded && statusesLoaded && typeDefsLoaded;
 
-  return { definitions, allDefinitions, counts, goals, resetAll, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek, loaded };
+  return { definitions, allDefinitions, counts, goals, updateDefinitions, resetBuiltInDefinitions, reload, getWeekData, saveCountForWeek, saveGoalForWeek, loaded };
 }

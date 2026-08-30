@@ -594,8 +594,6 @@
     "signedOutLocalDataKeptTitle": "Sesión cerrada, datos locales conservados",
     "signedOutLocalDataKeptBody_one": "{{count}} cambio no se pudo sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
     "signedOutLocalDataKeptBody_other": "{{count}} cambios no se pudieron sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
-    "resetWeekTitle": "Restablecer semana",
-    "resetWeekBody": "Esto borrará todos los conteos y metas de la semana actual, y restaurará las Metas integradas (nombres, íconos, colores, vínculos, objetivos) a sus valores originales. Las Metas personalizadas no se verán afectadas.",
     "resetGoalsTitle": "Restaurar metas predeterminadas",
     "resetGoalsBody": "Las Metas integradas (nombres, íconos, colores, vínculos, período) se restaurarán a sus valores originales. Las Metas personalizadas, y los conteos y objetivos de esta semana y mes, no se verán afectados. Esto no se puede deshacer.",
     "resetEventsTitle": "Restaurar eventos predeterminados",
