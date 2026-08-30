@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 
 /** The grid only has room for so many before it turns into a wall of cards. */
-export const MAX_VISIBLE_GOALS = 10;
+export const MAX_VISIBLE_GOALS = 12;
 
 /**
  * Ceiling for any goal-related number a person types in by hand: a weekly/

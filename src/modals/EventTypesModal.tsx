@@ -10,7 +10,7 @@ import { lightenColor } from '../utils/colorUtils';
 import type { ColorPalette } from '../constants/colors';
 import { EventColors, DEFAULT_GOAL_COLOR } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { DEFAULT_GOAL_SPLIT_TIME, EventTypeDefinition, eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
+import { DEFAULT_GOAL_SPLIT_TIME, MAX_EVENT_TYPES, EventTypeDefinition, eventTypeDisplayLabel } from '../constants/eventTypeDefaults';
 import { displayTime } from '../utils/dateUtils';
 import { GoalDefinition, goalDisplayLabel } from '../constants/defaultGoals';
 import { GoalIcon } from '../components/GoalIcon';
@@ -117,6 +117,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
   // Falls back to the first type so a delete, or a stale id, can never leave the
   // fields pointed at nothing while types still exist.
   const selected = activeDefs.find(d => d.id === selectedId) ?? activeDefs[0];
+  const canAddType = activeDefs.length < MAX_EVENT_TYPES;
 
   // Edits are committed when the sheet closes — onClose fires first so the
   // slide-out starts immediately rather than waiting on the writes.
@@ -196,6 +197,7 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
    * pair the selector was meant to replace.
    */
   function addType() {
+    if (!canAddType) return;
     const id = `custom_evt_${Date.now()}`;
     const nextOrder = Math.max(0, ...localDefs.map(d => d.order ?? 0)) + 1;
     setLocalDefs(prev => [...prev, {
@@ -701,9 +703,16 @@ export function EventTypesModal({ visible, onClose, definitions, onUpdateDefinit
         {/* The only thing under the card now that deleting has moved up beside
             the name — adding a type is the one action here that isn't editing
             what's already selected. */}
-        <TouchableOpacity onPress={addType} style={styles.addBtn} activeOpacity={0.85}>
-          <Ionicons name="add" size={18} color={Colors.white} />
-          <Text style={styles.addBtnText}>{t('eventTypesModal.addAnEventType')}</Text>
+        <TouchableOpacity
+          onPress={addType}
+          disabled={!canAddType}
+          style={[styles.addBtn, !canAddType && styles.addBtnDisabled]}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={18} color={canAddType ? Colors.white : Colors.textSecondary} />
+          <Text style={[styles.addBtnText, !canAddType && styles.addBtnTextDisabled]}>
+            {canAddType ? t('eventTypesModal.addAnEventType') : t('eventTypesModal.maxEventTypes', { max: MAX_EVENT_TYPES })}
+          </Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -946,5 +955,7 @@ function makeStyles(C: ColorPalette) {
       fontWeight: '700',
       color: C.white,
     },
+    addBtnDisabled: { backgroundColor: C.border },
+    addBtnTextDisabled: { color: C.textSecondary },
   });
 }

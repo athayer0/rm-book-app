@@ -100,7 +100,7 @@
     "searchPlaceholder": "Buscar contactos...",
     "loadingContacts": "Cargando contactos…",
     "accessDeniedTitle": "Acceso a contactos denegado",
-    "accessDeniedBody": "Permite el acceso en Ajustes para importar personas de tu teléfono — seguirás eligiendo exactamente quién se añade, nada sucede automáticamente.",
+    "accessDeniedBody": "Permite el acceso en Ajustes para importar personas de tu teléfono. Seguirás eligiendo exactamente quién se añade, nada sucede automáticamente.",
     "openSettings": "Abrir Ajustes",
     "couldntLoadTitle": "No se pudieron cargar los contactos",
     "couldntLoadBody": "Algo salió mal al leer tus contactos.",
@@ -108,7 +108,7 @@
     "onlySomeShared": "Solo se compartieron algunos contactos.",
     "manageSettings": "Administrar ajustes",
     "noContactsSharedYet": "Aún no se han compartido contactos",
-    "optionalSharingHint": "Eso está totalmente bien — compartir contactos es opcional. Elige solo a las personas que quieras importar, o pasa esto por completo.",
+    "optionalSharingHint": "Eso está totalmente bien, compartir contactos es opcional. Elige solo a las personas que quieras importar, o pasa esto por completo.",
     "chooseContacts": "Elegir contactos",
     "added": "Añadido"
   },
@@ -387,7 +387,7 @@
       "monthly": "Mensual",
       "both": "Ambos"
     },
-    "periodLimitHint": "Cada cuadrícula muestra un máximo de {{max}} metas — quita otra meta primero.",
+    "periodLimitHint": "Cada cuadrícula muestra un máximo de {{max}} metas. Quita otra meta primero.",
     "linkedEventType": "Tipo de evento vinculado",
     "linkedEventTypeEvening": "{{type}} (noche)",
     "emptyHint": "Añade una meta para empezar a seguirla.",
@@ -468,7 +468,7 @@
     "removeMessenger": "Quitar Messenger",
     "messengerPlaceholder": "Enlace de perfil o nombre de usuario",
     "messengerHintBounce": "Se abre a través de m.me, que puede rebotar por el navegador. Guardar su enlace profile.php?id=… en su lugar entra directo a Messenger.",
-    "messengerHintShareLink": "Ese es un enlace para compartir — solo Facebook puede expandirlo. Ábrelo en un navegador y luego copia la dirección facebook.com/… a la que llega.",
+    "messengerHintShareLink": "Ese es un enlace para compartir, solo Facebook puede expandirlo. Ábrelo en un navegador y luego copia la dirección facebook.com/… a la que llega.",
     "messengerHintUnrecognized": "No se pudo leer un perfil de eso. Pega su enlace de facebook.com o m.me, o solo su nombre de usuario.",
     "addContactMethod": "Añadir método de contacto",
     "removeAddress": "Quitar dirección",
@@ -574,8 +574,8 @@
     "version": "Versión",
     "replayOnboarding": "Repetir introducción",
     "scriptureQuote": "\"Mas sed hacedores de la palabra, y no tan solamente oidores, engañándoos a vosotros mismos.\"",
-    "scriptureRef": "— Santiago 1:22",
-    "signedOutLocalDataKeptTitle": "Sesión cerrada — datos locales conservados",
+    "scriptureRef": "Santiago 1:22",
+    "signedOutLocalDataKeptTitle": "Sesión cerrada, datos locales conservados",
     "signedOutLocalDataKeptBody_one": "{{count}} cambio no se pudo sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
     "signedOutLocalDataKeptBody_other": "{{count}} cambios no se pudieron sincronizar, así que la copia de este dispositivo se dejó tal cual. Vuelve a conectarte e inicia sesión de nuevo para terminar de sincronizar.",
     "resetWeekTitle": "Restablecer semana",
@@ -657,7 +657,7 @@
   },
   "quickAddTypes": {
     "title": "Añadir rápido",
-    "maxReached": "Se alcanzó el máximo de {{max}} — quita uno para añadir otro.",
+    "maxReached": "Se alcanzó el máximo de {{max}}. Quita uno para añadir otro.",
     "chooseUpTo": "Elige hasta {{max}} tipos para mostrar como burbujas de añadido rápido en el botón + del calendario."
   },
   "goalPeriodList": {
@@ -713,7 +713,8 @@
     },
     "defaultDuration": "Duración predeterminada",
     "emptyHint": "Añade un tipo de evento para empezar a programarlo.",
-    "addAnEventType": "Añadir un tipo de evento"
+    "addAnEventType": "Añadir un tipo de evento",
+    "maxEventTypes": "Se alcanzó el máximo de {{max}} tipos de evento"
   },
   "personPicker": {
     "title": "Seleccionar personas",

@@ -100,7 +100,7 @@
     "searchPlaceholder": "Search contacts...",
     "loadingContacts": "Loading contacts…",
     "accessDeniedTitle": "Contacts access denied",
-    "accessDeniedBody": "Allow access in Settings to import people from your phone — you'll still choose exactly who gets added, nothing happens automatically.",
+    "accessDeniedBody": "Allow access in Settings to import people from your phone. You'll still choose exactly who gets added, nothing happens automatically.",
     "openSettings": "Open Settings",
     "couldntLoadTitle": "Couldn't load contacts",
     "couldntLoadBody": "Something went wrong reading your contacts.",
@@ -108,7 +108,7 @@
     "onlySomeShared": "Only some contacts shared.",
     "manageSettings": "Manage Settings",
     "noContactsSharedYet": "No contacts shared yet",
-    "optionalSharingHint": "That's completely fine — sharing contacts is optional. Choose just the people you'd like to import, or skip this entirely.",
+    "optionalSharingHint": "That's completely fine, sharing contacts is optional. Choose just the people you'd like to import, or skip this entirely.",
     "chooseContacts": "Choose Contacts",
     "added": "Added"
   },
@@ -387,14 +387,14 @@
       "monthly": "Monthly",
       "both": "Both"
     },
-    "periodLimitHint": "Each grid shows at most {{max}} goals — move another goal off it first.",
+    "periodLimitHint": "Each grid shows at most {{max}} goals. Move another goal off it first.",
     "linkedEventType": "Linked Event Type",
     "linkedEventTypeEvening": "{{type}} (evening)",
     "emptyHint": "Add a goal to start tracking one.",
     "addAGoal": "Add a Goal",
     "maxGoalsPerGrid": "Maximum of {{max}} goals per grid",
     "reorderGoals": "Reorder Goals",
-    "deleteLinkedGoalBody": "\"{{goal}}\" is linked to {{type}}. Deleting it will also unlink {{type}} — its completions will stop counting toward any goal until you link a new one. This cannot be undone.",
+    "deleteLinkedGoalBody": "\"{{goal}}\" is linked to {{type}}. Deleting it will also unlink {{type}}, so its completions will stop counting toward any goal until you link a new one. This cannot be undone.",
     "deleteGoalTitle": "Delete \"{{name}}\"?",
     "cannotBeUndone": "This cannot be undone."
   },
@@ -468,7 +468,7 @@
     "removeMessenger": "Remove Messenger",
     "messengerPlaceholder": "Profile link or username",
     "messengerHintBounce": "Opens through m.me, which may bounce via the browser. Saving their profile.php?id=… link instead jumps straight into Messenger.",
-    "messengerHintShareLink": "That’s a share link — only Facebook can expand it. Open it in a browser, then copy the facebook.com/… address it lands on.",
+    "messengerHintShareLink": "That’s a share link, and only Facebook can expand it. Open it in a browser, then copy the facebook.com/… address it lands on.",
     "messengerHintUnrecognized": "Couldn’t read a profile out of that. Paste their facebook.com or m.me link, or just their username.",
     "addContactMethod": "Add contact method",
     "removeAddress": "Remove address",
@@ -559,7 +559,7 @@
     "signOutTitle": "Sign Out",
     "signOutBody": "Are you sure you want to sign out?",
     "deleteAccountTitle": "Delete Account",
-    "deleteAccountBody": "This will permanently delete your account and everything in it — people, events, goals, and settings. This cannot be undone.",
+    "deleteAccountBody": "This will permanently delete your account and everything in it: people, events, goals, and settings. This cannot be undone.",
     "deleteAccountContinueButton": "Continue",
     "deleteAccountFinalTitle": "Are you absolutely sure?",
     "deleteAccountFinalBody": "There is no way to recover your account or data once it's deleted.",
@@ -574,8 +574,8 @@
     "version": "Version",
     "replayOnboarding": "Replay Onboarding",
     "scriptureQuote": "\"But be ye doers of the word, and not hearers only.\"",
-    "scriptureRef": "— James 1:22",
-    "signedOutLocalDataKeptTitle": "Signed out — local data kept",
+    "scriptureRef": "James 1:22",
+    "signedOutLocalDataKeptTitle": "Signed out, local data kept",
     "signedOutLocalDataKeptBody_one": "{{count}} change could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
     "signedOutLocalDataKeptBody_other": "{{count}} changes could not be synced, so this device's copy was left in place. Reconnect and sign in again to finish syncing.",
     "resetWeekTitle": "Reset Week",
@@ -657,7 +657,7 @@
   },
   "quickAddTypes": {
     "title": "Quick Add",
-    "maxReached": "Maximum of {{max}} reached — remove one to add another.",
+    "maxReached": "Maximum of {{max}} reached. Remove one to add another.",
     "chooseUpTo": "Choose up to {{max}} types to show as quick-add bubbles on the calendar's + button."
   },
   "goalPeriodList": {
@@ -713,7 +713,8 @@
     },
     "defaultDuration": "Default Duration",
     "emptyHint": "Add an event type to start scheduling one.",
-    "addAnEventType": "Add an Event Type"
+    "addAnEventType": "Add an Event Type",
+    "maxEventTypes": "Maximum of {{max}} event types reached"
   },
   "personPicker": {
     "title": "Select People",

@@ -9,6 +9,9 @@ import { EventColors, EventTypeLabels } from './colors';
  */
 export const DEFAULT_GOAL_SPLIT_TIME = '2:00 PM';
 
+/** The type picker only has room for so many before it turns into a wall of rows. */
+export const MAX_EVENT_TYPES = 20;
+
 export interface EventTypeDefinition {
   id: string;
   label: string;
