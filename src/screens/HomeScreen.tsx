@@ -191,7 +191,7 @@ export function HomeScreen({ navigation, route }: any) {
                 them across two cards implied two independent features. EDIT sits on
                 the first heading only — there is one goals sheet for both grains.
                 Definitions editing itself (name/icon/color/link) has moved entirely
-                to Settings' Goal Types > Customize; EDIT here and a long-press on a
+                to Settings' Goal Types > Edit Goals; EDIT here and a long-press on a
                 card both just open GoalsModal now — EDIT on the general list, a
                 long-press scoped straight to that goal's set-target dialog. */}
             <View style={styles.card}>

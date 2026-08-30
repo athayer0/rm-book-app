@@ -86,8 +86,8 @@ DEPLOYMENT TASKS
 [x] make the ki cards seem pressed down when tapping and when holding them down
 [ ] walk through new reset settings to make sure they work
 [ ] figure out what to do w dev tools and delete all events and reset all settings buttons
-[ ] improve typing user experience for sign in and verification code entry
-[ ] make the sign in popups less cryptic
+[x] improve typing user experience for sign in and verification code entry
+[x] make the sign in popups less cryptic
 [ ] update privacy policy and support pages with how the app auth actually works now
 [ ] run security audit one more time
 [ ] make and submit build

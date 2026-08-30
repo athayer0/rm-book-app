@@ -790,13 +790,13 @@ export function SettingsScreen() {
         </View>
 
         {/* Event Types — name/status/goal-link editing plus color and duration
-            both live inside the "Customize" sheet now, per type. Colors and
+            both live inside the "Edit Events" sheet now, per type. Colors and
             durations used to have their own screens listing every type flat;
             those are gone, but one bulk "Restore Default Events" action stays
             here, covering built-in colors, durations, and the type list itself
             together (used to be three separate rows/alerts) — custom types are
             never touched. Color Scheme (applies one of the five named palettes
-            to every built-in type's color in one shot) sits above Customize —
+            to every built-in type's color in one shot) sits above Edit Events —
             it used to live on the Appearance card, but it only ever touches
             event-type colors, so it belongs with the rest of this section's
             controls instead. */}
@@ -842,7 +842,7 @@ export function SettingsScreen() {
             </View>
 
             <TouchableOpacity style={styles.row} onPress={() => setEventSheet('types')}>
-              <Text style={styles.rowLabel}>{t('settingsScreen.customize')}</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.eventTypes.editEvents')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 
@@ -870,12 +870,12 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* Goal Types — mirrors Event Types above. Customize opens the goal
+        {/* Goal Types — mirrors Event Types above. Edit Goals opens the goal
             definitions editor (name/icon/color/period/link), which used to live
             behind the Home screen's EDIT link and a long-press on a card; both
             of those now just open the counts/targets sheet (GoalsModal) instead,
             same as EventTypesModal's own definitions editing has never lived on
-            the Calendar screen. Color Scheme sits above Customize, same
+            the Calendar screen. Color Scheme sits above Edit Goals, same
             reasoning and position as Event Types' own — it used to live on
             the Appearance card, but only ever touches goal colors. Reorder
             hands off to Home's tap-to-order flow over the grids themselves
@@ -924,7 +924,7 @@ export function SettingsScreen() {
             </View>
 
             <TouchableOpacity style={styles.row} onPress={() => setGoalEditVisible(true)}>
-              <Text style={styles.rowLabel}>{t('settingsScreen.customize')}</Text>
+              <Text style={styles.rowLabel}>{t('settingsScreen.goalTypes.editGoals')}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
 

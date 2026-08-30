@@ -623,6 +623,7 @@
       "sectionTitle": "TIPOS DE EVENTO",
       "colorScheme": "Esquema de colores",
       "customScheme": "Personalizado",
+      "editEvents": "Editar eventos",
       "resetEvents": "Restaurar eventos predeterminados"
     },
     "eventBubble": {
@@ -630,6 +631,7 @@
     },
     "goalTypes": {
       "sectionTitle": "TIPOS DE META",
+      "editGoals": "Editar metas",
       "resetGoals": "Restaurar metas predeterminadas"
     },
     "goals": {

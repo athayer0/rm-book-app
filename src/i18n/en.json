@@ -623,6 +623,7 @@
       "sectionTitle": "EVENT TYPES",
       "colorScheme": "Color Scheme",
       "customScheme": "Custom",
+      "editEvents": "Edit Events",
       "resetEvents": "Restore Default Events"
     },
     "eventBubble": {
@@ -630,6 +631,7 @@
     },
     "goalTypes": {
       "sectionTitle": "GOAL TYPES",
+      "editGoals": "Edit Goals",
       "resetGoals": "Restore Default Goals"
     },
     "goals": {
