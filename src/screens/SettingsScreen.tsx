@@ -1275,7 +1275,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Reset Settings to Default',
-                  'This will reset every setting on this screen — theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, maps app, and notification reminders — along with the built-in Goals and Event Types (labels, icons, colors, links, targets), including restoring any that were deleted, to their original values. Your custom Goals, Event Types, counts, and events will not be affected.',
+                  'This will reset every setting on this screen (theme, week start, theme colors, all event colors, default durations, the default contact method, schedule hours, event size, maps app, and notification reminders), along with the built-in Goals and Event Types (labels, icons, colors, links, targets), including restoring any that were deleted, to their original values. Your custom Goals, Event Types, counts, and events will not be affected.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {

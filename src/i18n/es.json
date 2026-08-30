@@ -198,6 +198,22 @@
     "updatePassword": "Actualizar contraseña",
     "passwordUpdated": "Tu contraseña ha sido actualizada."
   },
+  "authErrors": {
+    "invalidCredentials": "Correo o contraseña incorrectos.",
+    "userAlreadyExists": "Ya existe una cuenta con este correo. Intenta iniciar sesión.",
+    "userNotFound": "No encontramos una cuenta con ese correo.",
+    "emailNotConfirmed": "Por favor, confirma tu correo antes de iniciar sesión.",
+    "invalidEmail": "Por favor, introduce un correo electrónico válido.",
+    "weakPassword": "Esa contraseña es demasiado débil. Prueba una más larga o menos común.",
+    "samePassword": "Tu nueva contraseña debe ser diferente a la actual.",
+    "codeExpired": "Ese código ha caducado. Solicita uno nuevo e inténtalo de nuevo.",
+    "signupDisabled": "Los registros no están disponibles en este momento.",
+    "userBanned": "Esta cuenta ya no está disponible.",
+    "rateLimited": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+    "sessionExpired": "Tu sesión ha caducado. Por favor, inicia sesión de nuevo.",
+    "network": "Comprueba tu conexión a internet e inténtalo de nuevo.",
+    "generic": "Algo salió mal. Por favor, inténtalo de nuevo."
+  },
   "common": {
     "save": "Guardar",
     "cancel": "Cancelar",

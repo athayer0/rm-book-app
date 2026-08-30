@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { useColors } from '../hooks/useColors';
 import type { ColorPalette } from '../constants/colors';
+import { authErrorMessage } from '../utils/authErrors';
 
 /** Shown instead of the main app while AuthContext.passwordRecovery is set — see its comment for why. */
 export function ResetPasswordScreen() {
@@ -50,7 +51,7 @@ export function ResetPasswordScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert(t('auth.errorTitle'), error.message);
+      Alert.alert(t('auth.errorTitle'), authErrorMessage(error, t));
       return;
     }
     Alert.alert(t('auth.passwordUpdated'));

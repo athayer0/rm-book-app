@@ -198,6 +198,22 @@
     "updatePassword": "Update Password",
     "passwordUpdated": "Your password has been updated."
   },
+  "authErrors": {
+    "invalidCredentials": "Incorrect email or password.",
+    "userAlreadyExists": "An account with this email already exists. Try signing in instead.",
+    "userNotFound": "We couldn't find an account with that email.",
+    "emailNotConfirmed": "Please confirm your email before signing in.",
+    "invalidEmail": "Please enter a valid email address.",
+    "weakPassword": "That password is too weak. Try a longer or less common one.",
+    "samePassword": "Your new password must be different from your current one.",
+    "codeExpired": "That code has expired. Request a new one and try again.",
+    "signupDisabled": "New sign-ups aren't available right now.",
+    "userBanned": "This account is no longer available.",
+    "rateLimited": "Too many attempts. Please wait a bit and try again.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "network": "Check your internet connection and try again.",
+    "generic": "Something went wrong. Please try again."
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

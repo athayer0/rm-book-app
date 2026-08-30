@@ -26,6 +26,7 @@ import { useColors } from '../hooks/useColors';
 import { useSettings } from '../hooks/useSettings';
 import type { ColorPalette } from '../constants/colors';
 import { AuthSkeleton } from '../components/AuthSkeleton';
+import { authErrorMessage } from '../utils/authErrors';
 
 const FOCUS_EASE = Easing.out(Easing.quad);
 const BLUR_EASE = Easing.in(Easing.quad);
@@ -109,7 +110,7 @@ export function AuthScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert(t('auth.errorTitle'), error.message);
+      Alert.alert(t('auth.errorTitle'), authErrorMessage(error, t));
     } else if (mode === 'signup') {
       setMode('confirmSignup');
     }
@@ -124,7 +125,7 @@ export function AuthScreen() {
     const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'signup' });
     setLoading(false);
 
-    if (error) Alert.alert(t('auth.errorTitle'), error.message);
+    if (error) Alert.alert(t('auth.errorTitle'), authErrorMessage(error, t));
   };
 
   // For a user who closed the app after signing up but before entering the
@@ -155,7 +156,7 @@ export function AuthScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert(t('auth.errorTitle'), error.message);
+      Alert.alert(t('auth.errorTitle'), authErrorMessage(error, t));
     } else {
       setMode('reset');
     }
@@ -174,7 +175,7 @@ export function AuthScreen() {
     const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'recovery' });
     setLoading(false);
 
-    if (error) Alert.alert(t('auth.errorTitle'), error.message);
+    if (error) Alert.alert(t('auth.errorTitle'), authErrorMessage(error, t));
   };
 
   const handleOAuth = async (provider: OAuthProvider) => {
@@ -186,7 +187,7 @@ export function AuthScreen() {
     try {
       await signInWithProvider(provider);
     } catch (err) {
-      Alert.alert(t('auth.errorTitle'), err instanceof Error ? err.message : String(err));
+      Alert.alert(t('auth.errorTitle'), authErrorMessage(err, t));
     } finally {
       setOauthLoading(null);
     }
